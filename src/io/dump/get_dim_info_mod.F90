@@ -40,6 +40,9 @@ USE jules_soil_biogeochem_mod, ONLY:                                           &
 USE jules_snow_mod, ONLY:                                                      &
   nsmax
 
+USE jules_meltlake_mod, ONLY:                                                  &
+  nsmax_ml
+
 USE jules_surface_types_mod, ONLY:                                             &
   npft, ntype, ncpft
 
@@ -61,6 +64,7 @@ USE model_interface_mod, ONLY: bedrock_dim_name => bedrock_dim_name_out,       &
                                tile_dim_name => tile_dim_name_out,             &
                                seed_dim_name => seed_dim_name_out,             &
                                snow_dim_name => snow_dim_name_out,             &
+                               snow_ml_dim_name => snow_ml_dim_name_out,       &
                                soil_dim_name => soil_dim_name_out,             &
                                soilt_dim_name => soilt_dim_name_out,           &
                                scalar_dim_name => scalar_dim_name_out,         &
@@ -202,6 +206,16 @@ CASE ( 'rgrainl', 'snow_ds', 'snow_ice', 'snow_liq', 'tsnow' )
   ndims = 3
   dim_names(1:ndims) = [ land_dim_name, tile_dim_name, snow_dim_name ]
   dim_sizes(1:ndims) = [ global_land_pts, nsurft, nsmax ]
+
+CASE ( 'rgrainl_ml', 'snow_ds_ml', 'snow_ice_ml', 'snow_liq_ml', 'tsnow_ml' )
+  ndims = 2
+  dim_names(1:ndims) = [ land_dim_name, snow_ml_dim_name ]
+  dim_sizes(1:ndims) = [ global_land_pts, nsmax_ml ]
+
+CASE ( 'lake_depth_ml' )
+  ndims = 2
+  dim_names(1:ndims) = [ land_dim_name, tile_dim_name ]
+  dim_sizes(1:ndims) = [ global_land_pts, nsurft ]
 
 CASE ( 'sthuf', 't_soil', 'sthu_irr' )
   ndims = 2

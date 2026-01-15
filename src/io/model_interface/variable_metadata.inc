@@ -9354,4 +9354,147 @@ DATA metadata(722) / var_metadata(                                             &
 ! Units
     "kg s-1"                                                                   &
   ) /
+!-----------------------------------------------------------------------------
+! Metadata for snow_ds_ml
+!-----------------------------------------------------------------------------
+DATA metadata(723) / var_metadata(                                             &
+! String identifier
+    'snow_ds_ml',                                                              &
+! Variable type
+    var_type_snow_ml,                                                          &
+! Long name
+    "Depth of snow layers in melt lake model",                                 &
+! Units
+    "m"                                                                        &
+  ) /
+!-----------------------------------------------------------------------------
+! Metadata for snow_ice_ml
+!-----------------------------------------------------------------------------
+DATA metadata(724) / var_metadata(                                             &
+! String identifier
+    'snow_ice_ml',                                                             &
+! Variable type
+    var_type_snow_ml,                                                          &
+! Long name
+    "Ice mass in snow layers for melt lake model",                             &
+! Units
+    "kg m-2"                                                                   &
+  ) /
+!-----------------------------------------------------------------------------
+! Metadata for snow_liq_ml
+!-----------------------------------------------------------------------------
+DATA metadata(725) / var_metadata(                                             &
+! String identifier
+    'snow_liq_ml',                                                             &
+! Variable type
+    var_type_snow_ml,                                                          &
+! Long name
+    "Liquid mass in snow layers for melt lake model",                          &
+! Units
+    "kg m-2"                                                                   &
+  ) /
+!-----------------------------------------------------------------------------
+! Metadata for tsnow_ml
+!-----------------------------------------------------------------------------
+DATA metadata(726) / var_metadata(                                             &
+! String identifier
+    'tsnow_ml',                                                                &
+! Variable type
+    var_type_snow_ml,                                                          &
+! Long name
+    "Temperature of snow layers for melt lake model",                          &
+! Units
+    "K"                                                                        &
+  ) /
+!-----------------------------------------------------------------------------
+! Metadata for rho_snow_ml
+!-----------------------------------------------------------------------------
+DATA metadata(727) / var_metadata(                                             &
+! String identifier
+    'rho_snow_ml',                                                             &
+! Variable type
+    var_type_snow_ml,                                                          &
+! Long name
+    "Density for snow layers for melt lake model",                             &
+! Units
+    "kg m-3"                                                                   &
+  ) /
+!-----------------------------------------------------------------------------
+! Metadata for sfrac
+!-----------------------------------------------------------------------------
+DATA metadata(728) / var_metadata(                                             &
+! String identifier
+    'sfrac_ml',                                                                &
+! Variable type
+    var_type_snow_ml,                                                          &
+! Long name
+    "Solid fraction for melt lake model",                                      &
+! Units
+    "-"                                                                        &
+  ) /
+!-----------------------------------------------------------------------------
+! Metadata for lfrac
+!-----------------------------------------------------------------------------
+DATA metadata(729) / var_metadata(                                             &
+! String identifier
+    'lfrac_ml',                                                                &
+! Variable type
+    var_type_snow_ml,                                                          &
+! Long name
+    "Liquid fraction for melt lake model",                                     &
+! Units
+    "-"                                                                        &
+  ) /
+!-----------------------------------------------------------------------------
+!! Metadata for melt lake depth
+!!-----------------------------------------------------------------------------
+DATA metadata(730) / var_metadata(                                             &
+! String identifier 
+    'lake_depth_ml',                                                           &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    "Melt lake depth",                                                         &
+! Units
+    "m"                                                                        &
+ ) /
+!-----------------------------------------------------------------------------
+!! Metadata for melt lake albedo
+!!-----------------------------------------------------------------------------
+DATA metadata(731) / var_metadata(                                             &
+! String identifier 
+    'lake_albedo_ml',                                                          &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    "Melt lake albedo",                                                         &
+! Units
+    "-"                                                                        &
+ ) /
+ !-----------------------------------------------------------------------------
+!! Metadata for melt lake temperature
+!!-----------------------------------------------------------------------------
+DATA metadata(732) / var_metadata(                                             &
+! String identifier 
+    'lake_temp_ml',                                                            &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    "Melt lake temperature",                                                   &
+! Units
+    "Kelvin"                                                                  &
+ ) /
+ !-----------------------------------------------------------------------------
+!! Metadata for melt lake exists mask
+!!-----------------------------------------------------------------------------
+!DATA metadata(733) / var_metadata(                                             &
+!! String identifier 
+!    'is_meltlake',                                                             &
+!! Variable type
+!    var_type_surft,                                                            &
+!! Long name
+!    "Melt lake mask",                                                          &
+!! Units
+!    "-"                                                                        &
+! ) /
 #endif

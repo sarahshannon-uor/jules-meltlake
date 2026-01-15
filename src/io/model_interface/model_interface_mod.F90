@@ -44,6 +44,7 @@ CHARACTER(LEN=max_sdf_name_len), PARAMETER ::                                  &
   tile_dim_name_out         = 'tile',                                          &
   soilt_dim_name_out        = 'soilt',                                         &
   snow_dim_name_out         = 'snow',                                          &
+  snow_ml_dim_name_out      = 'snow_ml',                                       &
   soil_dim_name_out         = 'soil',                                          &
   scpool_dim_name_out       = 'scpool',                                        &
   soil_n_pool_dim_name_out  = 'snpool',                                        &
@@ -75,6 +76,7 @@ CHARACTER(LEN=max_sdf_name_len) ::                                             &
   tile_dim_name     = 'tile',                                                  &
   soilt_dim_name    = 'soilt',                                                 &
   snow_dim_name     = 'snow',                                                  &
+  snow_ml_dim_name  = 'snow_ml',                                               &
   soil_dim_name     = 'soil',                                                  &
   scpool_dim_name   = 'scpool',                                                &
   soil_n_pool_dim_name  = 'snpool',                                            &
@@ -101,6 +103,7 @@ INTEGER ::                                                                     &
   tile_dim_size        = -1,                                                   &
   soilt_dim_size       = -1,                                                   &
   snow_dim_size        = -1,                                                   &
+  snow_ml_dim_size     = -1,                                                   &
   soil_dim_size        = -1,                                                   &
   scpool_dim_size      = -1,                                                   &
   soil_n_pool_dim_size = -1,                                                   &
@@ -156,7 +159,8 @@ INTEGER, PARAMETER ::                                                          &
   var_type_cable1L_snow   = var_type_cable_snow + 1,                           &
   var_type_imogen_drive   = var_type_cable1L_snow + 1,                         &
   var_type_nmasst         = var_type_imogen_drive + 1,                         &
-  var_type_imogen_clim    = var_type_nmasst + 1
+  var_type_imogen_clim    = var_type_nmasst + 1,                               &
+  var_type_snow_ml        = var_type_imogen_clim + 1
 
 ! Derived type to contain metadata about model variables
 TYPE :: var_metadata
@@ -176,7 +180,7 @@ END TYPE var_metadata
 ! Array holding the metadata for all model variables that we can use for input
 ! or output. The CABLE land surface model adds 10 prognostics for tiled
 ! soil/snow prognostics.
-INTEGER, PARAMETER :: n_vars = 722
+INTEGER, PARAMETER :: n_vars = 733
 TYPE(var_metadata) :: metadata(n_vars)
 
 ! Include the metadata DATA statement
@@ -191,8 +195,8 @@ PUBLIC                                                                         &
 ! Parameters
     identifier_len, bl_level_dim_name_out,                                     &
     pft_dim_name_out, quantile_dim_name_out, cpft_dim_name_out,                &
-    nvg_dim_name_out, type_dim_name_out,                                       &
-    tile_dim_name_out, soilt_dim_name_out, snow_dim_name_out,                  &
+    nvg_dim_name_out, type_dim_name_out, tile_dim_name_out,                    &
+    soilt_dim_name_out, snow_dim_name_out, snow_ml_dim_name_out,               &
     soil_dim_name_out, scpool_dim_name_out, soil_n_pool_dim_name_out,          &
     bedrock_dim_name_out, nmasst_dim_name_out, sclayer_dim_name_out,           &
     dep_species_dim_name_out, ch4layer_dim_name_out,                           &
@@ -202,14 +206,14 @@ PUBLIC                                                                         &
 ! Variables
     bl_level_dim_name, pft_dim_name, quantile_dim_name,                        &
     cpft_dim_name, nvg_dim_name, type_dim_name, tile_dim_name,                 &
-    soilt_dim_name, snow_dim_name, soil_dim_name, scpool_dim_name,             &
-    soil_n_pool_dim_name, bedrock_dim_name, nmasst_dim_name,                   &
+    soilt_dim_name, snow_dim_name, snow_ml_dim_name, soil_dim_name,            &
+    scpool_dim_name, soil_n_pool_dim_name, bedrock_dim_name, nmasst_dim_name,  &
     sclayer_dim_name, imogen_drive_dim_name, dep_species_dim_name,             &
     imogen_clim_dim_name, clim_time_dim_name,                                  &
     bl_level_dim_size, pft_dim_size, quantile_dim_size, cpft_dim_size,         &
     nvg_dim_size, imogen_drive_dim_size, nmasst_dim_size,                      &
     imogen_clim_dim_size, monthly_climatology_dim_size,                        &
-    type_dim_size, tile_dim_size, soilt_dim_size, snow_dim_size,               &
+    type_dim_size, tile_dim_size, soilt_dim_size, snow_dim_size, snow_ml_dim_size,              &
     soil_dim_size, scpool_dim_size, soil_n_pool_dim_size, bedrock_dim_size,    &
     sclayer_dim_size, dep_species_dim_size, ch4layer_dim_size,                 &
     cable_tile_dim_size, cable_snow_dim_size, cable_soil_dim_size,             &

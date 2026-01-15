@@ -10,8 +10,8 @@ SUBROUTINE populate_var(var_id, cube, const_val)
 USE jules_fields_mod, ONLY: crop_vars, psparms, toppdm, fire_vars, ainfo,      &
                             trif_vars, soilecosse, urban_param, progs,         &
                             trifctltype, jules_vars, fluxes, forcing,          &
-                            lake_vars, chemvars, rivers, water_resources,      &
-							jules_vars_data
+                            lake_vars, meltlake_vars, chemvars, rivers,        &
+                            water_resources, jules_vars_data
 
   !Science variables
 ! TYPE Definitions
@@ -1940,6 +1940,79 @@ CASE ( 'rgrainl' )
     progs%rgrainl_surft(:,:,:) = const_val
   END IF
 
+CASE ( 'snow_ds_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, progs%ds_surft_ml)
+  ELSE
+    progs%ds_surft_ml(:,:,:) = const_val
+  END IF
+
+CASE ( 'snow_ice_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, progs%sice_surft_ml)
+  ELSE
+    progs%sice_surft_ml(:,:,:) = const_val
+  END IF
+
+CASE ( 'snow_liq_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, progs%sliq_surft_ml)
+  ELSE
+    progs%sliq_surft_ml(:,:,:) = const_val
+  END IF
+
+CASE ( 'tsnow_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, progs%tsnow_surft_ml)
+  ELSE
+    progs%tsnow_surft_ml(:,:,:) = const_val
+  END IF
+
+CASE ( 'rho_snow_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, progs%rho_snow_surft_ml)
+  ELSE
+    progs%rho_snow_surft_ml(:,:,:) = const_val
+  END IF
+  
+ CASE ( 'lake_depth_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, meltlake_vars%lake_depth_ml)
+  ELSE
+    meltlake_vars%lake_depth_ml(:,:) = const_val
+  END IF 
+
+CASE ( 'lake_albedo_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, meltlake_vars%lake_albedo_ml)
+  ELSE
+    meltlake_vars%lake_albedo_ml(:,:) = const_val
+  END IF   
+
+CASE ( 'lake_temp_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, meltlake_vars%lake_temp_ml)
+  ELSE
+    meltlake_vars%lake_temp_ml(:,:) = const_val
+  END IF   
+
+!CASE ( 'is_meltlake' )
+ ! IF ( PRESENT(cube) ) THEN
+ !   cube_land = map_to_land(cube)
+ !   !CALL cube_get_data(cube_land, meltlake_vars%is_meltlake)
+ ! ELSE
+ !   meltlake_vars%is_meltlake(:,:) = const_val
+ ! END IF   
+  
+  
 CASE ( 'f_nsc' )
   IF ( PRESENT(cube) ) THEN
     cube_land = map_to_land(cube)

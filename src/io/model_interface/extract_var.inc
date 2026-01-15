@@ -10,7 +10,8 @@ FUNCTION extract_var(var_id) RESULT(cube)
 USE jules_fields_mod, ONLY: crop_vars, psparms, toppdm, fire_vars, ainfo,      &
                             trif_vars, soilecosse, urban_param, progs,         &
                             trifctltype, jules_vars, fluxes, forcing,          &
-                            lake_vars, chemvars, rivers, water_resources
+                            lake_vars, meltlake_vars, chemvars, rivers,        &
+                            water_resources
 
   !Use subroutines
 ! TYPE Definitions
@@ -2638,6 +2639,51 @@ CASE ( 'tsnow' )
   cube_land = cube_from_array(progs%tsnow_surft)
   cube = map_from_land(cube_land)
 
+CASE ( 'rho_snow_ml' )
+  cube_land = cube_from_array(progs%rho_snow_surft_ml)
+  cube = map_from_land(cube_land)
+
+CASE ( 'snow_ds_ml' )
+  cube_land = cube_from_array(progs%ds_surft_ml)
+  cube = map_from_land(cube_land)
+
+CASE ( 'snow_ice_ml' )
+  cube_land = cube_from_array(progs%sice_surft_ml)
+  cube = map_from_land(cube_land)
+
+CASE ( 'snow_liq_ml' )
+  cube_land = cube_from_array(progs%sliq_surft_ml)
+  cube = map_from_land(cube_land)
+
+CASE ( 'tsnow_ml' )
+  cube_land = cube_from_array(progs%tsnow_surft_ml)
+  cube = map_from_land(cube_land)
+
+CASE ( 'sfrac_ml' )
+  cube_land = cube_from_array(meltlake_vars%sfrac_ml)
+  cube = map_from_land(cube_land)
+
+CASE ( 'lfrac_ml' )
+  cube_land = cube_from_array(meltlake_vars%lfrac_ml)
+  cube = map_from_land(cube_land)
+
+CASE ( 'lake_depth_ml' )
+  cube_land = cube_from_array(meltlake_vars%lake_depth_ml)
+  cube = map_from_land(cube_land)
+
+CASE ( 'lake_albedo_ml' )
+  cube_land = cube_from_array(meltlake_vars%lake_albedo_ml)
+  cube = map_from_land(cube_land)
+  
+CASE ( 'lake_temp_ml' )
+  cube_land = cube_from_array(meltlake_vars%lake_temp_ml)
+  cube = map_from_land(cube_land)
+  
+!CASE ( 'is_meltlake' )
+  !cube_land = cube_from_array(meltlake_vars%is_meltlake)
+!  cube_land = cube_from_array( merge(1.0, 0.0, meltlake_vars%is_meltlake) )
+!  cube = map_from_land(cube_land)
+  
 CASE ( 'rflow' )
   cube_land = cube_from_array(fluxes%rflow_gb)
   cube = map_from_land(cube_land)

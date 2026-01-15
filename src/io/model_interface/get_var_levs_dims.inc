@@ -208,6 +208,23 @@ CASE ( var_type_snow )
   IF ( PRESENT(dim_sizes) )                                                    &
     dim_sizes(1:2) = [ tile_dim_size, snow_dim_size ]
 
+CASE ( var_type_snow_ml )
+  ! Snow variables have 2 levels dimensions
+  IF ( PRESENT(ndims) ) ndims = 2
+  IF ( PRESENT(dim_names_in) )                                                 &
+    dim_names_in(1:2) = [ tile_dim_name, snow_ml_dim_name ]
+  IF ( PRESENT(dim_names_out) )                                                &
+    dim_names_out(1:2) = [ tile_dim_name_out, snow_ml_dim_name_out ]
+  IF ( PRESENT(dim_sizes) )                                                    &
+    dim_sizes(1:2) = [ tile_dim_size, snow_ml_dim_size ]
+
+!CASE ( var_type_snow_ml )
+!  IF ( PRESENT(ndims) ) ndims = 1
+!  IF ( PRESENT(dim_names_in) ) dim_names_in(1) = snow_ml_dim_name
+!  IF ( PRESENT(dim_names_out) ) dim_names_out(1) = snow_ml_dim_name_out
+!  IF ( PRESENT(dim_sizes) ) dim_sizes(1) = snow_ml_dim_size
+
+
 CASE ( var_type_soilt_soil )
   ! Variables with soil tiles and levels
   IF ( PRESENT(ndims) ) ndims = 2
