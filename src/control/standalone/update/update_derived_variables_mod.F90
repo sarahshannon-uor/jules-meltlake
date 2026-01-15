@@ -32,7 +32,7 @@ USE fill_disaggregated_precip_arrays_mod, ONLY: fill_disaggregated_precip_arrays
 
 !Use in relevant variables
 USE datetime_mod,         ONLY: secs_in_day
-USE model_time_mod,       ONLY: current_time, timestep_len
+USE model_time_mod,       ONLY: current_time, timestep_len, timestep_number
 USE jules_forcing_mod,    ONLY: u_1_ij, v_1_ij
 USE jules_vegetation_mod, ONLY: l_croprotate, frac_min
 USE jules_irrig_mod,      ONLY: l_irrig_dmd
@@ -104,6 +104,15 @@ INTEGER :: insd  ! Timestep in day - used to index IMOGEN arrays
 INTEGER :: i,j,l,m,n  ! Index variables
 LOGICAL :: reset_done  ! Indicates if a reset of frac to frac_min was
                          ! performed
+
+! for idealised meltlake test (temporary)
+INTEGER :: cyc, warm_hours 
+INTEGER, PARAMETER :: t_trans = 168
+INTEGER, PARAMETER :: ramp_hours = 24
+REAL :: alpha
+INTEGER :: dt_h
+! for idealised meltlake test (temporary)
+
 !------------------------------------------------------------------------------
 
 
@@ -169,13 +178,98 @@ ELSE
   !------------------------------------------------------------------------------
   ! Apply any perturbations
   IF ( l_perturb_driving ) THEN
-    forcing%tl_1_ij(:,:) = forcing%tl_1_ij(:,:) + temperature_abs_perturbation
+    forcing%tl_1_ij(:,:)     = forcing%tl_1_ij(:,:) + temperature_abs_perturbation
     forcing%con_rain_ij(:,:) = precip_rel_perturbation * forcing%con_rain_ij(:,:)
     forcing%con_snow_ij(:,:) = precip_rel_perturbation * forcing%con_snow_ij(:,:)
     forcing%ls_rain_ij(:,:)  = precip_rel_perturbation * forcing%ls_rain_ij(:,:)
     forcing%ls_snow_ij(:,:)  = precip_rel_perturbation * forcing%ls_snow_ij(:,:)
   END IF
 
+
+  
+  ! linear transition hot --> cold
+  !dt_h = timestep_number - t_trans + 1
+  !IF (dt_h <= 0) THEN
+  !   alpha = 1.0
+  !ELSE IF (dt_h > ramp_hours) THEN
+  !   alpha = 0.0
+  !ELSE
+  !   alpha = 1.0 - REAL(dt_h) / REAL(ramp_hours)
+  !END IF
+
+  ! Warm values
+  !forcing%tl_1_ij(:,:)    = alpha*275.15 + (1.0-alpha)*253.15
+  !forcing%qw_1_ij(:,:)    = alpha*0.003  + (1.0-alpha)*0.001
+  !forcing%sw_down_ij(:,:) = alpha*600.0  + (1.0-alpha)*0.0
+  !forcing%lw_down_ij(:,:) = alpha*380.0  + (1.0-alpha)*140.0
+
+  ! No precipitation
+  !forcing%con_rain_ij(:,:) = 0.0
+  !forcing%ls_rain_ij(:,:)  = 0.0
+  !forcing%con_snow_ij(:,:) = 0.0
+  !forcing%ls_snow_ij(:,:)  = 0.0
+
+  ! Non-zero wind to avoid flux spikes
+  !forcing%u_0_ij(:,:) = 2.0
+  !forcing%v_0_ij(:,:) = 0.0
+  !u_1_ij(:,:)         = 2.0
+  !v_1_ij(:,:)         = 0.0
+  !forcing%pstar_ij(:,:) = 95000.0
+
+
+    IF (timestep_number <= 168) THEN
+    ! 1 day melt, 3 days freeze 
+    !cyc = 96
+    !warm_hours = 24
+    !IF ( MOD(timestep_number-1, cyc) < warm_hours ) THEN
+    ! hot
+    forcing%tl_1_ij(:,:)     = 275.15
+    forcing%qw_1_ij(:,:)     = 0.003
+    forcing%con_rain_ij(:,:) = 0.0!forcing%con_rain_ij(:,:)
+    forcing%ls_rain_ij(:,:)  = 0.0!forcing%ls_rain_ij(:,:)
+    forcing%con_snow_ij(:,:) = 0.0!forcing%con_snow_ij(:,:)
+    forcing%ls_snow_ij(:,:)  = 0.0!forcing%ls_snow_ij(:,:)
+    forcing%sw_down_ij(:,:)  = 600.0
+    forcing%lw_down_ij(:,:)  = 350.0
+    forcing%u_0_ij(:,:)      = 2.0
+    forcing%v_0_ij(:,:)      = 0.0
+    u_1_ij(:,:)              = 2.0
+    v_1_ij(:,:)              = 0.0
+    forcing%pstar_ij(:,:)    = 95000 
+    ELSE 
+    ! cold
+    forcing%tl_1_ij(:,:)     = 253.15
+    forcing%qw_1_ij(:,:)     = 0.0003
+    forcing%con_rain_ij(:,:) = 0.0!forcing%con_rain_ij(:,:)
+    forcing%ls_rain_ij(:,:)  = 0.0!forcing%ls_rain_ij(:,:)
+    forcing%con_snow_ij(:,:) = 0.0!forcing%con_snow_ij(:,:)
+    forcing%ls_snow_ij(:,:)  = 0.0!forcing%ls_snow_ij(:,:)
+    forcing%sw_down_ij(:,:)  = 0.0
+    forcing%lw_down_ij(:,:)  = 140.0
+    forcing%u_0_ij(:,:)      = 2.0
+    forcing%v_0_ij(:,:)      = 0.0
+    u_1_ij(:,:)              = 2.0
+    v_1_ij(:,:)              = 0.0
+    forcing%pstar_ij(:,:)    = 95000 
+
+    END IF 
+
+
+  ! sarah hack the forcing data
+    !forcing%tl_1_ij(:,:)     = forcing%tl_1_ij(:,:) + 10.0
+    !forcing%qw_1_ij(:,:)     = forcing%qw_1_ij(:,:)
+    !forcing%con_rain_ij(:,:) = 0.0!forcing%con_rain_ij(:,:)
+    !forcing%ls_rain_ij(:,:)  = 0.0!forcing%ls_rain_ij(:,:)
+    !forcing%con_snow_ij(:,:) = 0.0!forcing%con_snow_ij(:,:)
+    !forcing%ls_snow_ij(:,:)  = 0.0!forcing%ls_snow_ij(:,:)
+    !forcing%sw_down_ij(:,:)  = forcing%sw_down_ij(:,:)
+    !forcing%lw_down_ij(:,:)  = forcing%lw_down_ij(:,:)
+    !forcing%u_0_ij(:,:)      = forcing%u_0_ij(:,:)
+    !forcing%v_0_ij(:,:)      = forcing%v_0_ij(:,:)
+    !forcing%pstar_ij(:,:)    = forcing%pstar_ij(:,:) 
+    
+
+  
   IF (l_daily_disagg) THEN
     !-----------------------------------------------------------------------------
     ! If we are using the disaggregator, we need to disaggregate the precip at
