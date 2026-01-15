@@ -18,6 +18,9 @@ user_guide/doc/build
 # ignore VS Code files
 /.idea
 
+# ignore local fcm build script 
+build_fcm_make.sh
+
 # ignore envs
 .env
 .venv
