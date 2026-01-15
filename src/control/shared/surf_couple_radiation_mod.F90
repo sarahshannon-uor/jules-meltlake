@@ -43,6 +43,7 @@ SUBROUTINE surf_couple_radiation(                                              &
   psparms,ainfo,urban_param,progs,coast,jules_vars,                            &
   fluxes,                                                                      &
   lake_vars,                                                                   &
+  meltlake_vars,                                                               &
   !forcing, &
   !rivers, &
   !veg3_parm, &
@@ -62,6 +63,7 @@ USE coastal, ONLY: coastal_type
 USE jules_vars_mod, ONLY: jules_vars_type
 USE fluxes_mod, ONLY: fluxes_type
 USE lake_mod, ONLY: lake_type
+USE meltlake_vars_mod, ONLY: meltlake_vars_type
 ! USE forcing, ONLY: forcing_type
 ! USE jules_rivers_mod, ONLY: rivers_type
 ! USE veg3_parm_mod, ONLY: in_dev
@@ -192,6 +194,7 @@ TYPE(coastal_type), INTENT(IN OUT) :: coast
 TYPE(jules_vars_type), INTENT(IN OUT) :: jules_vars
 TYPE(fluxes_type), INTENT(IN OUT) :: fluxes
 TYPE(lake_type), INTENT(IN OUT) :: lake_vars
+TYPE(meltlake_vars_type), INTENT(IN OUT) :: meltlake_vars
 !TYPE(forcing_type), INTENT(IN OUT) :: forcing
 !TYPE(rivers_type), INTENT(IN OUT) :: rivers
 !TYPE(in_dev), INTENT(IN OUT) :: veg3_parm
@@ -262,8 +265,9 @@ CASE ( jules )
     ainfo%l_lice_point, ainfo%l_lice_surft,                                    &
     !prognostics (IN)
     progs%snowdepth_surft, progs%rho_snow_grnd_surft, progs%nsnow_surft,       &
-    progs%sice_surft, progs%sliq_surft, progs%ds_surft)
-
+    progs%sice_surft, progs%sliq_surft, progs%ds_surft,                        &
+    progs%sice_surft_ml, progs%sliq_surft_ml, progs%ds_surft_ml,               & 
+    meltlake_vars%lake_depth_ml)
 
 CASE ( cable )
 

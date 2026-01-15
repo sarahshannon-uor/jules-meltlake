@@ -41,7 +41,8 @@ SUBROUTINE jules_land_albedo(                                                  &
         l_lice_point, l_lice_surft,                                            &
         !prognostics (IN)
         snowdepth_surft, rho_snow_grnd_surft, nsnow_surft, sice_surft,         &
-        sliq_surft, ds_surft)
+        sliq_surft, ds_surft,                                                  &
+        sice_surft_ml, sliq_surft_ml, ds_surft_ml, lake_depth_ml)
 
 !Use in subroutines
 USE albpft_mod,               ONLY: albpft
@@ -61,6 +62,8 @@ USE jules_snow_mod,           ONLY:                                            &
   kland, maskd, tcland, rho_snow_const, rho_snow_fresh, cansnowtile,           &
   l_snowdep_surf, can_clump, lai_alb_lim_sn, n_lai_exposed, amax, aicemax,     &
   rho_firn_albedo, nsmax
+
+USE jules_meltlake_mod,  ONLY: l_meltlake, nsmax_ml
 
 USE jules_surface_types_mod,  ONLY:                                            &
   npft, ntype, lake, soil, urban_canyon
@@ -192,6 +195,11 @@ REAL(KIND=real_jlslsm), INTENT(IN) :: rho_snow_grnd_surft(land_pts,nsurft)
 REAL(KIND=real_jlslsm), INTENT(IN) :: sice_surft(land_pts,nsurft,nsmax)
 REAL(KIND=real_jlslsm), INTENT(IN) :: sliq_surft(land_pts,nsurft,nsmax)
 REAL(KIND=real_jlslsm), INTENT(IN) :: ds_surft(land_pts,nsurft,nsmax)
+
+REAL(KIND=real_jlslsm), INTENT(IN) :: sice_surft_ml(land_pts,nsurft,nsmax_ml)
+REAL(KIND=real_jlslsm), INTENT(IN) :: sliq_surft_ml(land_pts,nsurft,nsmax_ml)
+REAL(KIND=real_jlslsm), INTENT(IN) :: ds_surft_ml(land_pts,nsurft,nsmax_ml)
+REAL(KIND=real_jlslsm), INTENT(IN) :: lake_depth_ml(land_pts,nsurft)
 
 !Local variables:
 INTEGER, PARAMETER ::       ilayers_dummy = 1
@@ -1099,26 +1107,63 @@ IF (l_spec_albedo) THEN
       ! albedo above threshold with surface density (Gruell and Konzellmann '94)
       ! using ~ top 10cm
       !------------------------------------------------------------------------
-      IF (l_elev_land_ice) THEN
-        DO n = 1,ntype
-          IF (l_lice_surft(n)) THEN
-            DO j = 1,surft_pts(n)
-              l = surft_index(j,n)
-              IF (l_lice_point(l) .AND. nsnow_surft(l,n) > 0) THEN
-                ssum = 0.0
-                DO k = 1,nsnow_surft(l,n)
-                  ssum = ssum + ds_surft(l,n,k)
-                  IF (ssum > 0.1) EXIT
-                END DO
-                k = MIN(k,nsnow_surft(l,n))
+IF (l_elev_land_ice) THEN
+  DO n = 1, ntype
+    IF (l_lice_surft(n)) THEN
+      DO j = 1, surft_pts(n)
+        l = surft_index(j,n)
+
+        IF (l_lice_point(l) .AND. nsnow_surft(l,n) > 0) THEN
+
+          !--------------------------------------------------
+          ! Case 1: melt lake present on top of snow
+          !--------------------------------------------------
+          IF (l_meltlake .AND. lake_depth_ml(l,n) > 0.0) THEN
+            !print *, 'melt lake is on top of snowpack, reset albedo to water'
+
+            !alb_snow(l,n,:) = (9702.0 + 1000.0 * EXP(3.6 * lake_depth_ml(l,n))) &
+            !                 /(-539.0 + 20000.0 * EXP(3.6 * lake_depth_ml(l,n)))
+
+          ELSE
+            !------------------------------------------------
+            ! Case 2: no lake present, compute snow density
+            !------------------------------------------------
+            IF (l_meltlake) THEN
+              !print *, 'meltlake model is on but lake has not formed yet'
+
+              ssum = 0.0
+              DO k = 1, nsnow_surft(l,n)
+                ssum = ssum + ds_surft_ml(l,n,k)
+                IF (ssum > 0.1) EXIT
+              END DO
+              k = MIN(k, nsnow_surft(l,n))
+
+              IF (SUM(ds_surft_ml(l,n,1:k)) > 1.0e-3) THEN
+                rho_snow_surf = ( SUM(sice_surft_ml(l,n,1:k)) + &
+                                  SUM(sliq_surft_ml(l,n,1:k)) ) / &
+                                  SUM(ds_surft_ml(l,n,1:k))
+              ELSE
+                rho_snow_surf = rho_snow_const
+              END IF
+
+            ELSE
+              print *, 'meltlake model is off'
+
+              ssum = 0.0
+              DO k = 1, nsnow_surft(l,n)
+                ssum = ssum + ds_surft(l,n,k)
+                IF (ssum > 0.1) EXIT
+              END DO
+              k = MIN(k, nsnow_surft(l,n))
 
                 IF (SUM(ds_surft(l,n,1:k)) > 1.0e-3) THEN
                   rho_snow_surf = (SUM(sice_surft(l,n,1:k)) +                  &
                                    SUM(sliq_surft(l,n,1:k))) /                 &
                                   SUM(ds_surft(l,n,1:k))
-                ELSE
-                  rho_snow_surf = rho_snow_const
-                END IF
+              ELSE
+                rho_snow_surf = rho_snow_const
+              END IF
+            END IF  ! l_meltlake
 
                 IF (rho_snow_surf > rho_firn_albedo) THEN
                   snow_alb_vis_as = aicemax(1) + (rho_snow_surf - rho_ice) *   &
@@ -1139,6 +1184,7 @@ IF (l_spec_albedo) THEN
                   alb_snow(l,n,3) = MIN(alb_snow(l,n,3),amax(2))
                   alb_snow(l,n,4) = MIN(alb_snow(l,n,4),amax(2))
                 END IF
+                END IF  ! lake present
               END IF ! on an ice tile with deep snow
             END DO !loop points
           END IF !ice tiles exist somewhere for this n
