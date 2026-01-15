@@ -11,8 +11,8 @@ MODULE init_grid_mod
 CONTAINS
 
 SUBROUTINE init_grid(nml_dir, crop_vars_data,psparms_data,top_pdm_data,        &
-                              fire_vars_data,ainfo_data,ainfo,trif_vars_data,        &
-                              soil_ecosse_vars_data, aero_data,                &
+                              fire_vars_data,meltlake_vars_data,ainfo_data,ainfo,    &
+                              trif_vars_data,soil_ecosse_vars_data, aero_data, &
                               urban_param_data,progs_data,trifctl_data,        &
                               coastal_data,jules_vars_data,                    &
                               fluxes_data,                                     &
@@ -50,6 +50,7 @@ USE crop_vars_mod, ONLY: crop_vars_data_type
 USE p_s_parms,     ONLY: psparms_data_type
 USE top_pdm,       ONLY: top_pdm_data_type
 USE fire_vars_mod, ONLY: fire_vars_data_type
+USE meltlake_vars_mod, ONLY: meltlake_vars_data_type
 USE ancil_info,    ONLY: ainfo_data_type, ainfo_type
 USE trif_vars_mod, ONLY: trif_vars_data_type
 USE soil_ecosse_vars_mod, ONLY: soil_ecosse_vars_data_type
@@ -93,6 +94,7 @@ TYPE(crop_vars_data_type), INTENT(IN OUT) :: crop_vars_data
 TYPE(psparms_data_type), INTENT(IN OUT) :: psparms_data
 TYPE(top_pdm_data_type), INTENT(IN OUT) :: top_pdm_data
 TYPE(fire_vars_data_type), INTENT(IN OUT) :: fire_vars_data
+TYPE(meltlake_vars_data_type), INTENT(IN OUT) :: meltlake_vars_data
 TYPE(ainfo_data_type), INTENT(IN OUT) :: ainfo_data
 TYPE(ainfo_type), INTENT(IN OUT) :: ainfo
 TYPE(trif_vars_data_type), INTENT(IN OUT) :: trif_vars_data
@@ -145,8 +147,8 @@ CALL init_model_grid()
 !       dependency on surft_pts, which has not yet been initialised
 !-----------------------------------------------------------------------------
 CALL init_model_grid_arrays(crop_vars_data,psparms_data,top_pdm_data,          &
-                            fire_vars_data,ainfo_data,ainfo,trif_vars_data,    &
-                            soil_ecosse_vars_data, aero_data,                  &
+                            fire_vars_data,meltlake_vars_data,ainfo_data,ainfo,& 
+                            trif_vars_data,soil_ecosse_vars_data, aero_data,   &
                             urban_param_data, progs_data,trifctl_data,         &
                             coastal_data, jules_vars_data, fluxes_data,        &
                             lake_data, forcing_data, imgn_drive_data,          &

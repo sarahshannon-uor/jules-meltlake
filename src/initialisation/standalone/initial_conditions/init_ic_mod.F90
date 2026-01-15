@@ -39,6 +39,7 @@ USE freeze_soil_mod,     ONLY: freeze_soil
 USE flake_init_mod,      ONLY: flake_init
 USE tilepts_mod,         ONLY: tilepts
 USE total_snow_init_mod, ONLY: total_snow_init
+USE meltlake_init_mod,   ONLY: meltlake_init
 USE topmodel_init_mod,   ONLY: topmodel_init
 USE calc_fit_fsat_mod,   ONLY: calc_fit_fsat
 USE init_layeredcn_mod, ONLY: init_layeredcn
@@ -72,6 +73,8 @@ USE jules_irrig_mod, ONLY: l_irrig_dmd, l_irrig_limit
 USE update_mod, ONLY: l_daily_disagg, precip_disagg_method
 
 USE jules_surface_mod, ONLY: l_urban2t, l_anthrop_heat_use_wrr
+
+USE jules_meltlake_mod, ONLY: l_meltlake
 
 USE jules_soil_biogeochem_mod, ONLY:                                           &
   ! imported scalar parameters
@@ -785,6 +788,13 @@ IF ( l_flake_model                                                             &
    .AND. (land_pts > 0 ) ) THEN
   CALL flake_init(ainfo, progs, lake_vars)
 END IF ! FLake
+
+!---------------------------------------------------------------------------
+! Initial meltlake model
+!---------------------------------------------------------------------------
+IF ( l_meltlake ) THEN  
+   CALL meltlake_init(ainfo, progs)
+END IF ! meltlake
 
 !---------------------------------------------------------------------------
 ! Finish initialising irrigation

@@ -18,11 +18,11 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='SNOWTHERM_MOD'
 
 CONTAINS
 
-SUBROUTINE snowtherm ( land_pts, surft_pts, nsnow, surft_index, ds,            &
+SUBROUTINE snowtherm ( land_pts, surft_pts, nsnow, surft_index, nsmax, ds,     &
                        sice, sliq, csnow, ksnow )
 
 USE jules_snow_mod, ONLY:                                                      &
-  nsmax,                                                                       &
+  !nsmax,                                                                      &
     ! Maximum number of snow layers.
   ip_snow_cond_yen81,                                                          &
     ! Conductivity following Yen (1981).
@@ -53,8 +53,10 @@ IMPLICIT NONE
 INTEGER,INTENT(IN) ::                                                          &
   land_pts,                                                                    &
     ! Number of land points.
-  surft_pts
+  surft_pts,                                                                   &                                          
     ! Number of tile points.
+  nsmax
+	! Max number of snow layers. 
 
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(in)

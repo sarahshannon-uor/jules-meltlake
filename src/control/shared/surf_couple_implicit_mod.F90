@@ -68,7 +68,7 @@ SUBROUTINE surf_couple_implicit(                                               &
   flandg_v, rho1, f3_at_p, uStarGBM,tscrndcl_ssi,tscrndcl_surft,tStbTrans,     &
   rhokh_mix, ti_gb, sky,                                                       &
   !TYPES containing field data (IN OUT)
-  crop_vars,ainfo,aerotype,progs,coast, jules_vars,                            &
+  crop_vars,meltlake_vars, ainfo,aerotype,progs,coast, jules_vars,             &
   fluxes,                                                                      &
   lake_vars,                                                                   &
   forcing,                                                                     &
@@ -85,6 +85,7 @@ SUBROUTINE surf_couple_implicit(                                               &
 
 !TYPE definitions
 USE crop_vars_mod, ONLY: crop_vars_type
+USE meltlake_vars_mod, ONLY: meltlake_vars_type
 USE ancil_info,    ONLY: ainfo_type
 USE aero,          ONLY: aero_type
 USE prognostics,   ONLY: progs_type
@@ -341,6 +342,7 @@ INTEGER, INTENT(OUT) ::                                                        &
 TYPE(jls_wtrac_type), INTENT(IN OUT) :: wtrac_jls
 !TYPES containing field data (IN OUT)
 TYPE(crop_vars_type), INTENT(IN OUT) :: crop_vars
+TYPE(meltlake_vars_type), INTENT(IN OUT) :: meltlake_vars
 TYPE(ainfo_type), INTENT(IN OUT) :: ainfo
 TYPE(aero_type), INTENT(IN OUT) :: aerotype
 TYPE(progs_type), INTENT(IN OUT) :: progs
@@ -446,7 +448,7 @@ CASE ( jules )
             alpha1,ashtf_surft,                                                &
             jules_vars%dtrdz_charney_grid_1_ij,fracaero_t,fracaero_s,          &
             resfs,resft, rhokh_surft,                                          &
-            fluxes%emis_surft,progs%snow_surft,dtstar_surft,                   &
+            fluxes%emis_surft,progs%snow_surft,progs%snow_surft_ml, dtstar_surft,                   &
     ! INOUT data :
             progs%tstar_surft,fluxes%fqw_surft,fqw_1,ftl_1,fluxes%ftl_surft,   &
             sf_diag,                                                           &
@@ -474,9 +476,10 @@ CASE ( jules )
             ! prognostics (IN)
             progs%nsnow_surft,                                                 &
             ! jules_vars_mod (IN)
-            jules_vars%snowdep_surft,                                          &
+            jules_vars%snowdep_surft, progs%snowdepth_surft_ml,                &
             !TYPES containing field data (IN OUT)
             crop_vars,                                                         &
+            meltlake_vars,                                                     &
             !Water tracers (IN)
             wtrac_jls%snow_surft, wtrac_jls%smc_soilt,                         &
             wtrac_jls%canopy_surft, wtrac_jls%fqw_evapsrce,                    &

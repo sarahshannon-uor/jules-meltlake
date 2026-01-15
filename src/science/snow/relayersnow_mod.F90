@@ -18,8 +18,8 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='RELAYERSNOW_MOD'
 
 CONTAINS
 
-SUBROUTINE relayersnow( land_pts, surft_pts, n_wtrac_jls, surft_index,         &
-                        rgrain0, rho0, sice0, snowfall, snowmass,              &
+SUBROUTINE relayersnow( land_pts, surft_pts, n_wtrac_jls, surft_index, nsmax,  &
+                        dzsnow, rgrain0, rho0, sice0, snowfall, snowmass,      &
                         tsnow0, sice0_wtrac, nsnow, ds, rgrain, rgrainl, sice, &
                         rho_snow_grnd, sliq, tsnow, sice_wtrac, sliq_wtrac,    &
                         rho_snow, snowdepth )
@@ -39,7 +39,7 @@ USE water_constants_mod, ONLY:                                                 &
 
 USE jules_snow_mod, ONLY:                                                      &
   ! imported scalars (IN)
-  nsmax,                                                                       &
+  !nsmax,                                                                       &
     ! Maximum possible number of snow layers.
   rho_snow_fresh,                                                              &
     ! Density of fresh snow (kg per m**3).
@@ -49,6 +49,9 @@ USE jules_snow_mod, ONLY:                                                      &
     ! Switch for snowpack density correction.
   i_relayer_opt, ip_relayer_linear, ip_relayer_rgrain_inv
     ! Option for relayering the snow pack and permitted values
+  
+
+USE jules_meltlake_mod, ONLY: l_meltlake!, nsmax_ml, dzsnow_ml
 
 USE jules_radiation_mod, ONLY: l_snow_albedo, l_embedded_snow
 
@@ -69,9 +72,10 @@ INTEGER, INTENT(IN) ::                                                         &
     ! Total number of land points.
   surft_pts,                                                                   &
     ! Number of tile points.
-  n_wtrac_jls
+  n_wtrac_jls,                                                                 &    
     ! Number of water tracers
-
+  nsmax                                                                       
+	! Number of snow layers.
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(in)
 !-----------------------------------------------------------------------------
@@ -93,10 +97,12 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
      ! Snow mass on the ground (kg/m2).
   tsnow0(land_pts),                                                            &
      ! Temperature of fresh snow (K).
-  sice0_wtrac(land_pts,n_wtrac_jls)
+  sice0_wtrac(land_pts,n_wtrac_jls),                                           & 
      ! Water tracer ice content of fresh snow (kg/m2).
      ! Where nsnow=0, sice0 is the mass of the snowpack.
-
+  dzsnow(nsmax)
+    ! Max snow layer depths.
+	
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(inout)
 !-----------------------------------------------------------------------------
@@ -305,8 +311,9 @@ END DO
 !-----------------------------------------------------------------------------
 ! Divide snowpack into new layers
 !-----------------------------------------------------------------------------
-CALL layersnow( land_pts, surft_pts, surft_index, snowdepth, nsnow, ds )
 
+CALL layersnow (land_pts,surft_pts,surft_index,nsmax,dzsnow,snowdepth,nsnow,ds) 
+	                
 !$OMP PARALLEL DO                                                              &
 !$OMP SCHEDULE(STATIC)                                                         &
 !$OMP DEFAULT(SHARED)                                                          &

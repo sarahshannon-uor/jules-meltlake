@@ -86,7 +86,8 @@ SUBROUTINE surf_couple_extra(                                                  &
    dhf_surf_minus_soil,                                                        &
    land_sea_mask,                                                              &
    !TYPES containing field data (IN OUT)
-   crop_vars,psparms,toppdm,fire_vars,ainfo,trif_vars,soilecosse,urban_param,  &
+   crop_vars,meltlake_vars, psparms,toppdm,fire_vars,ainfo,trif_vars,          & 
+   soilecosse,urban_param,                                                     &
    progs,trifctltype,coast,jules_vars,                                         &
    fluxes,                                                                     &
    lake_vars,                                                                  &
@@ -101,6 +102,7 @@ SUBROUTINE surf_couple_extra(                                                  &
 
 !TYPE definitions
 USE crop_vars_mod, ONLY: crop_vars_type
+USE meltlake_vars_mod, ONLY: meltlake_vars_type
 USE p_s_parms, ONLY: psparms_type
 USE top_pdm, ONLY: top_pdm_type
 USE fire_vars_mod, ONLY: fire_vars_type
@@ -129,6 +131,9 @@ USE work_vars_mod_cbl,  ONLY: work_vars_type      ! and some kept thru timestep
 USE hydrol_mod,               ONLY: hydrol
 USE snow_mod,                 ONLY: snow
 USE jules_rivers_mod,         ONLY: l_rivers, l_inland, rivers_call
+
+USE jules_meltlake_mod,       ONLY: l_meltlake
+USE meltlake_mod,             ONLY: meltlake
 
 ! Code which isn't currently suitable for building into LFRic
 #if !defined(LFRIC)
@@ -203,7 +208,8 @@ USE jules_soil_biogeochem_mod, ONLY:                                           &
 
 USE jules_soil_mod,           ONLY: sm_levels, l_soil_sat_down, confrac
 
-USE jules_surface_mod,        ONLY: l_aggregate, l_flake_model
+USE jules_surface_mod,        ONLY: l_aggregate, l_flake_model,                &
+                                    l_elev_land_ice
 
 USE jules_surface_types_mod,  ONLY: npft, ncpft, nnpft, lake
 
@@ -392,6 +398,7 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
 
 !TYPES containing field data (IN OUT)
 TYPE(crop_vars_type), INTENT(IN OUT) :: crop_vars
+TYPE(meltlake_vars_type), INTENT(IN OUT) :: meltlake_vars
 TYPE(psparms_type), INTENT(IN OUT) :: psparms
 TYPE(top_pdm_type), INTENT(IN OUT) :: toppdm
 TYPE(fire_vars_type), INTENT(IN OUT) :: fire_vars
@@ -695,39 +702,114 @@ CASE ( jules )
 
     END IF
 
-    !Snow (standalone and UM)
-    CALL snow ( land_pts,timestep,smlt,nsurft,n_wtrac_jls,surft_pts,           &
-                ainfo%surft_index,psparms%catch_snow_surft,con_snow_gb,        &
-                con_rain_gb, tile_frac,ls_snow_gb,ls_graup_gb,ls_rain_gb,      &
-                fluxes%ei_surft,psparms%hcap_soilt(:,:,1),hcons_soilt,         &
-                fluxes%melt_surft,fluxes%snowinc_surft,                        &
-                progs%smcl_soilt(:,:,1),psparms%sthf_soilt(:,:,1),             &
-                fluxes%surf_htf_surft, progs%t_soil_soilt(:,:,1),              &
-                progs%tsurf_elev_surft, progs%tstar_surft,                     &
-                psparms%smvcst_soilt(:,:,1), con_snow_wtrac,                   &
-                wtrac_jls%ei_surft, progs%rgrain_surft,                        &
-                progs%rgrainl_surft, progs%rho_snow_grnd_surft,                &
-                progs%sice_surft,progs%sliq_surft,progs%snow_grnd_surft,       &
-                progs%snow_surft, progs%snowdepth_surft, progs%tsnow_surft,    &
-                progs%nsnow_surft, con_rain_wtrac, ls_rain_wtrac,              &
-                ls_snow_wtrac, ls_graup_wtrac, wtrac_ex%melt_surft,            &
-                wtrac_jls%snow_grnd_surft, wtrac_jls%snow_surft,               &
-                wtrac_jls%sice_surft, wtrac_jls%sliq_surft, progs%ds_surft,    &
-                fluxes%hf_snow_melt_gb,snow_mass_gb,progs%rho_snow_surft,      &
-                fluxes%snomlt_sub_htf_gb, fluxes%snow_melt_gb,                 &
-                fluxes%snow_soil_htf,surf_ht_flux_ld,                          &
-                sf_diag, dhf_surf_minus_soil, wtrac_ex%snow_melt,              &
-                wtrac_ex%lake_snow_melt,                                       &
-                ! New Arguments to replace USE statements
-                ! jules_internal
-                jules_vars%unload_backgrnd_pft, npft, l_flake_model,           &
-                !Ancil info (IN)
-                ainfo%l_lice_point, ainfo%l_lice_surft,                        &
-                ! Types Variables
-                lake_vars%lake_h_ice_gb, lake_vars%hcon_lake,                  &
-                lake_vars%ts1_lake_gb, lake_vars%lake_snow_melt,               &
-                lake_vars%non_lake_frac, lake_vars%lake_h_mxl_gb,              &
-                lake_vars%lake_depth_gb)
+   
+    
+!print *, 'inside surf_couple_extra before call snow', fluxes%melt_surft(:,9)
+       !Snow (standalone and UM)
+    CALL snow (a_step,                      & !IN
+            land_pts,                       & !IN
+            timestep,                       & !IN
+            smlt,                           & !IN
+            nsurft,                         & !IN
+            n_wtrac_jls,                    & !IN
+            surft_pts,                      & !IN (nsurft)
+            ainfo%surft_index,              & !IN (land_pts,nsurft)
+            psparms%catch_snow_surft,       & !IN (land_pts,nsurft)
+            con_snow_gb,                    & !IN/OUT (land_pts)
+            con_rain_gb,                    & !IN/OUT (land_pts)
+            tile_frac,                      & !IN (land_pts,nsurft)
+            ls_snow_gb,                     & !IN/OUT (land_pts) Used in metstats_timestep 
+            ls_graup_gb,                    & !IN/OUT (land_pts)
+            ls_rain_gb,                     & !IN/OUT (land_pts) Used in metstats_timestep 
+            fluxes%ei_surft,                & !IN (land_pts,nsurft) 
+            psparms%hcap_soilt(:,:,1),      & !IN (land_pts,nsoilt)
+            hcons_soilt,                    & !IN (land_pts)
+            fluxes%melt_surft,              & !IN/OUT (land_pts,nsurft)
+            fluxes%snowinc_surft,           & !IN (land_pts,nsurft)
+            progs%smcl_soilt(:,:,1),        & !IN (land_pts,nsoilt)
+            psparms%sthf_soilt(:,:,1),      & !IN (land_pts,nsoilt) Frozen soil moisture content of surface layer
+            fluxes%surf_htf_surft,          & !IN (land_pts,nsurft) surface heat flux 
+            progs%t_soil_soilt(:,:,1),      & !IN/OUT (land_pts,nsoilt) Soil surface layer temperature (K)
+            progs%tsurf_elev_surft,         & !IN/OUT (land_pts,nsurft) Temperature of elevated subsurface tiles (K)
+            progs%tstar_surft,              & !IN (land_pts,nsurft) tile surface temp
+            psparms%smvcst_soilt(:,:,1),    & !IN (land_pts,nsoilt) Surface soil layer volumetric moisture concentration
+            con_snow_wtrac,                 & !IN (land_pts,n_wtrac_jls) 
+            wtrac_jls%ei_surft,             & !IN (land_pts,nsurft,n_wtrac_jls)
+            progs%rgrain_surft,             & !IN/OUT and_pts,nsurft  *** Used to calc albedo in jules_land_albedo
+            progs%rgrainl_surft,            & !IN/OUT (land_pts,nsurft,nsmax)
+            progs%rho_snow_grnd_surft,      & !IN/OUT (land_pts,nsurft) *** Used to calc albedo in jules_land_albedo
+            progs%sice_surft,               & !IN/OUT (land_pts,nsurft,nsmax) *** Used to calc albedo in jules_land_albedo
+            progs%sliq_surft,               & !IN/OUT (land_pts,nsurft,nsmax) *** Used to calc albedo in jules_land_albedo
+            progs%snow_grnd_surft,          & !IN/OUT (land_pts,nsurft) snowpack bulk density
+            progs%snow_surft,               & !IN/OUT (land_pts,nsurft) *** Used to calc albedo in jules_land_albedo snow mass
+            progs%snowdepth_surft,          & !IN/OUT (land_pts,nsurft) *** This is used to calc snow_pts in jules_land_albedo
+            progs%tsnow_surft,              & !IN/OUT (land_pts,nsurft,nsmax) snow layer temp
+            progs%nsnow_surft,              & !IN/OUT (land_pts,nsurft) number of snow layers
+            con_rain_wtrac,                 & !IN/OUT (land_pts,n_wtrac_jls)
+            ls_rain_wtrac,                  & !IN/OUT (land_pts,n_wtrac_jls)
+            ls_snow_wtrac,                  & !IN/OUT (land_pts,n_wtrac_jls)
+            ls_graup_wtrac,                 & !IN/OUT (land_pts,n_wtrac_jls)
+            wtrac_ex%melt_surft,            & !IN/OUT (land_pts,nsurft,nsmax,n_wtrac_jls) 
+            wtrac_jls%snow_grnd_surft,      & !IN/OUT (land_pts,nsurft,nsmax,n_wtrac_jls)
+            wtrac_jls%snow_surft,           & !IN/OUT (land_pts,nsurft,nsmax,n_wtrac_jls)
+            wtrac_jls%sice_surft,           & !IN/OUT (land_pts,nsurft,nsmax,n_wtrac_jls)
+            wtrac_jls%sliq_surft,           & !IN/OUT (land_pts,nsurft,nsmax,n_wtrac_jls)
+            progs%ds_surft,                 & !OUT (land_pts,nsurft,nsmax)     *** Used to calc albedo in jules_land_albedo snow layer thicknesses (m)
+            fluxes%hf_snow_melt_gb,         & !OUT (land_pts) gridbox snowmelt heat flux (W/m2)
+            snow_mass_gb,                   & !OUT (land_pts) lying snow mass
+            progs%rho_snow_surft,           & !OUT (land_pts,nsurft,nsmax)     snow layer densities
+            fluxes%snomlt_sub_htf_gb,       & !OUT (land_pts) sub-canopy snowmelt heat flux 
+            fluxes%snow_melt_gb,            & !OUT (land_pts) gridbox snowmelt 
+            fluxes%snow_soil_htf,           & !OUT (land_pts,nsurft) heat flux into the uppermost subsurface layer i.e. snow to ground
+            surf_ht_flux_ld,                & !OUT (land_pts) surface heat flux on land 
+            sf_diag,                        & !IN/OUT
+            dhf_surf_minus_soil,            & !OUT (land_pts) heat flux difference across the FLake snowpack
+            wtrac_ex%snow_melt,             & !OUT (land_pts,n_wtrac_jls) GBM water tracer snowmelt
+            wtrac_ex%lake_snow_melt,        & !OUT (land_pts,n_wtrac_jls)  Water tracer snowmelt on the lake tile when using FLake 
+            ! New Arguments to replace USE statements
+            ! jules_internal
+            jules_vars%unload_backgrnd_pft, & !IN (land_pts,npft) 
+            npft,                           & !IN
+            l_flake_model,                  & !IN
+            ! Ancil info (IN)
+            ainfo%l_lice_point,             & !IN (land_pts)
+            ainfo%l_lice_surft,             & !IN (ntype)
+            ! Types Variables
+            lake_vars%lake_h_ice_gb,        & !IN/OUT (land_pts) lake ice thickness 
+            lake_vars%hcon_lake,            & !IN (land_pts) thermal conductivity of surface layer of the lake
+            lake_vars%ts1_lake_gb,          & !IN/OUT (land_pts) temperature of the surface layer of the lake
+            lake_vars%lake_snow_melt,       & !OUT (land_pts) snowmelt on the lake tile when using FLake
+            lake_vars%non_lake_frac,        & !IN (land_pts) sum of non-FLake tile fractions used for weighted average of surf_ht_flux_ld and snow_melt
+            lake_vars%lake_h_mxl_gb,        & !IN/OUT (land_pts) lake mixed layer thickness 
+            lake_vars%lake_depth_gb,        & !IN/OUT (land_pts) lake depth 
+            ! meltlake types 
+            progs%ds_surft_ml,              & !IN/OUT (land_pts,nsurft,nsmax_ml) 
+            progs%sice_surft_ml,            & !IN/OUT (land_pts,nsurft,nsmax_ml)
+            progs%sliq_surft_ml,            & !IN/OUT (land_pts,nsurft,nsmax_ml)
+            progs%tsnow_surft_ml,           & !IN/OUT (land_pts,nsurft,nsmax_ml)
+            progs%rgrainl_surft_ml,         & !IN/OUT (land_pts,nsurft,nsmax_ml)
+            progs%rho_snow_surft_ml,        & !OUT (land_pts,nsurft,nsmax_ml) snow layer densities
+            meltlake_vars%sfrac_ml,         & !OUT ((land_pts,nsurft,nsmax_ml)
+            meltlake_vars%lfrac_ml,         & !OUT ((land_pts,nsurft,nsmax_ml)
+            meltlake_vars%lake_depth_ml)      !IN/OUT (land_pts,nsurft,nsmax_ml)    
+
+    IF (l_meltlake) THEN
+        CALL meltlake(land_pts,                    & !IN
+                      timestep,                    & !IN
+                      nsurft,                      & !IN 
+                      surft_pts,                   & !IN
+                      ainfo%surft_index,           & !IN
+                      sf_diag%snice_runoff_surft,  & !IN/OUT 
+                      !sf_diag%lw_down_surft,       & !IN
+                      !sf_diag%lw_up_surft,         & !IN 
+                      !progs%tstar_surft,           & !IN/OUT
+                      !fluxes%sw_surft,             & !IN 
+                      meltlake_vars%lake_depth_ml, & !IN/OUT 
+                      meltlake_vars%lake_albedo_ml,& !IN/OUT 
+                      !Ancil info (IN)
+                      ainfo%l_lice_point,          & !IN (land_pts)
+                      ainfo%l_lice_surft)         !IN (land_pts)  
+    END IF
 
     IF (l_wtrac_jls) THEN
 

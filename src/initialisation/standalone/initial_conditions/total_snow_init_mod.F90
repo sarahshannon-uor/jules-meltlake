@@ -17,7 +17,7 @@ USE layersnow_mod,   ONLY: layersnow
 
 USE ancil_info, ONLY: land_pts, nsurft, lice_pts, nsoilt
 
-USE jules_snow_mod, ONLY: nsmax, rho_snow_const, rho_snow_fresh, canSnowTile
+USE jules_snow_mod, ONLY: nsmax, rho_snow_const, rho_snow_fresh, canSnowTile, dzsnow
 
 USE jules_surface_mod, ONLY: l_elev_land_ice
 
@@ -179,7 +179,7 @@ IF ( nsmax > 0 ) THEN
   !-------------------------------------------------------------------------------
   DO n = 1,nsurft
     CALL layersnow(land_pts, ainfo%surft_pts(n), ainfo%surft_index(:,n),       &
-                   progs%snowdepth_surft(:,n), progs%nsnow_surft(:,n),         &
+                   nsmax, dzsnow, progs%snowdepth_surft(:,n), progs%nsnow_surft(:,n),  &
                    progs%ds_surft(:,n,:))
   END DO
 

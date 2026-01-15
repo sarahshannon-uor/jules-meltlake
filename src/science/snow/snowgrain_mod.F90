@@ -19,7 +19,7 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='SNOWGRAIN_MOD'
 CONTAINS
 
 SUBROUTINE snowgrain ( land_pts, surft_pts, timestep, nsnow,                   &
-                       surft_index, sice, snowfall, snowmass, tsnow,           &
+                       surft_index, nsmax, sice, snowfall, snowmass, tsnow,    &
                        tstar_surft, rgrain, rgrainl, rgrain0 )
 
 USE conversions_mod, ONLY: rsec_per_hour, pi
@@ -33,7 +33,7 @@ USE water_constants_mod, ONLY:                                                 &
     ! Temperature at which fresh water freezes and ice melts (K).
 
 USE jules_snow_mod, ONLY:                                                      &
-  nsmax,                                                                       &
+  !nsmax,                                                                       &
     ! Maximum possible number of snow layers.
   r0,                                                                          &
     ! Grain size for fresh snow (microns).
@@ -58,8 +58,10 @@ IMPLICIT NONE
 INTEGER, INTENT(IN) ::                                                         &
   land_pts,                                                                    &
     ! Total number of land points.
-  surft_pts
+  surft_pts,                                                                   &
     ! Number of tile points.
+  nsmax
+    ! Number of snow layers
 
 REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
   timestep         ! Timestep (s).

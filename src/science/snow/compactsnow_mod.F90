@@ -19,7 +19,7 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='COMPACTSNOW_MOD'
 CONTAINS
 
 SUBROUTINE compactsnow ( land_pts, surft_pts, timestep, nsnow,                 &
-                         surft_index, sice,sliq, tsnow, rho_snow, ds )
+                         surft_index, nsmax, sice,sliq, tsnow, rho_snow, ds )
 
 USE water_constants_mod, ONLY:                                                 &
   rho_ice,                                                                     &
@@ -28,7 +28,7 @@ USE water_constants_mod, ONLY:                                                 &
 
 USE jules_snow_mod, ONLY:                                                      &
   ! imported scalars
-  nsmax,                                                                       &
+  !nsmax,                                                                       &
     !  Maximum possible number of snow layers
   l_et_metamorph,                                                              &
     !  Switch to include equitemperature metamorphism
@@ -57,8 +57,10 @@ IMPLICIT NONE
 INTEGER, INTENT(IN) ::                                                         &
   land_pts,                                                                    &
     ! Total number of land points.
-  surft_pts
+  surft_pts,                                                                   &
     ! Number of tile points.
+  nsmax                                                                       
+	! Number of snow layers.
 
 REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
   timestep

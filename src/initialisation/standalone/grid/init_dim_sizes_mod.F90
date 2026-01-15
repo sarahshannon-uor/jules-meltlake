@@ -34,6 +34,8 @@ USE jules_surface_types_mod, ONLY: npft, ncpft, nnvg, ntype
 
 USE jules_snow_mod, ONLY: nsmax
 
+USE jules_meltlake_mod, ONLY: nsmax_ml
+
 USE jules_sea_seaice_mod, ONLY: nice, nice_use
 
 USE jules_soil_mod, ONLY: sm_levels, ns_deep, l_tile_soil
@@ -46,7 +48,7 @@ USE model_interface_mod, ONLY: bl_level_dim_size, bedrock_dim_size,            &
                                 scpool_dim_size, ch4layer_dim_size,            &
                                 sclayer_dim_size, dep_species_dim_size,        &
                                 imogen_drive_dim_size, imogen_clim_dim_size,   &
-                                nmasst_dim_size
+                                nmasst_dim_size, snow_ml_dim_size
 
 USE imogen_run, ONLY: l_daily_metdata_climatol
 
@@ -134,6 +136,7 @@ type_dim_size     = ntype
 tile_dim_size     = nsurft
 soilt_dim_size    = nsoilt
 snow_dim_size     = nsmax
+snow_ml_dim_size  = nsmax_ml
 soil_dim_size     = sm_levels
 scpool_dim_size   = dim_cs1
 sclayer_dim_size  = dim_cslayer

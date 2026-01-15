@@ -18,14 +18,11 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='LAYERSNOW_MOD'
 
 CONTAINS
 
-SUBROUTINE layersnow ( land_pts, surft_pts, surft_index, snowdepth,            &
-                       nsnow, ds )
+SUBROUTINE layersnow ( land_pts, surft_pts, surft_index, nsmax, dzsnow,         &
+                       snowdepth, nsnow, ds )
 
-USE jules_snow_mod, ONLY:                                                      &
-  nsmax,                                                                       &
-    ! Maximum possible number of snow layers.
-  dzsnow
-    ! Prescribed snow layer depths (m).
+
+
 
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
@@ -40,9 +37,11 @@ IMPLICIT NONE
 INTEGER, INTENT(IN) ::                                                         &
   land_pts,                                                                    &
     ! Number of land points.
-  surft_pts
+  surft_pts,                                                                   &
     ! Number of tile points.
-
+  nsmax                                                                       
+	! Number of snow layers.
+  
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(in)
 !-----------------------------------------------------------------------------
@@ -50,7 +49,10 @@ INTEGER, INTENT(IN) ::                                                         &
   surft_index(land_pts)   ! Index of tile points.
 
 REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
-  snowdepth(land_pts)     ! Snow depth (m).
+  snowdepth(land_pts),                                                         &     
+    ! Snow depth (m).
+  dzsnow(nsmax)
+    ! Max snow layer depths.
 
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(out)

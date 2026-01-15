@@ -76,7 +76,7 @@ SUBROUTINE surf_couple_explicit(                                               &
     flandfac, fseafac, fb_surf, u_s, t1_sd, q1_sd, rhostar,                    &
     vshr, resp_s_tot_soilt, emis_soil,                                         &
     !TYPES containing field data (IN OUT)
-    crop_vars,psparms,ainfo,trif_vars,aerotype,urban_param,progs,              &
+    crop_vars,meltlake_vars,psparms,ainfo,trif_vars,aerotype,urban_param,progs,& 
     trifctltype,coast, jules_vars,                                             &
     fluxes,                                                                    &
     lake_vars,                                                                 &
@@ -93,6 +93,7 @@ SUBROUTINE surf_couple_explicit(                                               &
 
 !TYPE definitions
 USE crop_vars_mod, ONLY: crop_vars_type
+USE meltlake_vars_mod, ONLY: meltlake_vars_type
 USE p_s_parms, ONLY: psparms_type
 USE ancil_info,    ONLY: ainfo_type
 USE trif_vars_mod, ONLY: trif_vars_type
@@ -383,6 +384,7 @@ LOGICAL :: l_dust_diag
 
 !TYPES containing field data (IN OUT)
 TYPE(crop_vars_type), INTENT(IN OUT) :: crop_vars
+TYPE(meltlake_vars_type), INTENT(IN OUT) :: meltlake_vars
 TYPE(psparms_type), INTENT(IN OUT) :: psparms
 TYPE(ainfo_type), INTENT(IN OUT) :: ainfo
 TYPE(trif_vars_type), INTENT(IN OUT) :: trif_vars
@@ -639,6 +641,7 @@ CASE ( jules )
     !prognostics (IN)
     progs%nsnow_surft, progs%sice_surft, progs%sliq_surft,                     &
     progs%snowdepth_surft, progs%tsnow_surft, progs%ds_surft,                  &
+    progs%sice_surft_ml, progs%sliq_surft_ml, progs%tsnow_surft_ml, progs%ds_surft_ml,  &
     !c_elevate (OUT)
     jules_vars%surf_hgt_surft, jules_vars%lw_down_elevcorr_surft,              &
     !jules_vars_mod (OUT)

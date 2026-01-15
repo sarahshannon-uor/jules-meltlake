@@ -18,7 +18,7 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='SNOW_MOD'
 
 CONTAINS
 
-SUBROUTINE snow ( land_pts, timestep, stf_hf_snow_melt, nsurft, n_wtrac_jls,   &
+SUBROUTINE snow (a_step, land_pts, timestep, stf_hf_snow_melt, nsurft, n_wtrac_jls,&
                   surft_pts, surft_index, catch_snow, con_snow,                &
                   con_rain, tile_frac, ls_snow, ls_graup, ls_rain, ei_surft,   &
                   hcaps1_soilt, hcons, melt_surft, snowinc_surft,              &
@@ -43,8 +43,17 @@ SUBROUTINE snow ( land_pts, timestep, stf_hf_snow_melt, nsurft, n_wtrac_jls,   &
                   l_lice_point, l_lice_surft,                                  &
                   ! Types Variables
                   lake_h_ice_gb, hcon_lake, ts1_lake_gb, lake_snow_melt,       &
-                  non_lake_frac, lake_h_mxl_gb, lake_depth_gb                  &
-                  )
+                  non_lake_frac, lake_h_mxl_gb, lake_depth_gb,                 &
+                  ds_ml,         &     !(land_pts,nsurft,nsmax_ml)       
+                  sice_ml,       &     !(land_pts,nsurft,nsmax_ml)            
+                  sliq_ml,       &     !(land_pts,nsurft,nsmax_ml)
+                  tsnow_ml,      &     !(land_pts,nsurft,nsmax_ml)
+                  rgrainl_ml,    &     !(land_pts,nsurft,nsmax_ml) 
+                  rho_snow_ml,   &     !(land_pts,nsurft,nsmax_ml)
+                  sfrac_ml,      &     !(land_pts,nsurft,nsmax_ml)   
+                  lfrac_ml,      &     !(land_pts,nsurft,nsmax_ml)
+                  lake_depth_ml)           !(land_pts,nsurft) 
+
 
 USE canopysnow_mod,  ONLY: canopysnow
 USE compactsnow_mod, ONLY: compactsnow
@@ -57,8 +66,12 @@ USE snowtherm_mod,   ONLY: snowtherm
 
 USE water_constants_mod, ONLY:                                                 &
   ! imported scalar parameters
-   lf
+   lf,                                                                         &
      ! Latent heat of fusion of water at 0degc (J kg-1).
+   !rho_water,                                                                  &
+    ! Density of pure water (kg/m3).
+   rho_ice                                                               
+    ! Density of pure ice (kg/m3).
 
 USE jules_snow_mod, ONLY:                                                      &
   nsmax,                                                                       &
@@ -73,10 +86,15 @@ USE jules_snow_mod, ONLY:                                                      &
     ! Ignore graupel in the surface snowfall.
   r0,                                                                          &
     ! Grain size for fresh snow (microns).
-  cansnowtile
+  cansnowtile,                                                                 &
     ! Switch for canopy snow model.
+  dzsnow
+    ! Prescribed snow layer depths (m).
 
+ 
 USE jules_surface_types_mod, ONLY: lake, ntype
+
+USE jules_surface_mod, ONLY: l_elev_land_ice
 
 USE jules_radiation_mod, ONLY: l_snow_albedo, l_embedded_snow
 
@@ -87,6 +105,8 @@ USE ancil_info, ONLY: nsoilt
 USE jules_water_tracers_mod, ONLY: l_wtrac_jls, wtrac_calc_ratio_fn_jules
 USE wtrac_snow_mod,          ONLY: wtrac_sn_type, wtrac_alloc_snow,            &
                                    wtrac_dealloc_snow
+
+USE jules_meltlake_mod,  ONLY: l_meltlake, nsmax_ml, dzsnow_ml
 
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
@@ -99,7 +119,10 @@ IMPLICIT NONE
 ! Scalar arguments with intent(in)
 !-----------------------------------------------------------------------------
 INTEGER, INTENT(IN) ::                                                         &
-  land_pts              ! Total number of land points.
+     land_pts,                                                                 &
+                         ! Total number of land points.                        
+     a_step              ! model timestep from start
+        
 
 REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
   timestep              ! Timestep length (s).
@@ -153,7 +176,7 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
   sthf1_soilt(land_pts,nsoilt),                                                &
     ! Frozen soil moisture content of surface layer as a fraction
     ! of saturation.
-  surf_htf_surft(land_pts,nsurft),                                             &
+  !surf_htf_surft(land_pts,nsurft),                                             &
     ! Surface heat flux (W/m2).
   tstar_surft(land_pts,nsurft),                                                &
     ! Tile surface temperature (K).
@@ -170,8 +193,13 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
 TYPE (strnewsfdiag), INTENT(IN OUT) :: sf_diag
 
 INTEGER, INTENT(IN OUT) ::                                                     &
-  nsnow(land_pts,nsurft)   ! Number of snow layers.
+  nsnow(land_pts,nsurft)   
+    ! Number of snow layers.
 
+!LOGICAL, INTENT(IN OUT) ::                                                     &
+!  lake_depth_ml(land_pts,nsurft)   
+    ! Melt lake depth (m)
+  
 REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
   con_rain(land_pts),                                                          &
     ! Convective rainfall rate (kg/m2/s).
@@ -233,10 +261,24 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Water tracer snow mass content(kg/m2).
   sice_wtrac(land_pts,nsurft,nsmax,n_wtrac_jls),                               &
     ! Water tracer ice content of snow layers (kg/m2).
-  sliq_wtrac(land_pts,nsurft,nsmax,n_wtrac_jls)
+  sliq_wtrac(land_pts,nsurft,nsmax,n_wtrac_jls),                               &
     ! Water tracer liquid content of snow layers (kg/m2).
-
-
+  sice_ml(land_pts,nsurft,nsmax_ml),                                           &
+    ! Ice content of snow layers for meltlake(kg/m2).
+  sliq_ml(land_pts,nsurft,nsmax_ml),                                           &
+    ! Liquid content of snow layers for meltlake (kg/m2).
+  tsnow_ml(land_pts,nsurft,nsmax_ml),                                          &                                            
+    ! Snow layer temperatures (K).
+  rgrainl_ml(land_pts,nsurft,nsmax_ml),                                        &                                              
+    ! Snow layer grain size for meltlake (microns).
+  sfrac_ml(land_pts,nsurft,nsmax_ml),                                          &
+    ! Ice fraction of snow layers for meltlake(kg/m2).
+  lfrac_ml(land_pts,nsurft,nsmax_ml),                                          &                                          
+    ! Liquid fraction of snow layers for meltlake (kg/m2).
+  lake_depth_ml(land_pts,nsurft),                                              &    
+    ! Melt lake depth (m)
+  surf_htf_surft(land_pts,nsurft)                                             
+    ! Surface heat flux (W/m2). 
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(out)
 !-----------------------------------------------------------------------------
@@ -264,9 +306,13 @@ REAL(KIND=real_jlslsm), INTENT(OUT) ::                                         &
     ! Heat flux difference across the FLake snowpack (W/m2).
   snow_melt_wtrac(land_pts,n_wtrac_jls),                                       &
     ! GBM water tracer snowmelt (kg/m2/s).
-  lake_snow_melt_wtrac(land_pts,n_wtrac_jls)
+  lake_snow_melt_wtrac(land_pts,n_wtrac_jls),                                  &
     ! Water tracer snowmelt on the lake tile when using FLake (kg/m2/s).
-
+  ds_ml(land_pts,nsurft,nsmax_ml),                                             &                                                    
+    ! Snow layer thicknesses for meltlake (m).
+  rho_snow_ml(land_pts,nsurft,nsmax_ml)
+    ! Snow layer densities for meltlake(kg/m3).
+  
 !-----------------------------------------------------------------------------
 ! New arguments to replace USE statements
 !-----------------------------------------------------------------------------
@@ -341,8 +387,14 @@ REAL(KIND=real_jlslsm) ::                                                      &
    ! Where nsnow=0, sice0 is the mass of the snowpack.
   snow_can(land_pts,nsurft),                                                   &
     ! Canopy snow load (kg/m2).
-  tsnow0(land_pts)
+  tsnow0(land_pts),                                                            &
     ! Temperature of fresh snow (K).
+  csnow_ml(land_pts,nsmax_ml),                                                 &
+    ! Areal heat capacity of layers for meltlake (J/K/m2).
+  ksnow_ml(land_pts,nsmax_ml),                                                 &                                                       
+    ! Thermal conductivity of layers for meltlake (W/m/K).
+  tstar_surft_ml(land_pts,nsurft)                                                
+    ! Tile surface temperature (K), a lake can be on top of snowpack
 
 ! Snow quantities on a single surft, i.e. over snow layers (sl)
 REAL(KIND=real_jlslsm) ::                                                      &
@@ -356,9 +408,25 @@ REAL(KIND=real_jlslsm) ::                                                      &
     ! Temperature of fresh snow (K).
   rho_snow_sl(land_pts,nsmax),                                                 &
     ! Snow layer densities (kg/m3).
-  rgrainl_sl(land_pts,nsmax)
+  rgrainl_sl(land_pts,nsmax),                                                  &  
     ! Snow layer grain size (microns).
-
+  ds_sl_ml(land_pts,nsmax_ml),                                                 &                                                       
+    ! Snow layer thicknesses for meltlake (m).	
+  sice_sl_ml(land_pts,nsmax_ml),                                               &
+    ! Ice content of snow layers for meltlake (kg/m2).
+  sliq_sl_ml(land_pts,nsmax_ml),                                               &
+    ! Liquid content of snow layers for meltlake (kg/m2).
+  tsnow_sl_ml(land_pts,nsmax_ml),                                              &
+    ! Temperature of fresh snow for meltlake (K).
+  rho_snow_sl_ml(land_pts,nsmax_ml),                                           &                                                 
+    ! Snow layer densities for meltlake (kg/m3).
+  rgrainl_sl_ml(land_pts,nsmax_ml),                                            &                                                   
+    ! Snow layer grain size for meltlake(microns).	
+  sfrac_sl_ml(land_pts,nsmax_ml),                                              &
+    ! Ice fraction of snow layers for meltlake 
+  lfrac_sl_ml(land_pts,nsmax_ml)
+    ! Liquid fraction of snow layers for meltlake 
+  
 REAL(KIND=real_jlslsm), ALLOCATABLE ::                                         &
   snow_surft_old(:,:),                                                         &
   snow_grnd_old(:,:),                                                          &
@@ -384,6 +452,10 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 ! Allocate water tracer arrays and initialise GBM fields
 CALL wtrac_alloc_snow(land_pts, nsurft, nsmax, n_wtrac_jls, wtrac_sn)
 
+
+! sarah switch off smb diagnostics for now 
+sf_diag%l_snice=.TRUE.
+
 !-----------------------------------------------------------------------------
 ! Initialise gridbox variables.
 !-----------------------------------------------------------------------------
@@ -400,7 +472,7 @@ IF (sf_diag%l_snice) THEN
 !$OMP PRIVATE(n,k,i)                                                           &
 !$OMP SHARED(nsurft,surft_pts,land_pts,sf_diag,snow_surft_old,snow_surft,      &
 !$OMP        snow_grnd_old,snow_grnd,sice_old,sliq_old,nsmax,nsnow,            &
-!$OMP        sice,sliq,surft_index)
+!$OMP        sice,sliq,l_meltlake,l_lice_surft,sice_ml,sliq_ml,surft_index)
 
   ! Zeroing diagnostics
   DO n = 1,nsurft
@@ -432,8 +504,25 @@ IF (sf_diag%l_snice) THEN
       DO k = 1,surft_pts(n)
         i = surft_index(k,n)
         IF (nsnow(i,n) > 0) THEN
-          sice_old(i,n) = SUM(sice(i,n,1:nsnow(i,n)))
-          sliq_old(i,n) = SUM(sliq(i,n,1:nsnow(i,n)))
+
+            IF (l_meltlake.AND.l_lice_surft(n)) THEN 
+                sice_old(i,n) = SUM(sice_ml(i,n,1:nsnow(i,n)))
+                sliq_old(i,n) = SUM(sliq_ml(i,n,1:nsnow(i,n)))
+                
+               ! IF (lake_depth_ml(i,n) > 0.0) THEN
+               ! hack a lake on top snowpack 
+               ! assume no conductive heat enters the firn from above
+               ! maybe later add a logical is_meltlake id depth > 10cm like in monarchs 
+                  ! tstar_surft_ml(i,n) = 276.15 ! boundary condition for lake bottom-snowpack top, impacts rgrainl, will be calculated from conduction through water 
+                  ! surf_htf_surft(i,n) = 0.0    ! this will be T^4 of lake temp, leave zero for now
+                  ! melt_surft(i,n) = 0.0        ! assume no melting - the stephan eqn will be used to adjust lake depth/firn depth using T at boundary
+                !END IF
+
+            ELSE
+                sice_old(i,n) = SUM(sice(i,n,1:nsnow(i,n)))
+                sliq_old(i,n) = SUM(sliq(i,n,1:nsnow(i,n)))
+            END IF ! l_meltlake
+          
         END IF
       END DO
 !$OMP END DO
@@ -631,7 +720,26 @@ DO n = 1,nsurft
 !$OMP PRIVATE(ns,i,i_wt)                                                       &
 !$OMP SHARED(nsmax,land_pts,sice,sice_sl,sliq,sliq_sl,tsnow,tsnow_sl,          &
 !$OMP        l_snow_albedo,l_embedded_snow,rgrainl,rgrainl_sl,n,               &
-!$OMP        l_wtrac_jls,n_wtrac_jls,wtrac_sn,sice_wtrac,sliq_wtrac)
+!$OMP        l_wtrac_jls,n_wtrac_jls,wtrac_sn,sice_wtrac,sliq_wtrac,           &
+!$OMP        l_meltlake,nsmax_ml,sice_ml,sice_sl_ml,sliq_ml,sliq_sl_ml,        &
+!$OMP        tsnow_ml,tsnow_sl_ml,rgrainl_ml,rgrainl_sl_ml,sfrac_ml,           &
+!$OMP        sfrac_sl_ml,lfrac_ml,lfrac_sl_ml)
+IF (l_meltlake) THEN
+  DO ns = 1, nsmax_ml
+!$OMP DO SCHEDULE(STATIC)
+    DO i = 1, land_pts
+      sice_sl_ml(i,ns) = sice_ml(i,n,ns)
+      sliq_sl_ml(i,ns) = sliq_ml(i,n,ns)
+      tsnow_sl_ml(i,ns) = tsnow_ml(i,n,ns)
+      sfrac_sl_ml(i,ns) = sfrac_ml(i,n,ns)
+      lfrac_sl_ml(i,ns) = lfrac_ml(i,n,ns)
+    END DO
+!$OMP END DO NOWAIT
+  END DO
+  
+END IF !l_meltlake
+  
+    
   DO ns = 1, nsmax
 !$OMP DO SCHEDULE(STATIC)
     DO i = 1, land_pts
@@ -667,6 +775,17 @@ DO n = 1,nsurft
 !$OMP END DO NOWAIT
     END DO
   END IF
+  
+  IF (l_meltlake .AND. (l_snow_albedo .OR. l_embedded_snow)) THEN
+    DO ns = 1, nsmax_ml
+!$OMP DO SCHEDULE(STATIC)
+      DO i = 1, land_pts
+        rgrainl_sl_ml(i,ns) = rgrainl_ml(i,n,ns)
+      END DO
+!$OMP END DO NOWAIT
+    END DO
+  END IF
+  
 
 !$OMP END PARALLEL
 
@@ -698,22 +817,38 @@ DO n = 1,nsurft
                     snowfall, graupfall, wtrac_sn%snowfall,                    &
                     wtrac_sn%graupfall)
 
+!---------------------------------------------------------------------------
+! Divide snow pack into layers
+!---------------------------------------------------------------------------
+IF (l_meltlake.AND.l_elev_land_ice .AND. l_lice_surft(n)) THEN
+
+    CALL layersnow ( land_pts, surft_pts(n), surft_index(:,n),                 &
+                   nsmax_ml, dzsnow_ml, snowdepth(:,n), nsnow(:,n), ds_sl_ml )
+ELSE 
+    CALL layersnow ( land_pts, surft_pts(n), surft_index(:, n),                &
+                   nsmax, dzsnow, snowdepth(:,n), nsnow(:,n), ds_sl )  
+END IF
+
+!print *, 'snowdepth(:,n), nsnow(:,n)', n, snowdepth(:,n), nsnow(:,n)
 
   !---------------------------------------------------------------------------
-  ! Divide snow pack into layers
-  !---------------------------------------------------------------------------
-
-  CALL layersnow ( land_pts, surft_pts(n), surft_index(:, n),                  &
-                   snowdepth(:,n), nsnow(:,n), ds_sl )
-
-  !---------------------------------------------------------------------------
-  ! Thermal properties of snow layers
+  ! Thermal properties of snow layers- Ask Robin, alternatively call this twice 
+  ! once with nsmax and then with nsmax_ml (if l_meltlake) 
   !---------------------------------------------------------------------------
   IF ( nsmax > 0 ) THEN
-    CALL snowtherm ( land_pts, surft_pts(n), nsnow(:,n),                       &
-                     surft_index(:,n), ds_sl, sice_sl,                         &
+  
+  IF (l_meltlake.AND.l_elev_land_ice .AND. l_lice_surft(n)) THEN
+    CALL snowtherm ( land_pts, surft_pts(n), nsnow(:,n),                  &
+                     surft_index(:,n), nsmax_ml, ds_sl_ml, sice_sl_ml,        &
+                     sliq_sl_ml, csnow_ml, ksnow_ml )
+  
+ 
+  ELSE
+    CALL snowtherm ( land_pts, surft_pts(n), nsnow(:,n),                      &
+                     surft_index(:,n), nsmax, ds_sl, sice_sl,                 &
                      sliq_sl, csnow, ksnow )
-  END IF
+  END IF !l_meltlake
+  END IF !nsmax
 
   !---------------------------------------------------------------------------
   ! Snow thermodynamics and hydrology
@@ -838,8 +973,8 @@ DO n = 1,nsurft
   END IF !nsoilt
 
   IF ((l_flake_model) .AND. (n == lake)) THEN
-    CALL snowpack ( n, land_pts, surft_pts(n), n_wtrac_jls, timestep,          &
-                  cansnowtile(n), nsnow(:,n), surft_index(:,n), nsurft, csnow, &
+    CALL snowpack (a_step, n, land_pts, surft_pts(n), n_wtrac_jls, timestep,          &
+                  cansnowtile(n), nsnow(:,n), surft_index(:,n), nsurft, nsmax, csnow, &
                   ei_surft(:,n), hcaps1_soilt(:,m), hcon_lake, infiltration,   &
                   ksnow, rho_snow_grnd(:,n), smcl1_soilt(:,m),                 &
                   snowfall, sthf1_soilt(:,m), surf_htf_surft(:,n),             &
@@ -856,9 +991,34 @@ DO n = 1,nsurft
                   l_lice_point, l_lice_surft,                                  &
                   ! Types Variables
                   lake_h_ice_gb, lake_h_mxl_gb, lake_depth_gb)
-  ELSE
-    CALL snowpack ( n, land_pts, surft_pts(n), n_wtrac_jls, timestep,          &
-                  cansnowtile(n), nsnow(:,n), surft_index(:,n), nsurft, csnow, &
+ 
+  ELSE IF (l_meltlake.AND.l_lice_surft(n)) THEN
+               
+    CALL snowpack(a_step, n, land_pts, surft_pts(n), n_wtrac_jls, timestep,    &
+                  cansnowtile(n), nsnow(:,n), surft_index(:,n), nsurft, nsmax_ml,        &
+                  csnow_ml,ei_surft(:,n), hcaps1_soilt(:,m), hcons,            &
+                  infiltration, ksnow_ml, rho_snow_grnd(:,n), smcl1_soilt(:,m),&
+                  snowfall, sthf1_soilt(:,m), surf_htf_surft(:,n),             &
+                  tile_frac, smvcst1_soilt(:,m), ei_surft_wtrac,               &
+                  wtrac_sn%infiltration, ds_sl_ml,                             &
+                  melt_surft(:,n), snowinc_surft(:,n), sice_sl_ml, sliq_sl_ml, &
+                  snomlt_sub_htf, snowdepth(:,n), snowmass, tsnow_sl_ml,       &
+                  t_soil1_soilt(:,m), tsurf_elev_surft(:,n),                   &
+                  melt_surft_wtrac, wtrac_sn%sice_sl, wtrac_sn%sliq_sl,        &
+                  wtrac_sn%snowfall, wtrac_sn%snowmass,                        &
+                  snow_soil_htf(:,n), rho_snow_sl_ml, rho0, sice0, tsnow0,     &
+                  wtrac_sn%sice0, sf_diag, non_lake_frac,                      &
+                  !Ancil info (IN)
+                  l_lice_point, l_lice_surft,                                  &
+                  ! Types Variables
+                  lake_h_ice_gb, lake_h_mxl_gb, lake_depth_gb,                 &
+                  ! Optional meltlake variables 
+                  sfrac_sl_ml, lfrac_sl_ml)
+  
+  ELSE 
+  
+    CALL snowpack (a_step, n, land_pts, surft_pts(n), n_wtrac_jls, timestep,   &
+                  cansnowtile(n), nsnow(:,n), surft_index(:,n), nsurft, nsmax, csnow, &
                   ei_surft(:,n), hcaps1_soilt(:,m), hcons, infiltration,       &
                   ksnow, rho_snow_grnd(:,n), smcl1_soilt(:,m),                 &
                   snowfall, sthf1_soilt(:,m), surf_htf_surft(:,n),             &
@@ -878,6 +1038,7 @@ DO n = 1,nsurft
 
   END IF
 
+ 
   !===========================================================================
   ! *END NOTICE REGARDING SOIL TILING**
   !===========================================================================
@@ -886,34 +1047,69 @@ DO n = 1,nsurft
   ! Growth of snow grains
   !---------------------------------------------------------------------------
   IF ( l_snow_albedo .OR. l_embedded_snow ) THEN
-    CALL snowgrain ( land_pts, surft_pts(n), timestep, nsnow(:,n),             &
-                     surft_index(:,n), sice_sl, snowfall,                      &
-                     snowmass, tsnow_sl, tstar_surft(:,n),                     &
+  
+  IF (l_meltlake.AND.l_lice_surft(n)) THEN
+  
+  CALL snowgrain ( land_pts, surft_pts(n), timestep, nsnow(:,n),              &
+                     surft_index(:,n), nsmax_ml, sice_sl_ml, snowfall,        &
+                     snowmass, tsnow_sl_ml, tstar_surft_ml(:,n),              &
+                     rgrain(:,n), rgrainl_sl_ml, rgrain0 )
+  
+ ELSE
+    CALL snowgrain ( land_pts, surft_pts(n), timestep, nsnow(:,n),            &
+                     surft_index(:,n), nsmax, sice_sl, snowfall,              &
+                     snowmass, tsnow_sl, tstar_surft(:,n),                    &
                      rgrain(:,n), rgrainl_sl, rgrain0 )
+  END IF
+  
   ELSE
     ! Default initialization required for bit-comparison in the UM.
     rgrain0(:) = r0
   END IF
 
   IF ( nsmax > 0 ) THEN
+   
+   IF (l_meltlake.AND.l_lice_surft(n)) THEN
+   
     !-------------------------------------------------------------------------
     ! Mechanical compaction of snow
     !-------------------------------------------------------------------------
     CALL compactsnow ( land_pts, surft_pts(n), timestep, nsnow(:,n),           &
-                       surft_index(:,n), sice_sl, sliq_sl,                     &
-                       tsnow_sl, rho_snow_sl, ds_sl )
+                       surft_index(:,n), nsmax_ml, sice_sl_ml, sliq_sl_ml,     &
+                       tsnow_sl_ml, rho_snow_sl_ml, ds_sl_ml)
 
     !-------------------------------------------------------------------------
     ! Redivide snowpack after changes in depth, conserving mass and energy
     !-------------------------------------------------------------------------
     CALL relayersnow ( land_pts, surft_pts(n), n_wtrac_jls, surft_index(:,n),  &
-                       rgrain0, rho0, sice0, snowfall,                         &
+                       nsmax_ml, dzsnow_ml, rgrain0, rho0, sice0, snowfall,    &
+                       snowmass, tsnow0, wtrac_sn%sice0, nsnow(:,n), ds_sl_ml, &
+                       rgrain(:,n), rgrainl_sl_ml, sice_sl_ml,                 &
+                       rho_snow_grnd(:,n), sliq_sl_ml,                         &
+                       tsnow_sl_ml, wtrac_sn%sice_sl, wtrac_sn%sliq_sl,        &
+                       rho_snow_sl_ml, snowdepth(:,n) )
+    ELSE 
+
+    !-------------------------------------------------------------------------
+    ! Mechanical compaction of snow
+    !-------------------------------------------------------------------------
+    CALL compactsnow ( land_pts, surft_pts(n), timestep, nsnow(:,n),           &
+                       surft_index(:,n), nsmax, sice_sl, sliq_sl,              &
+                       tsnow_sl, rho_snow_sl, ds_sl )
+
+
+    !-------------------------------------------------------------------------
+    ! Redivide snowpack after changes in depth, conserving mass and energy
+    !-------------------------------------------------------------------------
+    CALL relayersnow ( land_pts, surft_pts(n), n_wtrac_jls, surft_index(:,n),  &
+                       nsmax, dzsnow, rgrain0, rho0, sice0, snowfall,          &
                        snowmass, tsnow0, wtrac_sn%sice0, nsnow(:,n), ds_sl,    &
                        rgrain(:,n), rgrainl_sl, sice_sl,                       &
                        rho_snow_grnd(:,n), sliq_sl,                            &
                        tsnow_sl, wtrac_sn%sice_sl, wtrac_sn%sliq_sl,           &
                        rho_snow_sl, snowdepth(:,n) )
-
+  
+    END IF !l_meltlake
   END IF  !  NSMAX>0
 
   !---------------------------------------------------------------------------
@@ -930,8 +1126,10 @@ DO n = 1,nsurft
 !$OMP        l_embedded_snow,rgrainl,rgrainl_sl, lake_snow_melt,               &
 !$OMP        l_flake_model,lake,l_wtrac_jls,snow_grnd_wtrac,snow_surft_wtrac,  &
 !$OMP        sice_wtrac,sliq_wtrac,lake_snow_melt_wtrac,snow_melt_wtrac,       &
-!$OMP        wtrac_sn,melt_surft_wtrac,n_wtrac_jls)
-
+!$OMP        wtrac_sn,melt_surft_wtrac,n_wtrac_jls,l_meltlake,nsmax_ml,        &
+!$OMP        ds_ml,ds_sl_ml,sice_ml,sice_sl_ml,sliq_ml,sliq_sl_ml,tsnow_ml,    &
+!$OMP        tsnow_sl_ml,rho_snow_ml,rho_snow_sl_ml,rgrainl_ml,rgrainl_sl_ml,  &
+!$OMP        sfrac_ml,sfrac_sl_ml,lfrac_ml,lfrac_sl_ml)
   IF ( cansnowtile(n) ) THEN
 !$OMP DO SCHEDULE(STATIC)
     DO k = 1,surft_pts(n)
@@ -973,6 +1171,22 @@ DO n = 1,nsurft
   END IF
 
   ! Copy data for this surft from the snow layer (sl) arrays
+  IF (l_meltlake) THEN
+   DO ns = 1, nsmax_ml
+!$OMP DO SCHEDULE(STATIC)
+     DO i = 1, land_pts
+       ds_ml(i,n,ns) = ds_sl_ml(i,ns)
+       sice_ml(i,n,ns) = sice_sl_ml(i,ns)
+       sliq_ml(i,n,ns) = sliq_sl_ml(i,ns)
+       tsnow_ml(i,n,ns) = tsnow_sl_ml(i,ns)
+       rho_snow_ml(i,n,ns) = rho_snow_sl_ml(i,ns)
+       sfrac_ml(i,n,ns) = sfrac_sl_ml(i,ns)
+       lfrac_ml(i,n,ns) = lfrac_sl_ml(i,ns)
+     END DO
+!$OMP END DO NOWAIT
+  END DO
+END IF
+  
   DO ns = 1, nsmax
 !$OMP DO SCHEDULE(STATIC)
     DO i = 1, land_pts
@@ -1008,6 +1222,18 @@ DO n = 1,nsurft
 !$OMP END DO NOWAIT
     END DO
   END IF
+
+IF (l_meltlake .AND. (l_snow_albedo .OR. l_embedded_snow)) THEN
+    DO ns = 1, nsmax_ml
+!$OMP DO SCHEDULE(STATIC)
+      DO i = 1, land_pts
+        rgrainl_ml(i,n,ns) = rgrainl_sl_ml(i,ns)
+      END DO
+!$OMP END DO NOWAIT
+    END DO
+ END IF
+
+
 
   !---------------------------------------------------------------------------
   ! Increment gridbox lying snow and snow melt.
@@ -1182,10 +1408,21 @@ IF (sf_diag%l_snice) THEN
       IF ( snow_surft(i,n)     > EPSILON(snow_surft) .OR.                      &
            snow_surft_old(i,n) > EPSILON(snow_surft) ) THEN
         IF (nsnow(i,n) > 0) THEN
+
+         IF (l_meltlake.AND.l_lice_surft(n)) THEN   
+ 
+          sf_diag%snice_sicerate_surft(i,n) = ( SUM(sice_ml(i,n,1:nsnow(i,n))) -  &
+                                              sice_old(i,n) ) / timestep
+          sf_diag%snice_sliqrate_surft(i,n) = ( SUM(sliq_ml(i,n,1:nsnow(i,n))) -  &
+                                              sliq_old(i,n) ) / timestep
+        ELSE
           sf_diag%snice_sicerate_surft(i,n) = ( SUM(sice(i,n,1:nsnow(i,n))) -  &
                                               sice_old(i,n) ) / timestep
           sf_diag%snice_sliqrate_surft(i,n) = ( SUM(sliq(i,n,1:nsnow(i,n))) -  &
                                               sliq_old(i,n) ) / timestep
+ 
+          END IF   ! l_meltlake
+ 
           sf_diag%snice_runoff_surft(i,n) = con_rain(i) + ls_rain(i)           &
                                             + sf_diag%snice_m_surft(i,n)       &
                                             - sf_diag%snice_freez_surft(i,n)   &

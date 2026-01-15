@@ -21,8 +21,8 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='SNOWPACK_MOD'
 
 CONTAINS
 
-SUBROUTINE snowpack ( surft_n, land_pts, surft_pts, n_wtrac_jls, timestep,     &
-                      cansnowtile, nsnow, surft_index, nsurft, csnow,          &
+SUBROUTINE snowpack ( a_step, surft_n, land_pts, surft_pts, n_wtrac_jls, timestep,     &
+                      cansnowtile, nsnow, surft_index, nsurft, nsmax, csnow,   &
                       ei_surft, hcaps1_soilt, hcons, infiltration, ksnow,      &
                       rho_snow_grnd, smcl1_soilt, snowfall, sthf1_soilt,       &
                       surf_htf_surft, tile_frac, smvcst1_soilt,                &
@@ -37,9 +37,12 @@ SUBROUTINE snowpack ( surft_n, land_pts, surft_pts, n_wtrac_jls, timestep,     &
                       !Ancil info (IN)
                       l_lice_point, l_lice_surft,                              &
                       ! Types Variables
-                      lake_h_ice_gb, lake_h_mxl_gb, lake_depth_gb)
+                      lake_h_ice_gb, lake_h_mxl_gb, lake_depth_gb,             &
+                      ! optional meltlake 
+                      sfrac,lfrac)
 
 USE tridag_mod, ONLY: tridag
+USE percolate_monarchs_mod,  ONLY: percolate_monarchs
 
 USE water_constants_mod, ONLY:                                                 &
   ! imported scalar parameters
@@ -63,7 +66,7 @@ USE jules_surface_mod, ONLY: l_elev_land_ice, l_flake_model
 USE jules_surface_types_mod, ONLY: lake, ntype
 
 USE jules_snow_mod, ONLY:                                                      &
-  nsmax,                                                                       &
+  !nsmax,                                                                       &
     ! Maximum possible number of snow layers.
   l_snow_infilt,                                                               &
     ! Include infiltration of rain into snow.
@@ -88,6 +91,8 @@ USE jules_snow_mod, ONLY:                                                      &
 
 USE jules_water_tracers_mod, ONLY: l_wtrac_jls, wtrac_calc_ratio_fn_jules
 
+USE jules_meltlake_mod,  ONLY: l_meltlake 
+
 USE sf_diags_mod, ONLY: strnewsfdiag
 
 USE parkind1, ONLY: jprb, jpim
@@ -101,6 +106,8 @@ IMPLICIT NONE
 ! Scalar arguments with intent(in)
 !-----------------------------------------------------------------------------
 INTEGER, INTENT(IN) ::                                                         &
+  a_step,                                                                      &
+                 ! model timestep since start
   land_pts,                                                                    &
                  ! Total number of land points.
   nsurft,                                                                      &
@@ -109,8 +116,10 @@ INTEGER, INTENT(IN) ::                                                         &
                  ! Tile number this loop.
   surft_pts,                                                                   &
                  ! Number of tile points.
-  n_wtrac_jls
+  n_wtrac_jls,                                                                 &
                  ! Number of water tracers.
+  nsmax
+                 ! Number of snow levels
 
 REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
   timestep       ! Timestep (s).
@@ -226,10 +235,17 @@ REAL(KIND=real_jlslsm), INTENT(OUT) ::                                         &
     ! Temperature of fresh snow (K).
   rho_snow(land_pts,nsmax),                                                    &
     ! Density of snow layers (kg/m3).
-  sice0_wtrac(land_pts,n_wtrac_jls)
+  sice0_wtrac(land_pts,n_wtrac_jls)!,                                           &
     ! Water tracer ice content of fresh snow (kg/m2).
     ! Where nsnow=0, sice0 is the mass of the snowpack.
+  !sfrac(land_pts,nsmax),                                                       &
+    ! Solid fraction
+  !lfrac(land_pts,nsmax)                                                       
+    ! Liquid fraction
 
+real(kind=real_jlslsm), intent(out), optional :: sfrac(:,:), lfrac(:,:)
+
+    
 !ancil_info (IN)
 LOGICAL, INTENT(IN) :: l_lice_point(land_pts)
 LOGICAL, INTENT(IN) :: l_lice_surft(ntype)
@@ -361,7 +377,7 @@ DO k = 1,surft_pts
   i = surft_index(k)
 
   IF (l_elev_land_ice .AND. l_lice_point(i)) THEN
-    tsoilw  = tsurf_elev_surft(i)
+    tsoilw  = 263.15!tsurf_elev_surft(i)
     dzsoilw = dzsoil_elev
     IF (l_lice_surft(surft_n)) THEN
       hconsw = snow_hcon
@@ -621,6 +637,7 @@ DO k = 1,surft_pts
       snow_soil_htf(i) = asnow(n) * ( tsnow(i,n) + r_gamma * dt(n) - tsoilw )
       DO n = 1,nsnow(i)
         tsnow(i,n) = tsnow(i,n) + dt(n)
+		 !print *, 'tsnow(i,n)', tsnow(i,n)
       END DO
 
     END IF  !  NSNOW
@@ -629,11 +646,14 @@ DO k = 1,surft_pts
     ! Melt snow in layers with temperature exceeding melting point
     !-------------------------------------------------------------------------
     DO n = 1,nsnow(i)
+    ! sarah energy per unit area needed to warm the layer to 0 °C.
       coldsnow = csnow(i,n) * (tm - tsnow(i,n))
       IF ( coldsnow < 0.0 ) THEN
         tsnow(i,n) = tm
+    !sarah Convert excess energy to melt depth
         dsice = -coldsnow / lf
         IF ( dsice > sice(i,n) ) dsice = sice(i,n)
+    !sarah reduce layer depth 
         ds(i,n)   = ( 1.0 - dsice / sice(i,n) ) * ds(i,n)
 
         ! Update water tracers first, so ratio calculation can use sice before
@@ -729,8 +749,28 @@ DO k = 1,surft_pts
 
     END IF ! l_snow_infilt
 
+    !IF (l_meltlake .AND. l_elev_land_ice .AND. l_lice_point(i)) THEN
+       
+     !  CALL percolate_monarchs( nsnow(i), nsmax, n_wtrac_jls,  &
+     !       timestep,                                          &
+     !       csnow(i,:), ds(i,:), tsnow(i,:),                   &
+     !       sice(i,:), sliq(i,:),                              &
+     !       sice_wtrac(i,:,:), sliq_wtrac(i,:,:),              &
+     !       win, win_wtrac,                                    &
+     !       sf_diag, surft_n, i )
+    !ELSE
+
+    
     DO n = 1,nsnow(i)
 
+       !IF (n == 1.AND.a_step<=168) THEN
+          ! add 1.1mmhr-1 to top
+        !  sliq(i,n) = sliq(i,n) + win + 1.0!0.0003
+     !     print *, 'add extrawater @', a_step
+       !ELSE
+        !  sliq(i,n) = sliq(i,n) + win
+       !END IF
+       
       sliq(i,n) = sliq(i,n) + win
       win       = 0.0
       sliqmax   = snowliqcap * rho_water * ds(i,n)
@@ -815,6 +855,8 @@ DO k = 1,surft_pts
 
     END DO  !  layers
 
+  !END IF ! percolate_monarchs or use default
+
     !-------------------------------------------------------------------------
     ! The remaining liquid water flux is melt.
     ! Include any separate canopy melt in this diagnostic.
@@ -847,6 +889,24 @@ DO k = 1,surft_pts
         rho_snow(i,n) = (sice(i,n) + sliq(i,n)) / ds(i,n)
       END IF
     END DO
+
+    !-------------------------------------------------------------------------
+    ! Get solid and liquid volume fractions
+    ! Convert mass per area (kg/m2) to volume fraction in each layer
+    !-------------------------------------------------------------------------
+    IF (l_meltlake) THEN
+
+       IF (PRESENT(sfrac).AND.PRESENT(lfrac)) THEN
+          DO n = 1,nsnow(i)
+            IF ( ds(i,n) > EPSILON(ds) ) THEN
+               ! vol fractions so that sfrac + lfrac + air = 1
+               ! dominator is total ice/liq that a layer can hold
+               sfrac(i,n) = sice(i,n) / (rho_ice   * ds(i,n))
+               lfrac(i,n) = sliq(i,n) / (rho_water * ds(i,n))
+            END IF
+         END DO
+      END IF !optional arguments provided 
+   END IF !l_meltlake
 
     !-------------------------------------------------------------------------
     ! Add snowfall and frost as layer 0.
