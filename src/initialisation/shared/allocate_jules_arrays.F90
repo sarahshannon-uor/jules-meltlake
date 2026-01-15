@@ -23,7 +23,7 @@ CONTAINS
 !   This file belongs in section: Technical
 
 SUBROUTINE allocate_jules_arrays(crop_vars_data,psparms_data,top_pdm_data,     &
-                                 fire_vars_data,ainfo_data, trif_vars_data,    &
+                                 fire_vars_data,meltlake_vars_data,ainfo_data, trif_vars_data,    &
                                  soil_ecosse_vars_data, aero_data,             &
                                  urban_param_data,progs_data,trifctl_data,     &
                                  coastal_data,jules_vars_data,                 &
@@ -55,10 +55,12 @@ USE jules_water_resources_mod,ONLY: l_have_groundwater, l_have_surface_water,  &
                                     n_sw_source, nwater_use
 USE jules_deposition_mod,     ONLY: l_deposition, ndry_dep_species
 USE jules_water_tracers_mod,  ONLY: l_wtrac_jls
+USE jules_meltlake_mod,       ONLY: l_meltlake
 
 !Variables- dimensions
 USE jules_surface_types_mod,  ONLY: ncpft,nnpft
 USE jules_snow_mod,           ONLY: nsmax, cansnowtile
+USE jules_meltlake_mod,       ONLY: nsmax_ml
 USE jules_surface_types_mod,  ONLY: npft, nnvg, ntype
 USE theta_field_sizes,        ONLY: t_i_length, t_j_length,                    &
                                     u_i_length,u_j_length,                     &
@@ -78,6 +80,7 @@ USE crop_vars_mod,            ONLY: crop_vars_alloc
 USE cropparm,                 ONLY: cropparm_alloc
 USE c_z0h_z0m,                ONLY: c_z0h_z0m_alloc
 USE fire_vars_mod,            ONLY: fire_vars_alloc
+USE meltlake_vars_mod,        ONLY: meltlake_vars_alloc
 USE fluxes_mod,               ONLY: fluxes_alloc
 USE jules_vars_mod,           ONLY: jules_vars_alloc
 USE jules_irrig_mod,          ONLY: irrig_vars_alloc
@@ -99,6 +102,7 @@ USE veg3_field_mod,           ONLY: veg3_field_allocate
 USE jules_rivers_mod,         ONLY: jules_rivers_alloc
 USE jules_forcing_mod,        ONLY: forcing_alloc
 USE jules_wtrac_type_mod,     ONLY: wtrac_jls_alloc
+USE meltlake_vars_mod,        ONLY: meltlake_vars_alloc
 
 #if !defined(UM_JULES)
 USE gridmean_fluxes,          ONLY: gridmean_fluxes_alloc
@@ -115,6 +119,7 @@ USE crop_vars_mod, ONLY: crop_vars_data_type
 USE p_s_parms,     ONLY: psparms_data_type
 USE top_pdm,       ONLY: top_pdm_data_type
 USE fire_vars_mod, ONLY: fire_vars_data_type
+USE meltlake_vars_mod, ONLY: meltlake_vars_data_type
 USE ancil_info,    ONLY: ainfo_data_type
 USE trif_vars_mod, ONLY: trif_vars_data_type
 USE soil_ecosse_vars_mod, ONLY: soil_ecosse_vars_data_type
@@ -133,6 +138,7 @@ USE jules_rivers_mod, ONLY: rivers_data_type
 USE jules_chemvars_mod, ONLY: chemvars_data_type
 USE water_resources_vars_mod, ONLY: water_resources_data_type
 USE jules_wtrac_type_mod,    ONLY: jls_wtrac_data_type
+USE meltlake_vars_mod, ONLY: meltlake_vars_data_type
 
 ! The following are needed to get the local river grid size
 ! (which is needed for water tracers)
@@ -154,6 +160,7 @@ TYPE(crop_vars_data_type), INTENT(IN OUT) :: crop_vars_data
 TYPE(psparms_data_type), INTENT(IN OUT) :: psparms_data
 TYPE(top_pdm_data_type), INTENT(IN OUT) :: top_pdm_data
 TYPE(fire_vars_data_type), INTENT(IN OUT) :: fire_vars_data
+TYPE(meltlake_vars_data_type), INTENT(IN OUT) :: meltlake_vars_data
 TYPE(ainfo_data_type), INTENT(IN OUT) :: ainfo_data
 TYPE(trif_vars_data_type), INTENT(IN OUT) :: trif_vars_data
 TYPE(soil_ecosse_vars_data_type), INTENT(IN OUT) :: soil_ecosse_vars_data
@@ -199,10 +206,10 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 CALL prognostics_alloc(land_pts, t_i_length, t_j_length,                       &
                       nsurft, npft, nsoilt, sm_levels, ns_deep, nsmax,         &
-                      dim_cslayer, dim_cs1, dim_ch4layer,                      &
+                      nsmax_ml, dim_cslayer, dim_cs1, dim_ch4layer,            &
                       nice, nice_use, soil_bgc_model, soil_model_ecosse,       &
                       l_layeredc, l_triffid, l_phenol, l_bedrock, l_red,       &
-                      nmasst, nnpft, l_acclim, l_sugar, progs_data)
+                      nmasst, nnpft, l_acclim, l_sugar, l_meltlake, progs_data)
 
 CALL fluxes_alloc(land_pts, t_i_length, t_j_length,                            &
                   nsurft, npft, nsoilt, sm_levels,                             &
@@ -221,6 +228,8 @@ CALL irrig_vars_alloc(npft, l_irrig_dmd)
 CALL cropparm_alloc(ncpft,l_crop)
 
 CALL fire_vars_alloc(land_pts,npft, fire_vars_data)
+
+CALL meltlake_vars_alloc(land_pts, nsurft, nsmax_ml, meltlake_vars_data)
 
 CALL c_z0h_z0m_alloc(ntype)
 

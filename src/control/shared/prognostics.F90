@@ -38,6 +38,8 @@ IMPLICIT NONE
 TYPE :: progs_data_type
   INTEGER, ALLOCATABLE :: nsnow_surft(:,:)
     ! Number of snow layers on ground on tiles
+  INTEGER, ALLOCATABLE :: nsnow_surft_ml(:,:)
+    ! Number of snow layers on ground on tiles for meltlake model
   INTEGER, ALLOCATABLE :: seed_rain(:)
     ! Seeding number for subdaily rainfall for use
     ! in IMOGEN or when l_daily_disagg = T
@@ -190,13 +192,29 @@ TYPE :: progs_data_type
   ! photosynthetic capacity (K).
   REAL(KIND=real_jlslsm), ALLOCATABLE :: f_nsc_pft(:,:)
     ! Non-structural carbohydrate mass fraction (kgC/kgC)
-
-END TYPE
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: ds_surft_ml(:,:,:)
+    ! Snow layer thickness meltlake (m)
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: tsnow_surft_ml(:,:,:)
+    ! Snow layer temperature meltlake (K)
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: rho_snow_surft_ml(:,:,:)
+    ! Snow layer density for melt lake (kg/m3)
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: sice_surft_ml(:,:,:)
+    ! Snow layer ice mass on tile meltlake (kg/m2)
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: sliq_surft_ml(:,:,:)
+    ! Snow layer liquid mass on tile meltlake (kg/m2)
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: snow_surft_ml(:,:)
+    ! Lying snow on elev ice tile for meltlake (kg/m2)	
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: snowdepth_surft_ml(:,:)
+    ! Snow depth on ground on tile meltlake (m)
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: rgrainl_surft_ml(:,:,:)
+    ! Snow layer grain size on tiles meltlake (microns)
+ END TYPE
 
 !================================
 
 TYPE :: progs_type
   INTEGER, POINTER :: nsnow_surft(:,:)
+  INTEGER, POINTER :: nsnow_surft_ml(:,:)
   INTEGER, POINTER :: seed_rain(:)
   INTEGER, POINTER :: years_since_harvest(:,:)
 
@@ -254,6 +272,16 @@ TYPE :: progs_type
   REAL(KIND=real_jlslsm), POINTER :: t_home_gb(:)
   REAL(KIND=real_jlslsm), POINTER :: t_growth_gb(:)
   REAL(KIND=real_jlslsm), POINTER :: f_nsc_pft(:,:)
+
+  REAL(KIND=real_jlslsm), POINTER :: sice_surft_ml(:,:,:)
+  REAL(KIND=real_jlslsm), POINTER :: sliq_surft_ml(:,:,:)
+  REAL(KIND=real_jlslsm), POINTER :: ds_surft_ml(:,:,:)
+  REAL(KIND=real_jlslsm), POINTER :: tsnow_surft_ml(:,:,:)
+  REAL(KIND=real_jlslsm), POINTER :: rho_snow_surft_ml(:,:,:)
+  REAL(KIND=real_jlslsm), POINTER :: snow_surft_ml(:,:)
+  REAL(KIND=real_jlslsm), POINTER :: snowdepth_surft_ml(:,:)
+  REAL(KIND=real_jlslsm), POINTER :: rgrainl_surft_ml(:,:,:)
+  
 END TYPE
 
 LOGICAL :: l_broadcast_soilt = .FALSE.
@@ -271,10 +299,10 @@ CONTAINS
 !===============================================================================
 SUBROUTINE prognostics_alloc(land_pts, t_i_length, t_j_length,                 &
                        nsurft, npft, nsoilt, sm_levels, ns_deep, nsmax,        &
-                       dim_cslayer, dim_cs1, dim_ch4layer,                     &
+                       nsmax_ml, dim_cslayer, dim_cs1, dim_ch4layer,           &
                        nice, nice_use, soil_bgc_model, soil_model_ecosse,      &
                        l_layeredc, l_triffid, l_phenol, l_bedrock, l_red,      &
-                       nmasst, nnpft, l_acclim, l_sugar, progs_data)
+                       nmasst, nnpft, l_acclim, l_sugar, l_meltlake, progs_data)
 
 !No USE statements other than Dr Hook
 USE parkind1,    ONLY: jprb, jpim
@@ -284,12 +312,12 @@ IMPLICIT NONE
 
 INTEGER, INTENT(IN) :: land_pts, t_i_length, t_j_length,                       &
                        nsurft, npft, nsoilt, sm_levels, ns_deep, nsmax,        &
-                       dim_cslayer, dim_cs1, dim_ch4layer,                     &
+                       nsmax_ml, dim_cslayer, dim_cs1, dim_ch4layer,           &
                        nice, nice_use, soil_bgc_model, soil_model_ecosse,      &
                        nmasst, nnpft
 
 LOGICAL, INTENT(IN) :: l_layeredc, l_triffid, l_phenol, l_bedrock, l_red,      &
-                       l_acclim, l_sugar
+                       l_acclim, l_sugar, l_meltlake
 
 TYPE(progs_data_type), INTENT(IN OUT) :: progs_data
   !Instance of the data type we need to allocate
@@ -367,6 +395,38 @@ progs_data%tsnow_surft(:,:,:)   = 0.0
 !See comment in prognostics module
 ALLOCATE(progs_data%rho_snow_surft(land_pts,nsurft,nsmax))
 progs_data%rho_snow_surft(:,:,:) = 0.0
+
+! Snowpack variables for melt lake model 
+IF (l_meltlake) THEN
+   ALLOCATE(progs_data%nsnow_surft_ml(land_pts,nsurft))
+   ALLOCATE(progs_data%ds_surft_ml(land_pts,nsurft,nsmax_ml))
+   ALLOCATE(progs_data%rho_snow_surft_ml(land_pts,nsurft,nsmax_ml))
+   ALLOCATE(progs_data%sice_surft_ml(land_pts,nsurft,nsmax_ml))
+   ALLOCATE(progs_data%sliq_surft_ml(land_pts,nsurft,nsmax_ml))
+   ALLOCATE(progs_data%tsnow_surft_ml(land_pts,nsurft,nsmax_ml))
+   ALLOCATE(progs_data%snow_surft_ml(land_pts,nsurft))
+   ALLOCATE(progs_data%snowdepth_surft_ml(land_pts,nsurft))
+   ALLOCATE(progs_data%rgrainl_surft_ml(land_pts,nsurft,nsmax_ml))
+   
+   progs_data%nsnow_surft_ml(:,:)     = 0
+   progs_data%ds_surft_ml(:,:,:)      = 0.0
+   progs_data%rho_snow_surft_ml(:,:,:)= 0.0
+   progs_data%sice_surft_ml(:,:,:)    = 0.0
+   progs_data%sliq_surft_ml(:,:,:)    = 0.0
+   progs_data%tsnow_surft_ml(:,:,:)   = 0.0
+   progs_data%snow_surft_ml(:,:)      = 0.0
+   progs_data%snowdepth_surft_ml(:,:) = 0.0
+   progs_data%rgrainl_surft_ml(:,:,:) = 0.0	
+!ELSE
+!   ALLOCATE(progs_data%nsnow_surft_ml(1,1))
+!   ALLOCATE(progs_data%ds_surft_ml(1,1,1))
+!   ALLOCATE(progs_data%rho_snow_surft_ml(1,1,1))
+!   ALLOCATE(progs_data%sice_surft_ml(1,1,1))
+!   ALLOCATE(progs_data%sliq_surft_ml(1,1,1))
+!   ALLOCATE(progs_data%tsnow_surft_ml(1,1,1))
+!   ALLOCATE(progs_data%snow_surft_ml(1,1))
+!   ALLOCATE(progs_data%snowdepth_surft_ml(1,1))
+END IF
 
 ! Allocate WP Pools
 IF ( l_triffid .OR. l_phenol ) THEN
@@ -546,6 +606,15 @@ DEALLOCATE(progs_data%mic_ch4)
 DEALLOCATE(progs_data%mic_act_ch4)
 DEALLOCATE(progs_data%acclim_ch4)
 DEALLOCATE(progs_data%frac_c_label_pool_soilt)
+DEALLOCATE(progs_data%nsnow_surft_ml)
+DEALLOCATE(progs_data%ds_surft_ml)
+DEALLOCATE(progs_data%rho_snow_surft_ml)
+DEALLOCATE(progs_data%sice_surft_ml)
+DEALLOCATE(progs_data%sliq_surft_ml)
+DEALLOCATE(progs_data%tsnow_surft_ml)
+DEALLOCATE(progs_data%snowdepth_surft_ml)
+DEALLOCATE(progs_data%snow_surft_ml)
+DEALLOCATE(progs_data%rgrainl_surft_ml)
 
 !Can just test on one of these being allocated
 IF ( ALLOCATED(progs_data%wood_prod_fast_gb) ) THEN
@@ -690,6 +759,15 @@ progs%years_since_harvest => progs_data%years_since_harvest
 progs%t_home_gb => progs_data%t_home_gb
 progs%t_growth_gb => progs_data%t_growth_gb
 progs%f_nsc_pft => progs_data%f_nsc_pft
+progs%nsnow_surft_ml => progs_data%nsnow_surft_ml
+progs%ds_surft_ml => progs_data%ds_surft_ml
+progs%rho_snow_surft_ml => progs_data%rho_snow_surft_ml
+progs%sice_surft_ml => progs_data%sice_surft_ml
+progs%sliq_surft_ml => progs_data%sliq_surft_ml
+progs%tsnow_surft_ml => progs_data%tsnow_surft_ml
+progs%snow_surft_ml => progs_data%snow_surft_ml
+progs%snowdepth_surft_ml => progs_data%snowdepth_surft_ml
+progs%rgrainl_surft_ml => progs_data%rgrainl_surft_ml
 
 IF (ALLOCATED(progs_data%seed_rain)) THEN
   progs%seed_rain => progs_data%seed_rain
@@ -781,6 +859,15 @@ NULLIFY(progs%years_since_harvest)
 NULLIFY(progs%t_home_gb)
 NULLIFY(progs%t_growth_gb)
 NULLIFY(progs%f_nsc_pft)
+NULLIFY(progs%nsnow_surft_ml)
+NULLIFY(progs%ds_surft_ml)
+NULLIFY(progs%rho_snow_surft_ml)
+NULLIFY(progs%sice_surft_ml)
+NULLIFY(progs%sliq_surft_ml)
+NULLIFY(progs%tsnow_surft_ml)
+NULLIFY(progs%snow_surft_ml)
+NULLIFY(progs%snowdepth_surft_ml)
+NULLIFY(progs%rgrainl_surft_ml)
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN
