@@ -12,7 +12,7 @@ IMPLICIT NONE
 
 CONTAINS
 
-SUBROUTINE init_z_land(ainfo_data,jules_vars_data)
+SUBROUTINE init_z_land(ainfo_data,ainfo,jules_vars_data)
 
 USE io_constants, ONLY: max_sdf_name_len, max_file_name_len, namelist_unit
 
@@ -33,7 +33,8 @@ USE errormessagelength_mod, ONLY: errormessagelength
 USE logging_mod, ONLY: log_info, log_warn, log_fatal
 
 !TYPE definitions
-USE ancil_info,    ONLY: ainfo_data_type
+USE ancil_info,    ONLY: ainfo_data_type, ainfo_type
+
 USE jules_vars_mod, ONLY: jules_vars_data_type
 
 IMPLICIT NONE
@@ -52,6 +53,7 @@ IMPLICIT NONE
 !-----------------------------------------------------------------------------
 ! Arguments
 TYPE(ainfo_data_type), INTENT(IN OUT) :: ainfo_data
+TYPE(ainfo_type), INTENT(IN OUT) :: ainfo
 TYPE(jules_vars_data_type), INTENT(IN OUT) :: jules_vars_data
 
 ! Work variables

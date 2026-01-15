@@ -10,6 +10,7 @@ SUBROUTINE init(nml_dir, crop_vars_data, crop_vars,                            &
                    psparms_data, psparms,                                      &
                    toppdm, top_pdm_data,                                       &
                    fire_vars, fire_vars_data,                                  &
+                   meltlake_vars, meltlake_vars_data,                          &
                    ainfo, ainfo_data,                                          &
                    trif_vars, trif_vars_data,                                  &
                    soilecosse, soil_ecosse_vars_data,                          &
@@ -56,6 +57,7 @@ USE init_hydrology_mod,           ONLY: init_hydrology
 USE init_model_environment_mod,   ONLY: init_model_environment
 USE init_radiation_mod,           ONLY: init_radiation
 USE init_snow_mod,                ONLY: init_snow
+USE init_meltlake_mod,            ONLY: init_meltlake
 USE init_surface_types_mod,       ONLY: init_jules_surface_types,              &
                                         init_cable_surface_types
 USE init_soil_biogeochem_mod,     ONLY: init_soil_biogeochem
@@ -91,6 +93,9 @@ USE top_pdm,                      ONLY: top_pdm_data_type,                     &
 USE fire_vars_mod,                ONLY: fire_vars_data_type,                   &
                                         fire_vars_type,                        &
                                         fire_vars_assoc
+USE meltlake_vars_mod,            ONLY: meltlake_vars_data_type,               &
+                                        meltlake_vars_type,                    &
+                                        meltlake_vars_assoc																			
 USE ancil_info,                   ONLY: ainfo_data_type,                       &
                                         ainfo_type,                            &
                                         ancil_info_assoc
@@ -184,6 +189,7 @@ TYPE(crop_vars_data_type), INTENT(IN OUT) :: crop_vars_data
 TYPE(psparms_data_type), INTENT(IN OUT) :: psparms_data
 TYPE(top_pdm_data_type), INTENT(IN OUT) :: top_pdm_data
 TYPE(fire_vars_data_type), INTENT(IN OUT) :: fire_vars_data
+TYPE(meltlake_vars_data_type), INTENT(IN OUT) :: meltlake_vars_data
 TYPE(ainfo_data_type), INTENT(IN OUT) :: ainfo_data
 TYPE(trif_vars_data_type), INTENT(IN OUT) :: trif_vars_data
 TYPE(soil_ecosse_vars_data_type), INTENT(IN OUT) :: soil_ecosse_vars_data
@@ -212,6 +218,7 @@ TYPE(crop_vars_type), INTENT(IN OUT) :: crop_vars
 TYPE(psparms_type), INTENT(IN OUT) :: psparms
 TYPE(top_pdm_type), INTENT(IN OUT) :: toppdm
 TYPE(fire_vars_type), INTENT(IN OUT) :: fire_vars
+TYPE(meltlake_vars_type), INTENT(IN OUT) :: meltlake_vars
 TYPE(ainfo_type), INTENT(IN OUT) :: ainfo
 TYPE(trif_vars_type), INTENT(IN OUT) :: trif_vars
 TYPE(soil_ecosse_vars_type), INTENT(IN OUT) :: soilecosse
@@ -290,6 +297,9 @@ CALL init_deposition(nml_dir)
 ! Initialise snow options
 CALL init_snow(nml_dir)
 
+! Initialise melt lake options
+CALL init_meltlake(nml_dir)
+
 ! Initialise river routing parameters, ancils and grid
 CALL init_rivers(nml_dir)
 
@@ -305,7 +315,7 @@ CALL init_science_fixes(nml_dir)
 
 ! Initialise the input, model and output grids **also allocates arrays**
 CALL init_grid(nml_dir, crop_vars_data,psparms_data,top_pdm_data,              &
-               fire_vars_data,ainfo_data,trif_vars_data,                       &
+               fire_vars_data,meltlake_vars_data,ainfo_data,ainfo,trif_vars_data,    &
                soil_ecosse_vars_data, aero_data, urban_param_data, progs_data, &
                trifctl_data, coastal_data,jules_vars_data,                     &
                fluxes_data,                                                    &
@@ -325,7 +335,8 @@ CALL crop_vars_assoc(crop_vars, crop_vars_data)
 CALL psparms_assoc(psparms,psparms_data)
 CALL top_pdm_assoc(toppdm, top_pdm_data)
 CALL fire_vars_assoc(fire_vars, fire_vars_data)
-CALL ancil_info_assoc(ainfo, ainfo_data)
+CALL meltlake_vars_assoc(meltlake_vars, meltlake_vars_data)
+!CALL ancil_info_assoc(ainfo, ainfo_data)
 CALL trif_vars_assoc(trif_vars, trif_vars_data)
 CALL soil_ecosse_vars_assoc(soilecosse, soil_ecosse_vars_data)
 CALL aero_assoc(aerotype,aero_data)

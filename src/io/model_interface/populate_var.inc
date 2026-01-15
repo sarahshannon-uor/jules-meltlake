@@ -10,7 +10,8 @@ SUBROUTINE populate_var(var_id, cube, const_val)
 USE jules_fields_mod, ONLY: crop_vars, psparms, toppdm, fire_vars, ainfo,      &
                             trif_vars, soilecosse, urban_param, progs,         &
                             trifctltype, jules_vars, fluxes, forcing,          &
-                            lake_vars, chemvars, rivers, water_resources
+                            lake_vars, chemvars, rivers, water_resources,      &
+							jules_vars_data
 
   !Science variables
 ! TYPE Definitions
@@ -155,9 +156,9 @@ CASE ( 'surf_hgt_surft' )
 CASE ( 'z_land_land' )
   IF ( PRESENT(cube) ) THEN
     cube_land = map_to_land(cube)
-    CALL cube_get_data(cube_land, jules_vars%z_land_land)
+	CALL cube_get_data(cube_land, jules_vars_data%z_land_land)
   ELSE
-    jules_vars%z_land_land(:) = const_val
+    jules_vars_data%z_land_land(:) = const_val
   END IF
 
 CASE ( 'frac' )
