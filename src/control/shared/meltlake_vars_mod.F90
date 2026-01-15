@@ -1,0 +1,222 @@
+! *****************************COPYRIGHT****************************************
+! (c) Crown copyright, Met Office. All rights reserved.
+!
+! This routine has been licensed to the other JULES partners for use and
+! distribution under the JULES collaboration agreement, subject to the terms and
+! conditions set out therein.
+!
+! [Met Office Ref SC0237]
+! *****************************COPYRIGHT****************************************
+!
+! Module containing melt lake variables.
+!
+! Code Description:
+!   Language: FORTRAN 90
+!
+! Code Owner: Please refer to ModuleLeaders.txt
+!
+
+MODULE meltlake_vars_mod
+
+
+USE um_types, ONLY: real_jlslsm
+
+IMPLICIT NONE
+
+! Implementation for field variables:
+! Each variable is declared in both the 'data' TYPE and the 'pointer' type.
+! Instances of these types are declared at at high level as required
+! This is to facilitate advanced memory management features, which are generally
+! not visible in the science code.
+! Checklist for adding a new variable:
+! -add to data_type
+! -add to pointer_type
+! -add to the allocate routine, passing in any new dimension sizes required
+!  by argument (not via USE statement)
+! -add to the deallocate routine
+! -add to the assoc and nullify routines
+!  Sarah copy fire variables 
+
+TYPE :: meltlake_vars_data_type    
+ 
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: sfrac_ml(:,:,:)
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: lfrac_ml(:,:,:)
+ 
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: lake_depth_ml(:,:)
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: lake_albedo_ml(:,:)
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: lake_temp_ml(:,:)
+  
+  LOGICAL, ALLOCATABLE :: is_meltlake(:,:)
+
+END TYPE meltlake_vars_data_type
+
+TYPE :: meltlake_vars_type
+  
+  REAL(KIND=real_jlslsm), POINTER :: sfrac_ml(:,:,:)
+  REAL(KIND=real_jlslsm), POINTER :: lfrac_ml(:,:,:)
+  
+  REAL(KIND=real_jlslsm), POINTER :: lake_depth_ml(:,:)
+  REAL(KIND=real_jlslsm), POINTER :: lake_albedo_ml(:,:)
+  REAL(KIND=real_jlslsm), POINTER :: lake_temp_ml(:,:)
+  
+  LOGICAL, POINTER :: is_meltlake(:,:)
+  
+END TYPE meltlake_vars_type
+
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='MELTLAKE_VARS_MOD'
+
+CONTAINS
+
+!===============================================================================
+SUBROUTINE meltlake_vars_alloc(land_pts,nsurft,nsmax_ml,meltlake_vars_data)
+
+!No USE statements other than Dr Hook
+USE parkind1,               ONLY: jprb, jpim
+USE yomhook,                ONLY: lhook, dr_hook
+
+IMPLICIT NONE
+
+!Arguments
+INTEGER, INTENT(IN) :: land_pts, nsurft, nsmax_ml
+TYPE(meltlake_vars_data_type), INTENT(IN OUT) :: meltlake_vars_data
+
+INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
+INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
+REAL(KIND=jprb)               :: zhook_handle
+
+CHARACTER(LEN=*), PARAMETER :: RoutineName='MELTLAKE_VARS_ALLOC'
+
+!End of header
+
+IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
+
+!-----------------------------------------------------------------------
+! Allocate space for meltlake diagnostic variables
+!-----------------------------------------------------------------------
+
+ALLOCATE(meltlake_vars_data%sfrac_ml(land_pts,nsurft,nsmax_ml))
+ALLOCATE(meltlake_vars_data%lfrac_ml(land_pts,nsurft,nsmax_ml))
+ALLOCATE(meltlake_vars_data%is_meltlake(land_pts,nsurft))
+ALLOCATE(meltlake_vars_data%lake_depth_ml(land_pts,nsurft))
+ALLOCATE(meltlake_vars_data%lake_albedo_ml(land_pts,nsurft))
+ALLOCATE(meltlake_vars_data%lake_temp_ml(land_pts,nsurft))
+
+meltlake_vars_data%sfrac_ml(:,:,:)      = 0.0
+meltlake_vars_data%lfrac_ml(:,:,:)      = 0.0
+meltlake_vars_data%lake_depth_ml(:,:)   = 0.0
+meltlake_vars_data%lake_albedo_ml(:,:)  = 0.85  
+meltlake_vars_data%lake_temp_ml(:,:)    = 273.15  
+meltlake_vars_data%is_meltlake(:,:)     = .FALSE.
+
+IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
+RETURN
+END SUBROUTINE meltlake_vars_alloc
+
+
+!===============================================================================
+SUBROUTINE meltlake_vars_dealloc(meltlake_vars_data)
+
+!No USE statements other than Dr Hook
+USE parkind1,    ONLY: jprb, jpim
+USE yomhook,     ONLY: lhook, dr_hook
+
+IMPLICIT NONE
+
+!Arguments
+TYPE(meltlake_vars_data_type), INTENT(IN OUT) :: meltlake_vars_data
+
+INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
+INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
+REAL(KIND=jprb)               :: zhook_handle
+
+CHARACTER(LEN=*), PARAMETER :: RoutineName='MELTLAKE_VARS_DEALLOC'
+
+!End of header
+
+IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
+
+!-----------------------------------------------------------------------
+! Deallocate space for melt lake diagnostic variables
+!-----------------------------------------------------------------------
+DEALLOCATE(meltlake_vars_data%sfrac_ml)
+DEALLOCATE(meltlake_vars_data%lfrac_ml)
+DEALLOCATE(meltlake_vars_data%lake_depth_ml)
+DEALLOCATE(meltlake_vars_data%lake_albedo_ml)
+DEALLOCATE(meltlake_vars_data%lake_temp_ml)
+DEALLOCATE(meltlake_vars_data%is_meltlake)
+
+IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
+RETURN
+END SUBROUTINE meltlake_vars_dealloc
+
+!===============================================================================
+SUBROUTINE meltlake_vars_assoc(meltlake_vars, meltlake_vars_data)
+
+!No USE statements other than Dr Hook
+USE parkind1,    ONLY: jprb, jpim
+USE yomhook,     ONLY: lhook, dr_hook
+
+IMPLICIT NONE
+
+!Arguments
+TYPE(meltlake_vars_type), INTENT(IN OUT) :: meltlake_vars
+TYPE(meltlake_vars_data_type), INTENT(IN OUT), TARGET :: meltlake_vars_data
+
+INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
+INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
+REAL(KIND=jprb)               :: zhook_handle
+
+CHARACTER(LEN=*), PARAMETER :: RoutineName='MELTLAKE_VARS_ASSOC'
+
+!End of header
+
+IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
+
+CALL meltlake_vars_nullify(meltlake_vars)
+
+meltlake_vars%sfrac_ml => meltlake_vars_data%sfrac_ml
+meltlake_vars%lfrac_ml => meltlake_vars_data%lfrac_ml
+meltlake_vars%lake_depth_ml => meltlake_vars_data%lake_depth_ml
+meltlake_vars%lake_albedo_ml => meltlake_vars_data%lake_albedo_ml
+meltlake_vars%lake_temp_ml => meltlake_vars_data%lake_temp_ml
+meltlake_vars%is_meltlake => meltlake_vars_data%is_meltlake
+
+IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
+RETURN
+END SUBROUTINE meltlake_vars_assoc
+
+!===============================================================================
+SUBROUTINE meltlake_vars_nullify(meltlake_vars)
+
+!No USE statements other than Dr Hook
+USE parkind1,    ONLY: jprb, jpim
+USE yomhook,     ONLY: lhook, dr_hook
+
+IMPLICIT NONE
+
+!Arguments
+TYPE(meltlake_vars_type), INTENT(IN OUT) :: meltlake_vars
+
+INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
+INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
+REAL(KIND=jprb)               :: zhook_handle
+
+CHARACTER(LEN=*), PARAMETER :: RoutineName='MELTLAKE_VARS_NULLIFY'
+
+!End of header
+
+IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
+
+NULLIFY(meltlake_vars%sfrac_ml)
+NULLIFY(meltlake_vars%lfrac_ml)
+NULLIFY(meltlake_vars%lake_depth_ml)
+NULLIFY(meltlake_vars%lake_albedo_ml)
+NULLIFY(meltlake_vars%lake_temp_ml)
+NULLIFY(meltlake_vars%is_meltlake)
+
+
+IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
+RETURN
+END SUBROUTINE meltlake_vars_nullify
+
+END MODULE meltlake_vars_mod
