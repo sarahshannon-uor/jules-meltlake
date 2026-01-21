@@ -375,9 +375,9 @@ END DO
 !$OMP DO SCHEDULE(STATIC)
 DO k = 1,surft_pts
   i = surft_index(k)
-
+  
   IF (l_elev_land_ice .AND. l_lice_point(i)) THEN
-    tsoilw  = 263.15!tsurf_elev_surft(i)
+    tsoilw  = 253.15!tsurf_elev_surft(i)
     dzsoilw = dzsoil_elev
     IF (l_lice_surft(surft_n)) THEN
       hconsw = snow_hcon
@@ -749,28 +749,40 @@ DO k = 1,surft_pts
 
     END IF ! l_snow_infilt
 
-    !IF (l_meltlake .AND. l_elev_land_ice .AND. l_lice_point(i)) THEN
+    IF (l_meltlake .AND. l_elev_land_ice .AND. l_lice_point(i)) THEN
+
+
+       ! NOTE:
+       ! Pass full arrays (ds, sice, sliq, tsnow, etc.) and index by land point
+       ! inside percolate_monarchs, rather than passing slices like var(i,:).
+       !
+       ! Passing var(i,:) creates a non-contiguous input args because
+       ! Fortran is column-major (the contiguous slice would be var(:,i)).
+       ! With INTENT(INOUT), ifort therefore creates copy-in/copy-out temporaries,
+       ! which are allocated on the heap when -heap-arrays is enabled.
+       !
+       ! In debug builds with ifort, this led to glibc errors
+       !   "corrupted size vs. prev_size in fastbins"
+       ! triggered even by simple I/O (e.g. PRINT *, 'hello') inside the routine.
+       ! The issue does not appear with gfortran (mpi/openmp) or intel
+       ! without -heap-arrays (flag in integ.cfg)
+       !
+       ! Using full arrays avoids non-contiguous arguments, prevents 
+       ! runtime error using intel serial build
+
+       CALL percolate_monarchs( i, nsnow(i), nsmax, n_wtrac_jls,  &
+            timestep,                                             &
+            csnow, ds, tsnow,                                     &
+            sice, sliq,                                           &
+            sice_wtrac, sliq_wtrac,                               &
+            win, win_wtrac,                                       &
+            sf_diag, surft_n )
        
-     !  CALL percolate_monarchs( nsnow(i), nsmax, n_wtrac_jls,  &
-     !       timestep,                                          &
-     !       csnow(i,:), ds(i,:), tsnow(i,:),                   &
-     !       sice(i,:), sliq(i,:),                              &
-     !       sice_wtrac(i,:,:), sliq_wtrac(i,:,:),              &
-     !       win, win_wtrac,                                    &
-     !       sf_diag, surft_n, i )
-    !ELSE
+    ELSE
 
     
     DO n = 1,nsnow(i)
-
-       !IF (n == 1.AND.a_step<=168) THEN
-          ! add 1.1mmhr-1 to top
-        !  sliq(i,n) = sliq(i,n) + win + 1.0!0.0003
-     !     print *, 'add extrawater @', a_step
-       !ELSE
-        !  sliq(i,n) = sliq(i,n) + win
-       !END IF
-       
+ 
       sliq(i,n) = sliq(i,n) + win
       win       = 0.0
       sliqmax   = snowliqcap * rho_water * ds(i,n)
@@ -855,7 +867,7 @@ DO k = 1,surft_pts
 
     END DO  !  layers
 
-  !END IF ! percolate_monarchs or use default
+  END IF ! percolate_monarchs or use default
 
     !-------------------------------------------------------------------------
     ! The remaining liquid water flux is melt.
