@@ -654,7 +654,7 @@ IF ( .NOT. l_correct ) THEN
 
     DO n = 1, nice_use
       CALL sf_melt (                                                           &
-        ssi_pts,ssi_index,                                                     &
+        n,ssi_pts,ssi_index,                                                     &
         sice_index_ncat(:,n),sice_pts_ncat(n),fssi_ij,                         &
         alpha1_sice(:,:,n),ashtf_prime(:,:,n),dtrdz_charney_grid_1,            &
         array_one,array_one,rhokh_sice(:,:,n),sice_frac_ncat(:,n),timestep,    &
@@ -708,7 +708,7 @@ IF ( .NOT. l_correct ) THEN
 !$OMP END PARALLEL DO
 
       CALL sf_melt (                                                           &
-        ssi_pts,ssi_index,                                                     &
+        n,ssi_pts,ssi_index,                                                     &
         sice_index_ncat(:,n),sice_pts_ncat(n),fssi_ij,                         &
         alpha1_sice(:,:,1),ashtf_prime(:,:,1),dtrdz_charney_grid_1,            &
         array_one,array_one,rhokh_sice(:,:,1),sice_frac_ncat(:,n),timestep,    &

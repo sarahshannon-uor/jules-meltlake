@@ -255,7 +255,7 @@ REAL(KIND=real_jlslsm) ::                                                      &
                 ! Threshold snowpack density where holding capacity/ability
                 ! to percolate meltwater starts to be reduced
                 ! (kg per m**3)
-  rho_firn_pore_closure = 850.0
+  rho_firn_pore_closure = 830.0!850.0
                 ! Threshold snowpack density where holding capacity/ability
                 ! to percolate meltwater becomes 0
                 ! (kg per m**3)

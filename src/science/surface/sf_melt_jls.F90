@@ -19,7 +19,7 @@ CONTAINS
 !           by melt and sublimation in P251.
 !-----------------------------------------------------------------------
 SUBROUTINE sf_melt (                                                           &
- points,pts_index                                                              &
+ n,points,pts_index                                                              &
 ,surft_index,surft_pts,fld_sea                                                 &
 ,alpha1,ashtf_prime,dtrdz_1                                                    &
 ,fracs,resft,rhokh_1,tile_frac,timestep,r_gamma                                &
@@ -44,6 +44,9 @@ USE water_constants_mod, ONLY:                                                 &
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 IMPLICIT NONE
+
+
+INTEGER :: n
 
 INTEGER ::                                                                     &
  points                                                                        &

@@ -55,7 +55,7 @@ TYPE(progs_type), INTENT(IN OUT) :: progs
 ! Work variables
 INTEGER :: i, j, k, l, n, m  ! Index variables
 
-REAL(KIND=real_jlslsm), PARAMETER :: T_min = 253.15, T_max = 263.15
+REAL(KIND=real_jlslsm), PARAMETER :: T_min = 253.15, T_max = 272.15!263.15
 
 REAL(KIND=real_jlslsm), PARAMETER :: rho_sfc = 500.0
 
@@ -102,41 +102,41 @@ DO n = 1,nsurft
                     progs%ds_surft_ml(i,n,k) = firn_depth_max / REAL(nsmax_ml) 
                     
                     ! get cumulative snowdepth layers assuming equally spaced layers 
-                    !dzsnow_cumulative(i,n,k) = (REAL(k - 1) / REAL(nsmax_ml - 1)) * firn_depth_max 
+                    dzsnow_cumulative(i,n,k) = (REAL(k - 1) / REAL(nsmax_ml - 1)) * firn_depth_max 
 !-------------------------------------------------------------------------------
 ! Initialise snowpack temperature. Default is a warm top, cold bottom
 !-------------------------------------------------------------------------------
 
-                    !progs%tsnow_surft_ml(i,n,k) = 263.15!T_max - ( (k-1) * (T_max - T_min) ) / REAL(nsmax_ml-1)
+                    progs%tsnow_surft_ml(i,n,k) = T_max - ( (k-1) * (T_max - T_min) ) / REAL(nsmax_ml-1)
 ! for idealised test to control where refreezing of meltwater happens in the snowpack
-            IF (k <= 20) THEN
+            !IF (k <= 20) THEN
                 ! 0–4 m: warm near-melting snow
-                progs%tsnow_surft_ml(i,n,k) = 272.65   ! K
+             !   progs%tsnow_surft_ml(i,n,k) = 272.65   ! K
 
-            ELSE IF (k <= 25) THEN
+            !ELSE IF (k <= 25) THEN
                ! 4–5 m: cold trap, linear ramp
-               progs%tsnow_surft_ml(i,n,k) = 271.15 + &
-               REAL(k-21) / REAL(25-21) * (253.15 - 271.15)
+             !  progs%tsnow_surft_ml(i,n,k) = 271.15 + &
+             !  REAL(k-21) / REAL(25-21) * (253.15 - 271.15)
 
-            ELSE
+            !ELSE
              ! below 3 m: cold background
-               progs%tsnow_surft_ml(i,n,k) = 253.15   ! K
+            !   progs%tsnow_surft_ml(i,n,k) = 253.15   ! K
 
-            END IF                     
+            !END IF                     
 !-------------------------------------------------------------------------------
 ! Increase density with depth using e-folding value
 !-------------------------------------------------------------------------------
 
-               progs%rho_snow_surft_ml(i,n,k) = 650.0
+               !progs%rho_snow_surft_ml(i,n,k) = 700.0
               
               ! monarchs init desnity profile   
-              !progs%rho_snow_surft_ml(i,n,k) = rho_ice - &(rho_ice - rho_sfc) * EXP( - (1.9 / rho_firn_efold) * dzsnow_cumulative(i,n,k) )
-               
+                    progs%rho_snow_surft_ml(i,n,k) = rho_ice - &
+                         (rho_ice - rho_sfc) * EXP( - (1.9 / rho_firn_efold) * dzsnow_cumulative(i,n,k) )
+               print *, 'k, rho, temp', k, progs%rho_snow_surft_ml(i,n,k),progs%tsnow_surft_ml(i,n,k)-273.15    
            END DO
         END IF
     END DO
 END DO
-
 
 !-------------------------------------------------------------------------------
 ! Calculate snow layer thicknesses - testing varaible ds instead of fixed 
@@ -190,12 +190,12 @@ DO n = 1,nsurft
 !print *, 'firn_depth_max', firn_depth_max
 !print *, 'progs%ds_surft_ml', progs%ds_surft_ml(:,9,:)
 !print *, 'dzsnow_ml', dzsnow_ml
-!print *, 'progs%tsnow_surft_ml', progs%tsnow_surft_ml(:,9,:)
+!print *, 'progs%tsnow_surft_ml', progs%tsnow_surft_ml(:,9,:)-273.15
 !print *, 'progs%rho_snow_surft_ml', progs%rho_snow_surft_ml(:,9,:)
 !print *, 'progs%snow_surft_ml(i)',progs%snow_surft_ml
 !print *, 'progs%snowdepth_surft_ml(i)',progs%snowdepth_surft_ml
 !print*, 'progs%ice_mass_snow_ml(i,n,k)',progs%sice_surft_ml
-!stop
+
 
 
 END IF

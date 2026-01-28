@@ -28,6 +28,7 @@ CONTAINS
 !           numerical solver.
 !
 !--------------------------------------------------------------------
+!--------------------------------------------------------------------
 !    Arguments :-
 SUBROUTINE jules_land_sf_implicit (                                            &
 ! IN values defining field dimensions and subset to be processed :
@@ -38,7 +39,7 @@ SUBROUTINE jules_land_sf_implicit (                                            &
 ! IN everything not covered so far :
  lw_down,sw_surft,sky,t_soil_soilt,r_gamma,alpha1,ashtf_prime_surft,           &
  dtrdz_charney_grid_1,fracaero_t,fracaero_s,resfs,resft,rhokh_surft,           &
- emis_surft,snow_surft,dtstar_surft,                                           &
+ emis_surft,snow_surft,snow_surft_ml, dtstar_surft,                            &
 ! INOUT data :
  tstar_surft,fqw_surft,fqw_1,ftl_1,ftl_surft,sf_diag,                          &
 ! OUT Diagnostic not requiring STASH flags :
@@ -61,9 +62,10 @@ SUBROUTINE jules_land_sf_implicit (                                            &
  ! prognostics (IN)
  nsnow_surft,                                                                  &
  ! jules_mod (IN)
- snowdep_surft,                                                                &
+ snowdep_surft, snowdep_surft_ml,                                              &
  ! JULES Types containing field data (IN OUT)
  crop_vars,                                                                    &
+ meltlake_vars,                                                                &  
  ! Water tracers (IN)
  snow_surft_wtrac, smc_soilt_wtrac, canopy_wtrac, fqw_evapsrce_wtrac,          &
  ! Water tracers (INOUT)
@@ -77,6 +79,8 @@ SUBROUTINE jules_land_sf_implicit (                                            &
 !TYPE definitions
 USE crop_vars_mod, ONLY: crop_vars_type
 
+USE meltlake_vars_mod, ONLY: meltlake_vars_type
+
 USE csigma,                   ONLY: sbcon
 
 USE planet_constants_mod,     ONLY: cp
@@ -85,7 +89,9 @@ USE atm_fields_bounds_mod,    ONLY: tdims, pdims
 
 USE theta_field_sizes,        ONLY: t_i_length, t_j_length
 
-USE jules_surface_mod,        ONLY: l_aggregate, l_flake_model, ls
+USE jules_surface_mod,        ONLY: l_aggregate, l_flake_model, ls, l_elev_land_ice
+
+USE jules_meltlake_mod,       ONLY: l_meltlake
 
 USE jules_snow_mod,           ONLY:                                            &
   nsmax, rho_snow_const, cansnowtile, l_snow_nocan_hc
@@ -173,6 +179,8 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
                              ! IN Emissivity for land tiles
 ,snow_surft(land_pts,nsurft)                                                   &
                              ! IN Lying snow on tiles (kg/m2)
+,snow_surft_ml(land_pts)                                                       &
+                             ! IN Lying snow on tile melt lake (kg/m2)
 ,dtstar_surft(land_pts,nsurft)
                              ! IN Change in TSTAR over timestep
                              !    for land tiles
@@ -402,9 +410,12 @@ REAL(KIND=real_jlslsm), INTENT(IN) :: lw_down_elevcorr_surft(land_pts,nsurft)
 INTEGER, INTENT(IN) :: nsnow_surft(land_pts,nsurft)
 ! jules_mod (IN)
 REAL(KIND=real_jlslsm), INTENT(IN) :: snowdep_surft(land_pts,nsurft)
+REAL(KIND=real_jlslsm), INTENT(IN) :: snowdep_surft_ml(land_pts)
 
 !TYPES containing field data (IN OUT)
 TYPE(crop_vars_type), INTENT(IN OUT) :: crop_vars
+
+TYPE(meltlake_vars_type), INTENT(IN OUT) :: meltlake_vars
 
 !--------------------------------------------------------------------
 !  Workspace :-
@@ -421,6 +432,17 @@ REAL(KIND=real_jlslsm) ::                                                      &
                              ! Snowmelt (kg/m2/s).
 ,snowinc_flake(land_pts,nsurft)
                              ! Increment to ice for FLake
+
+
+!--------------------------------------------------------------------
+! melt lake
+!--------------------------------------------------------------------
+REAL(KIND=real_jlslsm) ::                                                     &
+ melt_surft_ml(land_pts)                                                      &
+                             ! Snowmelt melt lake (kg/m2/s).
+,snowinc_surft_ml(land_pts)
+                             ! Increment to snow for meltlake
+
 
 REAL(KIND=real_jlslsm) ::                                                      &
  elake_surft_wtrac(land_pts,nsurft,n_wtrac_jls)
@@ -482,7 +504,7 @@ ERROR = 0
 !$OMP SHARED(tdims,nsurft,surft_pts,surft_index,                               &
 !$OMP        ftl_surft,nsoilt,land_pts,t_soil_soilt,                           &
 !$OMP        tstar_surft_old,tstar_surft,dtstar_surft,cp,error,tile_frac,      &
-!$OMP        non_lake_frac,lake,l_flake_model,l_aggregate)
+!$OMP        non_lake_frac,lake,l_flake_model,l_aggregate,l_meltlake)
 
 !-----------------------------------------------------------------------
 ! 6.1 Convert FTL to sensible heat flux in Watts per square metre.
@@ -587,7 +609,7 @@ CALL sf_evap (                                                                 &
 !$OMP DEFAULT(NONE)                                                            &
 !$OMP PRIVATE(l,n,j,i)                                                         &
 !$OMP SHARED(tdims,ei_land,snowmelt,nsurft,land_pts,melt_ice_surft,            &
-!$OMP snowinc_flake)
+!$OMP snowinc_flake,melt_surft_ml,snowinc_surft_ml)
 
 !$OMP DO SCHEDULE(STATIC)
 DO j = tdims%j_start,tdims%j_end
@@ -606,28 +628,19 @@ DO n = 1,nsurft
     snowinc_flake(l,n) = 0.0
   END DO
 !$OMP END DO NOWAIT
+
+
 END DO
 
 !$OMP END PARALLEL
 
 DO n = 1,nsurft
-  CALL sf_melt (                                                               &
-    land_pts,land_index,                                                       &
-    surft_index(:,n),surft_pts(n),flandg,                                      &
-    alpha1(:,n),ashtf_prime_surft(:,n),dtrdz_charney_grid_1,                   &
-    fracaero_s(:,n),resft(:,n),rhokh_surft(:,n),tile_frac(:,n),                &
-    timestep,r_gamma, ei_surft(:,n),fqw_1,ftl_1,fqw_surft(:,n),ftl_surft(:,n), &
-    tstar_surft(:,n),snow_surft(:,n),snowdep_surft(:,n),                       &
-    melt_surft(:,n),snowinc_surft(:,n)                                         &
-    )
 
-  !-----------------------------------------------------------------------
-  ! thermodynamic, flux contribution of melting ice on the FLake lake tile
-  !-----------------------------------------------------------------------
-  IF (     (l_flake_model   )                                                  &
-    .AND. ( .NOT. l_aggregate)                                                 &
-    .AND. (n == lake       ) ) THEN
-
+!-----------------------------------------------------------------------
+! thermodynamic, flux contribution of melting ice on the FLake lake tile
+!-----------------------------------------------------------------------
+  
+IF (l_flake_model .AND. .NOT. l_aggregate .AND. (n == lake)) THEN
     ! lake_h_ice_gb is only initialised if FLake is on.
 
 !$OMP PARALLEL DO                                                              &
@@ -641,7 +654,7 @@ DO n = 1,nsurft
 !$OMP END PARALLEL DO
 
     CALL sf_melt (                                                             &
-      land_pts,land_index,                                                     &
+      n, land_pts,land_index,                                                  &
       surft_index(:,n),surft_pts(n),flandg,                                    &
       alpha1(:,n),ashtf_prime_surft(:,n),dtrdz_charney_grid_1,                 &
       fracaero_s(:,n),resft(:,n),rhokh_surft(:,n),tile_frac(:,n),              &
@@ -650,6 +663,28 @@ DO n = 1,nsurft
       tstar_surft(:,n),lake_ice_mass,lake_ice_mass / rho_snow_const,           &
       melt_ice_surft(:,n),snowinc_flake(:,n)                                   &
         )
+
+  ELSE
+
+
+  CALL sf_melt (                                                               &
+    n, land_pts,land_index,                                                    &
+    surft_index(:,n),surft_pts(n),flandg,                                      &
+    alpha1(:,n),ashtf_prime_surft(:,n),dtrdz_charney_grid_1,                   &
+    fracaero_s(:,n),resft(:,n),rhokh_surft(:,n),tile_frac(:,n),                &
+    timestep,r_gamma, ei_surft(:,n),fqw_1,ftl_1,fqw_surft(:,n),ftl_surft(:,n), &
+    tstar_surft(:,n),snow_surft(:,n),snowdep_surft(:,n),                       &
+    melt_surft(:,n),snowinc_surft(:,n)                                         &
+    )
+
+	!print *, '----inside jules_land_sf_implicit------------' 
+    !print *, 'snow_surft', n,snow_surft(:,n)
+	!print *, 'snowdep_surft', n, snowdep_surft(:,n)
+	!print *, 'melt_surft',n,melt_surft(:,n)
+	!print *, 'snowinc_surft',n ,snowinc_surft(:,n) 
+	!print *, '----- end sf_implicit-----------' 
+
+
   END IF
 
   !-----------------------------------------------------------------------
@@ -779,7 +814,23 @@ ELSE
       radnet_surft(l,n) = sw_surft(l,n) +   emis_surft(l,n) *                  &
                  ( lw_down(i,j) + lw_down_elevcorr_surft(l,n)                  &
                                 - sbcon * tstar_surft(l,n)**4 )
-    END DO
+    
+!IF (n == 9) THEN
+!   PRINT *, '--- radiative balance terms at l=', l, ' n=', n, ' ---'
+!   PRINT *, 'sw_surft              = ', sw_surft(l,n)
+!   PRINT *, 'emis_surft            = ', emis_surft(l,n)
+!   PRINT *, 'lw_down(i,j)          = ', lw_down(i,j)
+!   PRINT *, 'lw_down_elevcorr_surft= ', lw_down_elevcorr_surft(l,n)
+!   PRINT *, 'sbcon                 = ', sbcon
+!   PRINT *, 'tstar_surft           = ', tstar_surft(l,n)
+!   PRINT *, 'emis*lw_down          = ', emis_surft(l,n) * lw_down(i,j)
+!   PRINT *, 'emis*lw_down_elevcorr = ', emis_surft(l,n) * lw_down_elevcorr_surft(l,n)
+!   PRINT *, 'emis*sbcon*T^4        = ', emis_surft(l,n) * sbcon * tstar_surft(l,n)**4
+!   PRINT *, 'radnet_surft          = ', radnet_surft(l,n)
+!   PRINT *, '-----------------------------------------------------'	 
+!END IF	
+ 
+	END DO
 !$OMP END DO
   END DO
   IF (sf_diag%l_lw_surft) THEN
@@ -854,6 +905,23 @@ DO n = 1,nsurft
                         le_surft(l,n) -                                        &
                         lf * (melt_surft(l,n) + melt_ice_surft(l,n)) -         &
                         surf_ht_store_surft(l,n)
+						
+	
+	!IF (n == 9) THEN
+	!   PRINT *, '--- energy balance terms at l=', l, ' n=', n, ' ---'
+	!   PRINT *, 'radnet_surft        = ', radnet_surft(l,n)
+	!   PRINT *, 'anthrop_heat_surft  = ', anthrop_heat_surft(l,n)
+	!   PRINT *, 'ftl_surft           = ', ftl_surft(l,n)
+	!   PRINT *, 'le_surft            = ', le_surft(l,n)
+	!   PRINT *, 'melt_surft          = ', melt_surft(l,n)
+	!   PRINT *, 'melt_ice_surft      = ', melt_ice_surft(l,n)
+	!   PRINT *, 'lf                  = ', lf
+	!   PRINT *, 'surf_ht_store_surft = ', surf_ht_store_surft(l,n)
+	!   PRINT *, 'surf_htf_surft      = ', surf_htf_surft(l,n)
+	!   PRINT *, '-------------------------------------------------'
+	  
+	!END IF
+								
     ! separate out the lake heat flux for FLake
     ! and replace the snow-melt (NSMAX=0 only) and ice-melt heat fluxes
     ! so Flake can do its melting

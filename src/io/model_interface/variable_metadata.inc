@@ -9497,4 +9497,17 @@ DATA metadata(732) / var_metadata(                                             &
 !! Units
 !    "-"                                                                        &
 ! ) /
+ !-----------------------------------------------------------------------------
+!! Metadata for ice lens depth (most upper lens)
+!!-----------------------------------------------------------------------------
+DATA metadata(733) / var_metadata(                                             &
+! String identifier 
+    'ice_lens_depth',                                                          &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    "Ice lens depth",                                                          &
+! Units
+    "m"                                                                        &
+ ) /
 #endif

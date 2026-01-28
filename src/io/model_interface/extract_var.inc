@@ -2678,7 +2678,11 @@ CASE ( 'lake_albedo_ml' )
 CASE ( 'lake_temp_ml' )
   cube_land = cube_from_array(meltlake_vars%lake_temp_ml)
   cube = map_from_land(cube_land)
-  
+
+CASE ( 'ice_lens_depth' )
+  cube_land = cube_from_array(meltlake_vars%ice_lens_depth)
+  cube = map_from_land(cube_land)
+
 !CASE ( 'is_meltlake' )
   !cube_land = cube_from_array(meltlake_vars%is_meltlake)
 !  cube_land = cube_from_array( merge(1.0, 0.0, meltlake_vars%is_meltlake) )

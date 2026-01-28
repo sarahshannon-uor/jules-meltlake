@@ -102,6 +102,7 @@ SUBROUTINE jules_land_sf_explicit (                                            &
  !prognostics (IN)
  nsnow_surft, sice_surft, sliq_surft, snowdepth_surft,                         &
                         tsnow_surft, ds_surft,                                 &
+ sice_surft_ml, sliq_surft_ml, tsnow_surft_ml, ds_surft_ml,                    &
  !c_elevate (OUT)
  surf_hgt_surft, lw_down_elevcorr_surft,                                       &
  !jules_mod (OUT)
@@ -196,6 +197,8 @@ USE jules_surface_mod, ONLY: l_aggregate, formdrag, l_anthrop_heat_src,        &
 
 USE jules_vegetation_mod, ONLY: can_model, can_rad_mod, ilayers, l_triffid,    &
                                 l_vegdrag_surft
+
+USE jules_meltlake_mod,  ONLY: l_meltlake, nsmax_ml
 
 USE jules_irrig_mod, ONLY: l_irrig_dmd
 
@@ -713,8 +716,12 @@ REAL(KIND=real_jlslsm), INTENT(IN) :: sice_surft(land_pts,nsurft,nsmax),       &
                                       sliq_surft(land_pts,nsurft,nsmax),       &
                                       snowdepth_surft(land_pts,nsurft),        &
                                       tsnow_surft(land_pts,nsurft,nsmax),      &
-                                      ds_surft(land_pts,nsurft,nsmax)
-
+                                      ds_surft(land_pts,nsurft,nsmax),         &
+                                      sice_surft_ml(land_pts,nsurft,nsmax_ml), & 
+                                      sliq_surft_ml(land_pts,nsurft,nsmax_ml), & 
+                                      tsnow_surft_ml(land_pts,nsurft,nsmax_ml),&
+                                      ds_surft_ml(land_pts,nsurft,nsmax_ml)         
+									  
 !c_elevate (OUT)
 REAL(KIND=real_jlslsm), INTENT(OUT) :: surf_hgt_surft(land_pts,nsurft),        &
                                        lw_down_elevcorr_surft(land_pts,nsurft)
@@ -813,8 +820,19 @@ REAL(KIND=real_jlslsm) ::                                                      &
                              ! Ice content of snow layers (kg/m2)
 ,sliq_surft_tmp(land_pts,nsmax)                                                &
                              ! Liquid content of snow layers (kg/m2)
-,ds_surft_tmp(land_pts,nsmax)
+,ds_surft_tmp(land_pts,nsmax)                                                  &  
                              ! Snow layer thicknesses (m)
+,csnow_ml(land_pts,nsmax_ml)                                                   &
+                             ! Areal heat capacity of snow meltlake(J/K/m2)
+,ksnow_ml(land_pts,nsmax_ml)                                                   &
+                             ! Thermal conductivity of snow meltlake(W/m/K)
+,sice_surft_tmp_ml(land_pts,nsmax_ml)                                          &
+                             ! Ice content of snow layers (kg/m2)
+,sliq_surft_tmp_ml(land_pts,nsmax_ml)                                          &
+                             ! Liquid content of snow layers (kg/m2)
+,ds_surft_tmp_ml(land_pts,nsmax_ml)                                              
+                             ! Snow layer thicknesses (m)
+
 REAL(KIND=real_jlslsm) ::                                                      &
  lh0                         ! Latent heat for snow free surface
                              !   =LS for sea-ice, =LC otherwise
@@ -1443,20 +1461,64 @@ IF (land_pts >  0) THEN    ! Omit if no land points
                    sthf_soilt(:,m,1),smvcst_soilt(:,m,1),hcons_soilt(:,m))
   END DO
 
-  ! Thermal conductvity of top snow layer if nsmax > 0
-  IF (nsmax > 0) THEN
-    DO n = 1,nsurft
-      ds_surft_tmp(:,:) = ds_surft(:,n,:)
-      sice_surft_tmp(:,:) = sice_surft(:,n,:)
-      sliq_surft_tmp(:,:) = sliq_surft(:,n,:)
-      CALL snowtherm(land_pts,surft_pts(n),nsnow_surft(:,n),                   &
-                     surft_index(:,n),ds_surft_tmp,sice_surft_tmp,             &
-                     sliq_surft_tmp,csnow,ksnow)
-      DO l = 1,land_pts
-        hcons_snow(l,n) = ksnow(l,1)
-      END DO
+!-----------------------------------------------------------------------
+! Thermal conductvity of top snow layer if nsmax > 0
+! do for multi-level snowpack or high res snowpack for meltlake 
+! check if there is a cleaner way to code this
+!-----------------------------------------------------------------------
+IF (nsmax > 0) THEN
+  DO n = 1, nsurft
+    IF (l_meltlake .AND. l_lice_surft(n)) THEN
+		
+	 ds_surft_tmp_ml(:,:)  = ds_surft_ml(:,n,:)
+	 sice_surft_tmp_ml(:,:) = sice_surft_ml(:,n,:)
+	 sliq_surft_tmp_ml(:,:) = sliq_surft_ml(:,n,:)
+
+	 CALL snowtherm(land_pts,surft_pts(n),nsnow_surft(:,n),            &
+                     surft_index(:,n),nsmax_ml,ds_surft_tmp_ml,            &
+                     sice_surft_tmp_ml,sliq_surft_tmp_ml,csnow_ml,ksnow_ml)
+  
+    DO l = 1, land_pts
+	 hcons_snow(l,n) = ksnow_ml(l,1)
     END DO
-  END IF
+
+    ELSE
+		
+	ds_surft_tmp(:,:)   = ds_surft(:,n,:)
+	sice_surft_tmp(:,:) = sice_surft(:,n,:)
+	sliq_surft_tmp(:,:) = sliq_surft(:,n,:)
+
+	CALL snowtherm(land_pts,surft_pts(n),nsnow_surft(:,n),              &
+                     surft_index(:,n),nsmax,ds_surft_tmp,sice_surft_tmp,    &
+                     sliq_surft_tmp,csnow,ksnow)
+		
+   DO l = 1, land_pts
+    hcons_snow(l,n) = ksnow(l,1)
+   END DO
+
+  END IF ! l_meltlake
+
+ END DO
+END IF ! nsmax > 0 
+
+
+
+
+
+  ! Thermal conductvity of top snow layer if nsmax > 0
+  !IF (nsmax > 0) THEN
+  !  DO n = 1,nsurft
+  !    ds_surft_tmp(:,:) = ds_surft(:,n,:)
+  !    sice_surft_tmp(:,:) = sice_surft(:,n,:)
+  !    sliq_surft_tmp(:,:) = sliq_surft(:,n,:)
+  !    CALL snowtherm(land_pts,surft_pts(n),nsnow_surft(:,n),                   &
+  !                   surft_index(:,n),nsmax,ds_surft_tmp,sice_surft_tmp,       &
+  !                   sliq_surft_tmp,csnow,ksnow)
+  !    DO l = 1,land_pts
+  !      hcons_snow(l,n) = ksnow(l,1)
+  !    END DO
+  !  END DO
+  !END IF
 
 END IF                     ! End test on land points
 
@@ -1978,7 +2040,9 @@ DO n = 1,nsurft
       dzsurf(l,n)     = dzsoil(1)
     END IF
 
-    IF ( ( nsmax > 0 ) .AND. ( nsnow_surft(l,n) > 0 ) ) THEN
+	!sarah this seems to overwrite l_elev_land_ice tsurf,dzsurf,hcons 
+    !IF ( ( nsmax > 0 ) .AND. ( nsnow_surft(l,n) > 0 ) ) THEN
+	IF (.NOT. l_elev_land_ice .AND. nsmax > 0 .AND. nsnow_surft(l,n) > 0) THEN
       ! Snow
       tsurf(l,n) = tsnow_surft(l,n,1)
       ! change the effective surface layer thickness for snow

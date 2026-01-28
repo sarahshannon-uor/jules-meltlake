@@ -186,73 +186,53 @@ ELSE
   END IF
 
 
-  
-  ! linear transition hot --> cold
-  !dt_h = timestep_number - t_trans + 1
-  !IF (dt_h <= 0) THEN
-  !   alpha = 1.0
-  !ELSE IF (dt_h > ramp_hours) THEN
-  !   alpha = 0.0
-  !ELSE
-  !   alpha = 1.0 - REAL(dt_h) / REAL(ramp_hours)
-  !END IF
-
-  ! Warm values
-  !forcing%tl_1_ij(:,:)    = alpha*275.15 + (1.0-alpha)*253.15
-  !forcing%qw_1_ij(:,:)    = alpha*0.003  + (1.0-alpha)*0.001
-  !forcing%sw_down_ij(:,:) = alpha*600.0  + (1.0-alpha)*0.0
-  !forcing%lw_down_ij(:,:) = alpha*380.0  + (1.0-alpha)*140.0
-
-  ! No precipitation
-  !forcing%con_rain_ij(:,:) = 0.0
-  !forcing%ls_rain_ij(:,:)  = 0.0
-  !forcing%con_snow_ij(:,:) = 0.0
-  !forcing%ls_snow_ij(:,:)  = 0.0
-
-  ! Non-zero wind to avoid flux spikes
-  !forcing%u_0_ij(:,:) = 2.0
-  !forcing%v_0_ij(:,:) = 0.0
-  !u_1_ij(:,:)         = 2.0
-  !v_1_ij(:,:)         = 0.0
-  !forcing%pstar_ij(:,:) = 95000.0
-
-
-    IF (timestep_number <= 168) THEN
-    ! 1 day melt, 3 days freeze 
-    !cyc = 96
-    !warm_hours = 24
-    !IF ( MOD(timestep_number-1, cyc) < warm_hours ) THEN
+  !IF (timestep_number <= 168) THEN
     ! hot
-    forcing%tl_1_ij(:,:)     = 275.15
-    forcing%qw_1_ij(:,:)     = 0.003
-    forcing%con_rain_ij(:,:) = 0.0!forcing%con_rain_ij(:,:)
-    forcing%ls_rain_ij(:,:)  = 0.0!forcing%ls_rain_ij(:,:)
-    forcing%con_snow_ij(:,:) = 0.0!forcing%con_snow_ij(:,:)
-    forcing%ls_snow_ij(:,:)  = 0.0!forcing%ls_snow_ij(:,:)
-    forcing%sw_down_ij(:,:)  = 600.0
-    forcing%lw_down_ij(:,:)  = 350.0
-    forcing%u_0_ij(:,:)      = 2.0
-    forcing%v_0_ij(:,:)      = 0.0
-    u_1_ij(:,:)              = 2.0
-    v_1_ij(:,:)              = 0.0
-    forcing%pstar_ij(:,:)    = 95000 
-    ELSE 
+   ! forcing%tl_1_ij(:,:)     = 275.15
+   ! forcing%qw_1_ij(:,:)     = 0.0003
+   ! forcing%con_rain_ij(:,:) = 0.0!forcing%con_rain_ij(:,:)
+   ! forcing%ls_rain_ij(:,:)  = 0.0!forcing%ls_rain_ij(:,:)
+   ! forcing%con_snow_ij(:,:) = 0.0!forcing%con_snow_ij(:,:)
+   ! forcing%ls_snow_ij(:,:)  = 0.0!forcing%ls_snow_ij(:,:)
+   ! forcing%sw_down_ij(:,:)  = 600.0
+   ! forcing%lw_down_ij(:,:)  = 350.0
+   ! forcing%u_0_ij(:,:)      = 2.0
+   ! forcing%v_0_ij(:,:)      = 0.0
+   ! u_1_ij(:,:)              = 2.0
+   ! v_1_ij(:,:)              = 0.0
+   ! forcing%pstar_ij(:,:)    = 95000
+ !ELSEIF (timestep_number > 168) THEN!.AND.timestep_number <= 2160) THEN
     ! cold
-    forcing%tl_1_ij(:,:)     = 253.15
-    forcing%qw_1_ij(:,:)     = 0.0003
-    forcing%con_rain_ij(:,:) = 0.0!forcing%con_rain_ij(:,:)
-    forcing%ls_rain_ij(:,:)  = 0.0!forcing%ls_rain_ij(:,:)
-    forcing%con_snow_ij(:,:) = 0.0!forcing%con_snow_ij(:,:)
-    forcing%ls_snow_ij(:,:)  = 0.0!forcing%ls_snow_ij(:,:)
-    forcing%sw_down_ij(:,:)  = 0.0
-    forcing%lw_down_ij(:,:)  = 140.0
-    forcing%u_0_ij(:,:)      = 2.0
-    forcing%v_0_ij(:,:)      = 0.0
-    u_1_ij(:,:)              = 2.0
-    v_1_ij(:,:)              = 0.0
-    forcing%pstar_ij(:,:)    = 95000 
-
-    END IF 
+  !  forcing%tl_1_ij(:,:)     = 253.15
+  !  forcing%qw_1_ij(:,:)     = 0.0003
+  !  forcing%con_rain_ij(:,:) = 0.0
+  !  forcing%ls_rain_ij(:,:)  = 0.0
+  !  forcing%con_snow_ij(:,:) = 0.0
+  !  forcing%ls_snow_ij(:,:)  = 0.0
+  !  forcing%sw_down_ij(:,:)  = 0.0
+  !  forcing%lw_down_ij(:,:)  = 140.0
+  !  forcing%u_0_ij(:,:)      = 2.0
+  !  forcing%v_0_ij(:,:)      = 0.0
+  !  u_1_ij(:,:)              = 2.0
+  !  v_1_ij(:,:)              = 0.0
+  !  forcing%pstar_ij(:,:)    = 95000 
+ !ELSEIF (timestep_number > 2160 ) THEN
+    ! warm wet
+ !   forcing%tl_1_ij(:,:)     = 275.15
+ !   forcing%qw_1_ij(:,:)     = 0.0003
+ !   forcing%con_rain_ij(:,:) = 5.0e-5
+ !   forcing%ls_rain_ij(:,:)  = 0.0
+ !   forcing%con_snow_ij(:,:) = 0.0
+ !   forcing%ls_snow_ij(:,:)  = 0.0
+ !   forcing%sw_down_ij(:,:)  = 0.0
+ !   forcing%lw_down_ij(:,:)  = 600.0
+ !   forcing%u_0_ij(:,:)      = 350.0
+ !   forcing%v_0_ij(:,:)      = 0.0
+ !   u_1_ij(:,:)              = 2.0
+ !   v_1_ij(:,:)              = 0.0
+ !   forcing%pstar_ij(:,:)    = 95000 
+    
+ !END IF
 
 
   ! sarah hack the forcing data

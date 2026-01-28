@@ -52,7 +52,8 @@ SUBROUTINE snow (a_step, land_pts, timestep, stf_hf_snow_melt, nsurft, n_wtrac_j
                   rho_snow_ml,   &     !(land_pts,nsurft,nsmax_ml)
                   sfrac_ml,      &     !(land_pts,nsurft,nsmax_ml)   
                   lfrac_ml,      &     !(land_pts,nsurft,nsmax_ml)
-                  lake_depth_ml)           !(land_pts,nsurft) 
+                  lake_depth_ml,  &    !(land_pts,nsurft)
+                  ice_lens_depth)
 
 
 USE canopysnow_mod,  ONLY: canopysnow
@@ -277,6 +278,8 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Liquid fraction of snow layers for meltlake (kg/m2).
   lake_depth_ml(land_pts,nsurft),                                              &    
     ! Melt lake depth (m)
+  ice_lens_depth(land_pts,nsurft),                                             &
+    ! Ice lens depth (m)
   surf_htf_surft(land_pts,nsurft)                                             
     ! Surface heat flux (W/m2). 
 !-----------------------------------------------------------------------------
@@ -850,6 +853,11 @@ END IF
   END IF !l_meltlake
   END IF !nsmax
 
+! sarah hack suppress snow conduction
+  !ksnow_ml(:,:) = 1.0e-6
+
+
+
   !---------------------------------------------------------------------------
   ! Snow thermodynamics and hydrology
   !---------------------------------------------------------------------------
@@ -1013,7 +1021,7 @@ END IF
                   ! Types Variables
                   lake_h_ice_gb, lake_h_mxl_gb, lake_depth_gb,                 &
                   ! Optional meltlake variables 
-                  sfrac_sl_ml, lfrac_sl_ml)
+                  sfrac_sl_ml, lfrac_sl_ml, ice_lens_depth(:,n))
   
   ELSE 
   
@@ -1035,7 +1043,7 @@ END IF
                   l_lice_point, l_lice_surft,                                  &
                   ! Types Variables
                   lake_h_ice_gb, lake_h_mxl_gb, lake_depth_gb)
-
+                
   END IF
 
  

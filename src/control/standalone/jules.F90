@@ -47,6 +47,7 @@ USE jules_fields_mod, ONLY: crop_vars_data, crop_vars,                         &
                             psparms_data, psparms,                             &
                             top_pdm_data, toppdm,                              &
                             fire_vars_data, fire_vars,                         &
+                            meltlake_vars_data, meltlake_vars,                 &
                             ainfo_data, ainfo,                                 &
                             fire_vars_data, fire_vars,                         &
                             trif_vars_data, trif_vars,                         &
@@ -129,6 +130,7 @@ CALL init(nml_dir, crop_vars_data, crop_vars,                                  &
                    psparms_data, psparms,                                      &
                    toppdm, top_pdm_data,                                       &
                    fire_vars, fire_vars_data,                                  &
+                   meltlake_vars, meltlake_vars_data,                          &
                    ainfo, ainfo_data,                                          &
                    trif_vars, trif_vars_data,                                  &
                    soilecosse, soil_ecosse_vars_data,                          &
@@ -199,7 +201,8 @@ DO    !  timestep
   !   Gridbox mean surface fluxes (INTENT OUT)
       fqw_1_ij, ftl_1_ij, taux_1_ij, tauy_1_ij,                                &
       !TYPES containing field data (IN OUT)
-      crop_vars,psparms,toppdm,fire_vars,ainfo,trif_vars,soilecosse, aerotype, &
+      crop_vars,psparms,toppdm,fire_vars,meltlake_vars,ainfo,trif_vars,        &
+      soilecosse, aerotype,                                                    &
       urban_param,progs,trifctltype, coast, jules_vars,                        &
       fluxes,                                                                  &
       lake_vars,                                                               &

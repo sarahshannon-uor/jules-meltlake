@@ -6,8 +6,8 @@ SUBROUTINE control (                                                           &
 !   Gridbox mean surface fluxes (INTENT OUT)
     fqw_1_ij, ftl_1_ij, taux_1_ij, tauy_1_ij,                                  &
     !TYPES containing field data (IN OUT)
-    crop_vars,psparms,toppdm,fire_vars,ainfo,trif_vars,soilecosse, aerotype,   &
-    urban_param,progs,trifctltype,coast,jules_vars,                            &
+    crop_vars, psparms,toppdm,fire_vars,meltlake_vars,ainfo,trif_vars,         &  
+    soilecosse, aerotype, urban_param, progs, trifctltype, coast, jules_vars,  &
     fluxes,                                                                    &
     lake_vars,                                                                 &
     forcing,                                                                   &
@@ -25,6 +25,7 @@ SUBROUTINE control (                                                           &
 
 !TYPE definitions
 USE crop_vars_mod, ONLY: crop_vars_type
+USE meltlake_vars_mod, ONLY: meltlake_vars_type
 USE p_s_parms, ONLY: psparms_type
 USE top_pdm, ONLY: top_pdm_type
 USE fire_vars_mod, ONLY: fire_vars_type
@@ -132,6 +133,7 @@ REAL, INTENT(IN) ::                                                            &
 ! Arguments with intent(out)
 !-------------------------------------------------------------------------------
 TYPE(crop_vars_type), INTENT(IN OUT) :: crop_vars
+TYPE(meltlake_vars_type), INTENT(IN OUT) :: meltlake_vars
 TYPE(psparms_type), INTENT(IN OUT) :: psparms
 TYPE(top_pdm_type), INTENT(IN OUT) :: toppdm
 TYPE(fire_vars_type), INTENT(IN OUT) :: fire_vars
@@ -500,6 +502,7 @@ CALL surf_couple_radiation(                                                    &
   psparms, ainfo, urban_param, progs, coast, jules_vars,                       &
   fluxes,                                                                      &
   lake_vars,                                                                   &
+  meltlake_vars,                                                               &   
   !forcing, &
   !rivers, &
   !veg3_parm, &
@@ -623,7 +626,8 @@ CALL surf_couple_explicit(                                                     &
   flandfac, fseafac, fb_surf, u_s, t1_sd, q1_sd, rhostar,                      &
   vshr, resp_s_tot_soilt, emis_soil,                                           &
   !TYPES containing field data (IN OUT)
-  crop_vars,psparms,ainfo,trif_vars,aerotype,urban_param,progs,trifctltype,    &
+  crop_vars,meltlake_vars,psparms,ainfo,trif_vars,aerotype,urban_param,progs,  &
+  trifctltype,                                                                 &
   coast, jules_vars,                                                           &
   fluxes,                                                                      &
   lake_vars,                                                                   &
@@ -755,7 +759,7 @@ CALL surf_couple_implicit(                                                     &
   rho1, f3_at_p, uStarGBM,tscrndcl_ssi,tscrndcl_surft,tStbTrans,               &
   rhokh_mix, ti_gb, sky,                                                       &
   !TYPES containing field data (IN OUT)
-  crop_vars,ainfo,aerotype,progs, coast, jules_vars,                           &
+  crop_vars,meltlake_vars, ainfo,aerotype,progs, coast, jules_vars,            &
   fluxes,                                                                      &
   lake_vars,                                                                   &
   forcing,                                                                     &
@@ -823,7 +827,7 @@ CALL surf_couple_implicit(                                                     &
   rho1, f3_at_p, uStarGBM,tscrndcl_ssi,tscrndcl_surft,tStbTrans,               &
   rhokh_mix, ti_gb, sky,                                                       &
   !TYPES containing field data (IN OUT)
-  crop_vars,ainfo,aerotype,progs, coast, jules_vars,                           &
+  crop_vars,meltlake_vars, ainfo,aerotype,progs, coast, jules_vars,            &
   fluxes,                                                                      &
   lake_vars,                                                                   &
   forcing,                                                                     &
@@ -898,7 +902,8 @@ CALL surf_couple_extra(                                                        &
   !OUT
   dhf_surf_minus_soil, land_sea_mask,                                          &
   !TYPES containing field data (IN OUT)
-  crop_vars,psparms,toppdm,fire_vars,ainfo,trif_vars,soilecosse, urban_param,  &
+  crop_vars,meltlake_vars,psparms,toppdm,fire_vars,ainfo,trif_vars,soilecosse, & 
+  urban_param,                                                                 & 
   progs,trifctltype,coast,jules_vars,                                          &
   fluxes,                                                                      &
   lake_vars,                                                                   &

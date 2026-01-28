@@ -1988,6 +1988,14 @@ CASE ( 'rho_snow_ml' )
     meltlake_vars%lake_depth_ml(:,:) = const_val
   END IF 
 
+CASE ( 'ice_lens_depth' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, meltlake_vars%ice_lens_depth)
+  ELSE
+    meltlake_vars%ice_lens_depth(:,:) = const_val
+  END IF
+  
 CASE ( 'lake_albedo_ml' )
   IF ( PRESENT(cube) ) THEN
     cube_land = map_to_land(cube)

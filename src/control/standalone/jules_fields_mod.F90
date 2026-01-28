@@ -10,6 +10,7 @@ MODULE jules_fields_mod
 
 !TYPE definitions
 USE crop_vars_mod, ONLY: crop_vars_type, crop_vars_data_type
+USE meltlake_vars_mod, ONLY: meltlake_vars_type, meltlake_vars_data_type
 USE p_s_parms,     ONLY: psparms_type, psparms_data_type
 USE top_pdm,       ONLY: top_pdm_type, top_pdm_data_type
 USE fire_vars_mod, ONLY: fire_vars_type, fire_vars_data_type
@@ -36,6 +37,7 @@ USE jules_wtrac_type_mod, ONLY: jls_wtrac_data_type, jls_wtrac_type
 !Declare instances of the TYPES required to hold the data
 !TYPES to hold the data
 TYPE(crop_vars_data_type), TARGET :: crop_vars_data
+TYPE(meltlake_vars_data_type), TARGET :: meltlake_vars_data
 TYPE(psparms_data_type), TARGET :: psparms_data
 TYPE(top_pdm_data_type), TARGET :: top_pdm_data
 TYPE(fire_vars_data_type), TARGET :: fire_vars_data
@@ -61,6 +63,7 @@ TYPE(jls_wtrac_data_type), TARGET :: wtrac_jls_data
 !TYPES we pass around. These happen to be pointers to the data types above
 !but this should be transparent
 TYPE(crop_vars_type) :: crop_vars
+TYPE(meltlake_vars_type) :: meltlake_vars
 TYPE(psparms_type) :: psparms
 TYPE(top_pdm_type) :: toppdm
 TYPE(fire_vars_type) :: fire_vars

@@ -39,7 +39,7 @@ SUBROUTINE snowpack ( a_step, surft_n, land_pts, surft_pts, n_wtrac_jls, timeste
                       ! Types Variables
                       lake_h_ice_gb, lake_h_mxl_gb, lake_depth_gb,             &
                       ! optional meltlake 
-                      sfrac,lfrac)
+                      sfrac, lfrac, ice_lens_depth)
 
 USE tridag_mod, ONLY: tridag
 USE percolate_monarchs_mod,  ONLY: percolate_monarchs
@@ -64,6 +64,8 @@ USE jules_soil_mod, ONLY: dzsoil, dzsoil_elev, hcondeep
 USE jules_surface_mod, ONLY: l_elev_land_ice, l_flake_model
 
 USE jules_surface_types_mod, ONLY: lake, ntype
+
+USE model_time_mod, ONLY: timestep_number
 
 USE jules_snow_mod, ONLY:                                                      &
   !nsmax,                                                                       &
@@ -92,6 +94,8 @@ USE jules_snow_mod, ONLY:                                                      &
 USE jules_water_tracers_mod, ONLY: l_wtrac_jls, wtrac_calc_ratio_fn_jules
 
 USE jules_meltlake_mod,  ONLY: l_meltlake 
+
+!USE meltlake_vars_mod, ONLY: meltlake_vars_type
 
 USE sf_diags_mod, ONLY: strnewsfdiag
 
@@ -180,6 +184,8 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
   infiltration_wtrac(land_pts,n_wtrac_jls)
     ! Water tracer content in rainfall infiltrating into snowpack (kg/m2).
 
+!TYPE(meltlake_vars_type), INTENT(IN OUT) :: meltlake_vars
+
 ! Array arguments with intent(inout)
 TYPE (strnewsfdiag), INTENT(IN OUT) :: sf_diag
 
@@ -217,6 +223,7 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Water tracer content of frozen precip reaching the ground (kg/m2).
   snowmass_wtrac(land_pts,n_wtrac_jls)
     ! Water tracer content in snow mass on the ground (kg/m2).
+  
 
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(out)
@@ -243,7 +250,14 @@ REAL(KIND=real_jlslsm), INTENT(OUT) ::                                         &
   !lfrac(land_pts,nsmax)                                                       
     ! Liquid fraction
 
-real(kind=real_jlslsm), intent(out), optional :: sfrac(:,:), lfrac(:,:)
+! Sarah advice - not sure about using optional args
+real(kind=real_jlslsm), intent(out), optional ::                               & 
+  sfrac(:,:),                                                                  &
+   ! volumetric solid fraction of snow layer           
+  lfrac(:,:),                                                                  &
+   ! volumetric liquid fraction of snow layer   
+  ice_lens_depth(:)                                                  
+    ! depth of uppermost ice lens (m) 
 
     
 !ancil_info (IN)
@@ -334,6 +348,8 @@ REAL(KIND=real_jlslsm) ::                                                      &
   win_wtrac(n_wtrac_jls)
     ! Water tracer entering layer (kg/m2).
 
+REAL(KIND=real_jlslsm) :: store_before, store_after, win_in, win_out, err_mass
+
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
 REAL(KIND=jprb)               :: zhook_handle
@@ -397,6 +413,8 @@ DO k = 1,surft_pts
   !---------------------------------------------------------------------------
   IF ( .NOT. cansnowtile ) g_snow_surf = g_snow_surf + lf * melt_surft(i)
 
+  !print *, ' g_snow_surf', g_snow_surf
+  
   IF ( nsnow(i) == 0 ) THEN
 
     IF (flake_tile) THEN
@@ -729,8 +747,21 @@ DO k = 1,surft_pts
     ! Optionally include infiltration of rainwater and melting from the
     ! canopy into the snowpack.
     IF (l_snow_infilt) THEN
+
+       !IF (timestep_number > 2160) THEN
+          !print *, 'adding water at timestep', timestep_number
+        !  win = 1.0 + can_melt * timestep ! 1 kg m-2 per hour = 1 mm/hr
+       !ELSE
+       !   win = infiltration(i) + can_melt * timestep
+       !END IF
+
+       !IF (timestep_number == 2180) THEN
+       !   stop
+       !END IF
+       
       win = infiltration(i) + can_melt * timestep
-      IF (l_wtrac_jls) THEN
+
+       IF (l_wtrac_jls) THEN
         ! Repeat for water tracers
         DO i_wt = 1,n_wtrac_jls
           win_wtrac(i_wt) = infiltration_wtrac(i,i_wt) + can_melt_wtrac(i_wt)  &
@@ -752,35 +783,45 @@ DO k = 1,surft_pts
     IF (l_meltlake .AND. l_elev_land_ice .AND. l_lice_point(i)) THEN
 
 
-       ! NOTE:
-       ! Pass full arrays (ds, sice, sliq, tsnow, etc.) and index by land point
-       ! inside percolate_monarchs, rather than passing slices like var(i,:).
-       !
-       ! Passing var(i,:) creates a non-contiguous input args because
-       ! Fortran is column-major (the contiguous slice would be var(:,i)).
-       ! With INTENT(INOUT), ifort therefore creates copy-in/copy-out temporaries,
-       ! which are allocated on the heap when -heap-arrays is enabled.
-       !
-       ! In debug builds with ifort, this led to glibc errors
-       !   "corrupted size vs. prev_size in fastbins"
-       ! triggered even by simple I/O (e.g. PRINT *, 'hello') inside the routine.
-       ! The issue does not appear with gfortran (mpi/openmp) or intel
-       ! without -heap-arrays (flag in integ.cfg)
-       !
-       ! Using full arrays avoids non-contiguous arguments, prevents 
-       ! runtime error using intel serial build
+       ! ---- snowpack-level water conservation check (debug) ----
+	!store_before = 0.0
+	!DO n = 1, nsnow(i)
+	!store_before = store_before + sice(i,n) + sliq(i,n)
+	!END DO
+	!win_in = win
+       !IF (PRESENT(ice_lens_depth)) THEN
+       !   print *, 'ice_lens_depth', ice_lens_depth(:)
+       !   STOP
+       !END IF
+    
+       !CALL percolate_monarchs( i, nsnow(i), nsmax, n_wtrac_jls,  &
+       !     timestep,                                             &
+       !     csnow, ds, tsnow,                                     &
+       !     sice, sliq,                                           &
+       !     sice_wtrac, sliq_wtrac,                               &
+       !     win, win_wtrac,                                       &
+       !     sf_diag, surft_n, ice_lens_depth )
+      
+    !win_out = win
+	!store_after = 0.0
+	!DO n = 1, nsnow(i)
+!		store_after = store_after + sice(i,n) + sliq(i,n)
+!	END DO
 
-       CALL percolate_monarchs( i, nsnow(i), nsmax, n_wtrac_jls,  &
-            timestep,                                             &
-            csnow, ds, tsnow,                                     &
-            sice, sliq,                                           &
-            sice_wtrac, sliq_wtrac,                               &
-            win, win_wtrac,                                       &
-            sf_diag, surft_n )
-       
-    ELSE
+!	err_mass = (store_before + win_in) - (store_after + win_out)
+
+!	IF (ABS(err_mass) > 1.0e-8) THEN
+!	PRINT '(A,I6,A,I8,A,ES16.8,A,ES16.8,A,ES16.8,A,ES16.8,A,ES16.8)', &
+!  'WATER BAL ERR i=', i, ' step=', a_step, ' err=', err_mass,         &
+!  ' win_in=', win_in, ' win_out=', win_out,                           &
+!  ' store_b=', store_before, ' store_a=', store_after
+!	END IF
+! ---------------------------------------------------------
+
+	ELSE
 
     
+	
     DO n = 1,nsnow(i)
  
       sliq(i,n) = sliq(i,n) + win
@@ -913,6 +954,7 @@ DO k = 1,surft_pts
             IF ( ds(i,n) > EPSILON(ds) ) THEN
                ! vol fractions so that sfrac + lfrac + air = 1
                ! dominator is total ice/liq that a layer can hold
+               ! should add this to percolate_monarchs and not here
                sfrac(i,n) = sice(i,n) / (rho_ice   * ds(i,n))
                lfrac(i,n) = sliq(i,n) / (rho_water * ds(i,n))
             END IF
