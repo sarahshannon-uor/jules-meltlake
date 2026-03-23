@@ -9446,9 +9446,35 @@ DATA metadata(729) / var_metadata(                                             &
     "-"                                                                        &
   ) /
 !-----------------------------------------------------------------------------
+! Metadata for refreeze
+!-----------------------------------------------------------------------------
+DATA metadata(730) / var_metadata(                                             &
+! String identifier
+    'refreeze_ml',                                                             &
+! Variable type
+    var_type_snow_ml,                                                          &
+! Long name
+    "Refrozen mass in snow layers for melt lake model",                       &
+! Units
+    "kg m-2"                                                                   &
+  ) / 
+!-----------------------------------------------------------------------------
+! Metadata for refreeze
+!-----------------------------------------------------------------------------
+DATA metadata(731) / var_metadata(                                             &
+! String identifier
+    'melt_ml',                                                                 &
+! Variable type
+    var_type_snow_ml,                                                          &
+! Long name
+    "Melt mass in snow layers for melt lake model",                            &
+! Units
+    "kg m-2"                                                                   &
+  ) / 
+!-----------------------------------------------------------------------------
 !! Metadata for melt lake depth
 !!-----------------------------------------------------------------------------
-DATA metadata(730) / var_metadata(                                             &
+DATA metadata(732) / var_metadata(                                             &
 ! String identifier 
     'lake_depth_ml',                                                           &
 ! Variable type
@@ -9461,20 +9487,20 @@ DATA metadata(730) / var_metadata(                                             &
 !-----------------------------------------------------------------------------
 !! Metadata for melt lake albedo
 !!-----------------------------------------------------------------------------
-DATA metadata(731) / var_metadata(                                             &
+DATA metadata(733) / var_metadata(                                             &
 ! String identifier 
     'lake_albedo_ml',                                                          &
 ! Variable type
     var_type_surft,                                                            &
 ! Long name
-    "Melt lake albedo",                                                         &
+    "Melt lake albedo",                                                        &
 ! Units
     "-"                                                                        &
  ) /
  !-----------------------------------------------------------------------------
 !! Metadata for melt lake temperature
 !!-----------------------------------------------------------------------------
-DATA metadata(732) / var_metadata(                                             &
+DATA metadata(734) / var_metadata(                                             &
 ! String identifier 
     'lake_temp_ml',                                                            &
 ! Variable type
@@ -9487,7 +9513,7 @@ DATA metadata(732) / var_metadata(                                             &
  !-----------------------------------------------------------------------------
 !! Metadata for melt lake exists mask
 !!-----------------------------------------------------------------------------
-!DATA metadata(733) / var_metadata(                                             &
+!DATA metadata(735) / var_metadata(                                             &
 !! String identifier 
 !    'is_meltlake',                                                             &
 !! Variable type
@@ -9500,7 +9526,7 @@ DATA metadata(732) / var_metadata(                                             &
  !-----------------------------------------------------------------------------
 !! Metadata for ice lens depth (most upper lens)
 !!-----------------------------------------------------------------------------
-DATA metadata(733) / var_metadata(                                             &
+DATA metadata(736) / var_metadata(                                             &
 ! String identifier 
     'ice_lens_depth',                                                          &
 ! Variable type
@@ -9509,5 +9535,31 @@ DATA metadata(733) / var_metadata(                                             &
     "Ice lens depth",                                                          &
 ! Units
     "m"                                                                        &
+ ) /
+!-----------------------------------------------------------------------------
+!! Metadata for ice lens index (most upper lens)
+!!-----------------------------------------------------------------------------
+DATA metadata(737) / var_metadata(                                             &
+! String identifier 
+    'ice_lens_index',                                                          &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    "Ice lens index",                                                          &
+! Units
+    "-"                                                                        &
+ ) /
+!-----------------------------------------------------------------------------
+!! Metadata for water into lake from snowpack
+!!-----------------------------------------------------------------------------
+DATA metadata(738) / var_metadata(                                             &
+! String identifier 
+    'lake_inflow',                                                             &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    "Mass of water from snowpack into melt lake",                              &
+! Units
+    "kgm-2"                                                                    &
  ) /
 #endif

@@ -2667,6 +2667,14 @@ CASE ( 'lfrac_ml' )
   cube_land = cube_from_array(meltlake_vars%lfrac_ml)
   cube = map_from_land(cube_land)
 
+CASE ( 'refreeze_ml' )
+  cube_land = cube_from_array(meltlake_vars%refreeze_ml)
+  cube = map_from_land(cube_land)
+
+CASE ( 'melt_ml' )
+  cube_land = cube_from_array(meltlake_vars%melt_ml)
+  cube = map_from_land(cube_land)
+
 CASE ( 'lake_depth_ml' )
   cube_land = cube_from_array(meltlake_vars%lake_depth_ml)
   cube = map_from_land(cube_land)
@@ -2681,6 +2689,14 @@ CASE ( 'lake_temp_ml' )
 
 CASE ( 'ice_lens_depth' )
   cube_land = cube_from_array(meltlake_vars%ice_lens_depth)
+  cube = map_from_land(cube_land)
+
+CASE ( 'ice_lens_index' )
+  cube_land = cube_from_array(meltlake_vars%ice_lens_index)
+  cube = map_from_land(cube_land)
+
+CASE ( 'lake_inflow' )
+  cube_land = cube_from_array(meltlake_vars%lake_inflow)
   cube = map_from_land(cube_land)
 
 !CASE ( 'is_meltlake' )

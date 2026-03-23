@@ -1,3 +1,4 @@
+
 ! *****************************COPYRIGHT*******************************
 
 ! (c) [University of Edinburgh]. All rights reserved.
@@ -39,7 +40,8 @@ SUBROUTINE snowpack ( a_step, surft_n, land_pts, surft_pts, n_wtrac_jls, timeste
                       ! Types Variables
                       lake_h_ice_gb, lake_h_mxl_gb, lake_depth_gb,             &
                       ! optional meltlake 
-                      sfrac, lfrac, ice_lens_depth)
+                      sfrac, lfrac, refreeze, melt_mass, ice_lens_depth,       &
+                      ice_lens_index, lake_inflow)
 
 USE tridag_mod, ONLY: tridag
 USE percolate_monarchs_mod,  ONLY: percolate_monarchs
@@ -152,7 +154,7 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
   hcons(land_pts),                                                             &
     ! Thermal conductivity of top soil layer,
     ! including water and ice (W/m/K).
-  ksnow(land_pts,nsmax),                                                       &
+  !ksnow(land_pts,nsmax),                                                       &
     ! Thermal conductivity of layers (W/m/K).
   rho_snow_grnd(land_pts),                                                     &
     ! Snowpack bulk density (kg/m3).
@@ -221,9 +223,10 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Water tracer liquid content of snow layers (kg/m2).
   snowfall_wtrac(land_pts,n_wtrac_jls),                                        &
     ! Water tracer content of frozen precip reaching the ground (kg/m2).
-  snowmass_wtrac(land_pts,n_wtrac_jls)
+  snowmass_wtrac(land_pts,n_wtrac_jls), &
     ! Water tracer content in snow mass on the ground (kg/m2).
-  
+  ksnow(land_pts,nsmax)                                                      
+    ! Thermal conductivity of layers (W/m/K). just for testing remove to IN after
 
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(out)
@@ -250,16 +253,23 @@ REAL(KIND=real_jlslsm), INTENT(OUT) ::                                         &
   !lfrac(land_pts,nsmax)                                                       
     ! Liquid fraction
 
-! Sarah advice - not sure about using optional args
+! Sarah get advice - not sure about using optional args
 real(kind=real_jlslsm), intent(out), optional ::                               & 
   sfrac(:,:),                                                                  &
    ! volumetric solid fraction of snow layer           
   lfrac(:,:),                                                                  &
    ! volumetric liquid fraction of snow layer   
-  ice_lens_depth(:)                                                  
+  ice_lens_depth(land_pts),                                                    &                                                  
     ! depth of uppermost ice lens (m) 
-
-    
+  ice_lens_index(land_pts),                                                    &                                 
+    ! snow level containing uppermost lens (as a real)
+  refreeze(land_pts,nsmax),                                                    &
+    ! Refrozen mass (kg/m2).
+  melt_mass(land_pts,nsmax),                                                   &
+    ! Melting mass (kg/m2).
+  lake_inflow(land_pts)
+    ! excess water from snowpack into lake (kgm-2)
+  
 !ancil_info (IN)
 LOGICAL, INTENT(IN) :: l_lice_point(land_pts)
 LOGICAL, INTENT(IN) :: l_lice_surft(ntype)
@@ -286,8 +296,9 @@ INTEGER ::                                                                     &
     ! Tile point index.
   n,                                                                           &
     ! Snow layer index.
-  i_wt
+  i_wt, &
     ! Water tracer index.
+  jj
 
 REAL(KIND=real_jlslsm) ::                                                      &
   asoil,                                                                       &
@@ -322,8 +333,17 @@ REAL(KIND=real_jlslsm) ::                                                      &
   ratio_sice,                                                                  &
   ratio_sliq,                                                                  &
     ! Water tracer to water ratios
-  submelt_wtrac
+  submelt_wtrac,                                                               &
     ! Amount of water tracer snow that is melted or liquid that is frozen
+  snowdepth_before,                                                            &
+    ! snowdepth at previous timestep (m) 
+  m_before, &
+  i_before, &
+  l_before, &
+  m_after, &
+  i_after, &
+  l_after, &
+  z
 
 !-----------------------------------------------------------------------------
 ! Local arrays
@@ -348,7 +368,14 @@ REAL(KIND=real_jlslsm) ::                                                      &
   win_wtrac(n_wtrac_jls)
     ! Water tracer entering layer (kg/m2).
 
+! --- debugging stuff
 REAL(KIND=real_jlslsm) :: store_before, store_after, win_in, win_out, err_mass
+REAL :: ztop, zbot
+REAL :: band_top, band_bot, overlap, sice_band
+INTEGER :: iw
+CHARACTER(LEN=*), PARAMETER :: dbgfile = 'before_after_perc.txt'
+
+
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -377,7 +404,7 @@ flake_not_lake = (( l_flake_model ) .AND. .NOT. (surft_n == lake ))
 DO n = 1,nsmax
 !$OMP DO SCHEDULE(STATIC)
   DO i = 1, land_pts
-    rho_snow(i,n) = 0.0
+     rho_snow(i,n) = 0.0
   END DO
 !$OMP END DO
 END DO
@@ -407,14 +434,12 @@ DO k = 1,surft_pts
   END IF
 
   g_snow_surf = surf_htf_surft(i)
-
+ 
   !---------------------------------------------------------------------------
   ! Add melt to snow surface heat flux, unless using the snow canopy model
   !---------------------------------------------------------------------------
   IF ( .NOT. cansnowtile ) g_snow_surf = g_snow_surf + lf * melt_surft(i)
 
-  !print *, ' g_snow_surf', g_snow_surf
-  
   IF ( nsnow(i) == 0 ) THEN
 
     IF (flake_tile) THEN
@@ -584,6 +609,10 @@ DO k = 1,surft_pts
 
   ELSE
 
+     IF (l_meltlake .AND. l_elev_land_ice .AND. l_lice_point(i)) THEN
+        snowdepth_before = snowdepth(i)
+     END IF
+     
     !-------------------------------------------------------------------------
     ! There is at least one snow layer. Calculate heat conduction between
     !   layers and temperature increments.
@@ -663,12 +692,15 @@ DO k = 1,surft_pts
     !-------------------------------------------------------------------------
     ! Melt snow in layers with temperature exceeding melting point
     !-------------------------------------------------------------------------
+
     DO n = 1,nsnow(i)
+       melt_mass(i,n) = 0.0 ! sarah hack for diag
+       
     ! sarah energy per unit area needed to warm the layer to 0 °C.
       coldsnow = csnow(i,n) * (tm - tsnow(i,n))
       IF ( coldsnow < 0.0 ) THEN
         tsnow(i,n) = tm
-    !sarah Convert excess energy to melt depth
+    !sarah convert excess energy to melt depth
         dsice = -coldsnow / lf
         IF ( dsice > sice(i,n) ) dsice = sice(i,n)
     !sarah reduce layer depth 
@@ -688,20 +720,32 @@ DO k = 1,surft_pts
 
         sice(i,n) = sice(i,n) - dsice
         sliq(i,n) = sliq(i,n) + dsice
+        
+        !-------------------------------------------------------------------------
+        ! melting at each snow level for output diagnostics
+        !-------------------------------------------------------------------------
+        melt_mass(i,n) = dsice   
+              
         IF (sf_diag%l_snice) THEN
           sf_diag%snice_m_surft(i,surft_n) = sf_diag%snice_m_surft(i,surft_n)  &
                                              + dsice / timestep
         END IF
-      END IF
+     END IF
+
+     !write(*,'(A,I0,A,F16.8,A,F16.8,A,F16.12,A,F16.8,A,F16.8,A,F16.8,A,I0)') ' after melt jj=', n, ' sliq=', sliq(i,n), ' sice=', sice(i,n), ' melt_mass=', melt_mass(i,n),' tsnow=', tsnow(i,n)-273.15,'ds=', ds(i,n),'lens=', ice_lens_index(i), 't=', timestep_number  
+     
     END DO
     ! Melt still > 0? - no snow left
 
+    !print *, 'after melt', sice(i,44)
+    
     !-------------------------------------------------------------------------
     ! Remove snow by sublimation unless snow is beneath canopy
     !-------------------------------------------------------------------------
     IF ( .NOT. cansnowtile ) THEN
 
-      dsice = MAX( ei_surft(i), 0.0 ) * timestep
+       dsice = MAX( ei_surft(i), 0.0 ) * timestep
+       !print *, "sublimination layer", n, "dsice", dsice
       IF (l_wtrac_jls) THEN
         DO i_wt = 1,n_wtrac_jls
           dsice_wtrac(i_wt) = MAX( ei_surft_wtrac(i,surft_n,i_wt), 0.0 )       &
@@ -727,6 +771,7 @@ DO k = 1,surft_pts
             ! Layer sublimates partially
             ds(i,n)   = (1.0 - dsice / sice(i,n)) * ds(i,n)
             sice(i,n) = sice(i,n) - dsice
+           
             IF (l_wtrac_jls) THEN
               ! Remove all water tracer leftover sublimation here
               DO i_wt = 1, n_wtrac_jls
@@ -736,7 +781,7 @@ DO k = 1,surft_pts
 
             EXIT    !   sublimation exhausted
           END IF
-
+          
         END DO
       END IF  !  DSICE>0
     END IF  !  CANSNOWTILE
@@ -748,16 +793,13 @@ DO k = 1,surft_pts
     ! canopy into the snowpack.
     IF (l_snow_infilt) THEN
 
-       !IF (timestep_number > 2160) THEN
+       !IF (timestep_number >= 2160) THEN
           !print *, 'adding water at timestep', timestep_number
-        !  win = 1.0 + can_melt * timestep ! 1 kg m-2 per hour = 1 mm/hr
+        !  win = 1.0 + can_melt * timestep ! 1 kg m-2 per hour = 1 mm/hr for 48 hours
        !ELSE
        !   win = infiltration(i) + can_melt * timestep
        !END IF
 
-       !IF (timestep_number == 2180) THEN
-       !   stop
-       !END IF
        
       win = infiltration(i) + can_melt * timestep
 
@@ -782,51 +824,45 @@ DO k = 1,surft_pts
 
     IF (l_meltlake .AND. l_elev_land_ice .AND. l_lice_point(i)) THEN
 
+       !OPEN(NEWUNIT=iw, FILE=dbgfile, STATUS='UNKNOWN', POSITION='APPEND', ACTION='WRITE')
 
-       ! ---- snowpack-level water conservation check (debug) ----
-	!store_before = 0.0
-	!DO n = 1, nsnow(i)
-	!store_before = store_before + sice(i,n) + sliq(i,n)
-	!END DO
-	!win_in = win
-       !IF (PRESENT(ice_lens_depth)) THEN
-       !   print *, 'ice_lens_depth', ice_lens_depth(:)
-       !   STOP
-       !END IF
-    
-       !CALL percolate_monarchs( i, nsnow(i), nsmax, n_wtrac_jls,  &
-       !     timestep,                                             &
-       !     csnow, ds, tsnow,                                     &
-       !     sice, sliq,                                           &
-       !     sice_wtrac, sliq_wtrac,                               &
-       !     win, win_wtrac,                                       &
-       !     sf_diag, surft_n, ice_lens_depth )
+       !write(iw,'(A,I8)') 'BEFORE timestep=', timestep_number
+       !DO jj = 1, nsnow(i)
+       !   write(iw,'(I4,",",ES16.8,",",ES16.8,",",ES16.8,",",ES16.8)') &
+       !        jj, sice(i,jj), sliq(i,jj), ds(i,jj), ice_lens_index(i)
+       !END DO
+       
+       CALL percolate_monarchs( i, nsnow(i), land_pts, nsmax,     &
+            n_wtrac_jls,timestep,                                 &
+            csnow, ds, tsnow,                                     &
+            sice, sliq,                                           &
+            sice_wtrac, sliq_wtrac,                               &
+            win, win_wtrac,                                       &
+            sf_diag, surft_n, refreeze, ice_lens_depth,           &
+            ice_lens_index, lake_inflow )
+
+       !write(iw,'(A,I8)') 'AFTER timestep=', timestep_number
+       !DO jj = 1, nsnow(i)
+       !   write(iw,'(I4,",",ES16.8,",",ES16.8,",",ES16.8,",",ES16.8)') &
+       !        jj, sice(i,jj), sliq(i,jj), ds(i,jj), ice_lens_index(i)
+       !END DO
+       !write(iw,'(A)') '---'
+       
+       !DO jj = 1, nsnow(i)
+       !   write(*,'(A,I0,A,F16.8,A,F16.8,A,F1.8,A,F16.8,A,F16.8,A,F16.8,A,I0)') ' after perc jj=', jj, ' sliq=', sliq(i,jj), ' sice=', sice(i,jj), ' refreeze=', refreeze(i,jj),' tsnow=', tsnow(i,jj)-273.15,'ds=', ds(i,jj), 'lens=', ice_lens_index(i), 't=', timestep_number 
+       !END DO
       
-    !win_out = win
-	!store_after = 0.0
-	!DO n = 1, nsnow(i)
-!		store_after = store_after + sice(i,n) + sliq(i,n)
-!	END DO
+       !CLOSE(iw)
+      
+                     
+   ELSE
 
-!	err_mass = (store_before + win_in) - (store_after + win_out)
-
-!	IF (ABS(err_mass) > 1.0e-8) THEN
-!	PRINT '(A,I6,A,I8,A,ES16.8,A,ES16.8,A,ES16.8,A,ES16.8,A,ES16.8)', &
-!  'WATER BAL ERR i=', i, ' step=', a_step, ' err=', err_mass,         &
-!  ' win_in=', win_in, ' win_out=', win_out,                           &
-!  ' store_b=', store_before, ' store_a=', store_after
-!	END IF
-! ---------------------------------------------------------
-
-	ELSE
-
-    
-	
-    DO n = 1,nsnow(i)
+       
+       DO n = 1,nsnow(i)
  
-      sliq(i,n) = sliq(i,n) + win
-      win       = 0.0
-      sliqmax   = snowliqcap * rho_water * ds(i,n)
+          sliq(i,n) = sliq(i,n) + win
+          win       = 0.0
+          sliqmax   = snowliqcap * rho_water * ds(i,n)
 
       IF (l_wtrac_jls) THEN
         ! Repeat for water tracers
@@ -875,6 +911,9 @@ DO k = 1,surft_pts
       END IF
 
       coldsnow = csnow(i,n) * (tm - tsnow(i,n))
+      
+      !print *, "refreeze layer", n, "dsice", 0, "tsnow before refreeze", tsnow(i,n)-273.15
+
       IF (coldsnow > 0.0) THEN
         ! Liquid can freeze
         dsice      = MIN(sliq(i,n), coldsnow / lf)
@@ -900,6 +939,9 @@ DO k = 1,surft_pts
         sliq(i,n)  = sliq(i,n) - dsice
         sice(i,n)  = sice(i,n) + dsice
         tsnow(i,n) = tsnow(i,n) + lf * dsice / csnow(i,n)
+
+        !print *, "refreeze layer", n, "dsice", dsice, "tsnow after refreeze", tsnow(i,n)-273.15
+        
         IF (sf_diag%l_snice) THEN
           sf_diag%snice_freez_surft(i,surft_n) =                               &
                        sf_diag%snice_freez_surft(i,surft_n) + dsice / timestep
@@ -939,7 +981,7 @@ DO k = 1,surft_pts
     !-------------------------------------------------------------------------
     DO n = 1,nsnow(i)
       IF ( ds(i,n) > EPSILON(ds) ) THEN
-        rho_snow(i,n) = (sice(i,n) + sliq(i,n)) / ds(i,n)
+         rho_snow(i,n) = (sice(i,n) + sliq(i,n)) / ds(i,n)
       END IF
     END DO
 
@@ -994,10 +1036,11 @@ DO k = 1,surft_pts
     snowdepth(i) = sice0(i) / rho0(i)
     snowmass(i)  = sice0(i)
     DO n = 1,nsnow(i)
-      snowdepth(i) = snowdepth(i) + ds(i,n)
-      snowmass(i)  = snowmass(i) + sice(i,n) + sliq(i,n)
-    END DO
+       snowdepth(i) = snowdepth(i) + ds(i,n)
+       snowmass(i)  = snowmass(i) + sice(i,n) + sliq(i,n)
+   END DO
 
+       
     IF (l_wtrac_jls) THEN
       ! Repeat for water tracers
       DO i_wt = 1,n_wtrac_jls
@@ -1013,6 +1056,7 @@ DO k = 1,surft_pts
 
   END IF    !  nsnow
 
+   
   ! tsoil only modified for canopy snow tiles (and not land ice ones,
   ! although they shouldn't have this switch on anyway)
   IF ( .NOT. l_elev_land_ice) THEN

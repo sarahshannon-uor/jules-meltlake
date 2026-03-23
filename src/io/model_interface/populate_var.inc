@@ -1979,6 +1979,22 @@ CASE ( 'rho_snow_ml' )
   ELSE
     progs%rho_snow_surft_ml(:,:,:) = const_val
   END IF
+
+CASE ( 'refreeze_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, meltlake_vars%refreeze_ml)
+  ELSE
+    meltlake_vars%refreeze_ml(:,:,:) = const_val
+  END IF
+
+CASE ( 'melt_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, meltlake_vars%melt_ml)
+  ELSE
+    meltlake_vars%melt_ml(:,:,:) = const_val
+  END IF
   
  CASE ( 'lake_depth_ml' )
   IF ( PRESENT(cube) ) THEN
@@ -1994,6 +2010,22 @@ CASE ( 'ice_lens_depth' )
     CALL cube_get_data(cube_land, meltlake_vars%ice_lens_depth)
   ELSE
     meltlake_vars%ice_lens_depth(:,:) = const_val
+  END IF
+
+CASE ( 'ice_lens_index' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, meltlake_vars%ice_lens_index)
+  ELSE
+    meltlake_vars%ice_lens_index(:,:) = const_val
+  END IF
+
+CASE ( 'lake_inflow' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, meltlake_vars%lake_inflow)
+  ELSE
+    meltlake_vars%lake_inflow(:,:) = const_val
   END IF
   
 CASE ( 'lake_albedo_ml' )

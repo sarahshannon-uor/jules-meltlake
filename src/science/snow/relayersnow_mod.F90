@@ -26,6 +26,8 @@ SUBROUTINE relayersnow( land_pts, surft_pts, n_wtrac_jls, surft_index, nsmax,  &
 
 USE layersnow_mod, ONLY: layersnow
 
+USE model_time_mod, ONLY: timestep_number
+
 USE ereport_mod, ONLY: ereport
 
 USE water_constants_mod, ONLY:                                                 &
@@ -302,7 +304,8 @@ DO k = 1,surft_pts
   snowdepth(i) = d0(i,0)
   DO n = 1,nsnow(i)
     snowdepth(i) = snowdepth(i) + d0(i,n)
-  END DO
+ END DO
+
 END DO
 !$OMP END DO
 
@@ -312,8 +315,8 @@ END DO
 ! Divide snowpack into new layers
 !-----------------------------------------------------------------------------
 
-CALL layersnow (land_pts,surft_pts,surft_index,nsmax,dzsnow,snowdepth,nsnow,ds) 
-	                
+CALL layersnow (land_pts,surft_pts,surft_index,nsmax,dzsnow,snowdepth,nsnow,ds)
+
 !$OMP PARALLEL DO                                                              &
 !$OMP SCHEDULE(STATIC)                                                         &
 !$OMP DEFAULT(SHARED)                                                          &
@@ -566,6 +569,7 @@ DO k = 1,surft_pts
       tsnow(i,n)     = tm
     END DO
 
+     
     IF (l_wtrac_jls) THEN
       ! Repeat for water tracers
       DO i_wt = 1,n_wtrac_jls
@@ -577,6 +581,7 @@ DO k = 1,surft_pts
     END IF     ! l_wtrac_jls
   END IF
 
+  
 END DO  !  K (points)
 !$OMP END PARALLEL DO
 

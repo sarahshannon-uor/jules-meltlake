@@ -111,6 +111,10 @@ REAL(KIND=real_jlslsm) ::                                                      &
     ! Overlying mass of snow (kg/m2).
   rho
     ! Snow density (kg/m3).
+ 
+REAL(KIND=real_jlslsm) ::                                                      &
+     ds_input(land_pts, nsmax)
+
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -136,20 +140,44 @@ DO k = 1,surft_pts
 
   !Reset for all possible layers
   DO n = 1,nsmax
-    ds(l,n) = 0.0
+     ds(l,n) = 0.0
   END DO
 
+    
   DO n = 1,nsnow(l)
     mass = mass + 0.5 * (sice(l,n) + sliq(l,n))
     rho  = rho_snow(l,n)
+    
     rho  = rho + 0.5e-7 * rho * g * mass * timestep *                          &
                 EXP(14.643-4.0e3 / tsnow(l,n) - 0.02 * rho)
+    
     IF (l_et_metamorph)                                                        &
-      rho = rho + rho * timestep * a_snow_et *                                 &
-                  EXP(-b_snow_et * (tm - tsnow(l,n)) -                         &
-                      c_snow_et * MAX(0.0, rho - rho_snow_et_crit))
+    
+         rho = rho + rho * timestep * a_snow_et *                              &
+         EXP(-b_snow_et * (tm - tsnow(l,n)) -                                  &
+         c_snow_et * MAX(0.0, rho - rho_snow_et_crit))
+
+        
     ! Do not allow the density to rise above that of solid ice.
     rho = MIN(rho, rho_ice)
+
+    
+    !--- Water sitting on top of lens causes rho_snow > 917 kgm-3
+    !--- This fix prevents ds from growing if rho > 917 
+    IF (rho_snow(l,n) >= rho_ice) THEN
+    !   print '(A, I4, A, F10.4, A, F10.4, A, F10.2, A, F10.2, A, F10.4)', &
+    !  'com l=', n, &
+    !  ' sice=', sice(l,n), &
+    !  ' sliq=', sliq(l,n), &
+    !  ' rho_snow=', rho_snow(l,n), &
+    !  ' rho=', rho, &
+    !  ' ds=', ds_input(l,n)
+
+       rho = MAX(rho, rho_snow(l,n))
+             
+    END IF
+   
+    
     ! Note: mass (and hence rho) can be zero but nsnow>0 (likely 1!) if a very
     ! shallow snowpack has been exhausted in this timestep.
     IF ( rho > EPSILON(rho) )                                                  &

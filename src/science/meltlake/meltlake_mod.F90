@@ -23,7 +23,7 @@ SUBROUTINE  meltlake (land_pts,                 & !IN
                       nsurft,                   & !IN 
                       surft_pts,                & !IN
                       surft_index,              & !IN
-                      snice_runoff_surft,       & !IN/OUT 
+                      lake_inflow,              & !IN 
                       !lw_down_surft,            & !IN  can't highjack these without using switches (set in sf_diag.F90) 
                       !lw_up_surft,              & !IN     
                       !tstar_surft,              & !IN/OUT
@@ -83,9 +83,11 @@ INTEGER, INTENT(IN) ::                                                         &
 !INTEGER, INTENT(IN OUT) ::                                                     &
 !  nsnow(land_pts,nsurft)   ! Number of snow layers.
 
+REAL(KIND=real_jlslsm), INTENT(IN) ::                                           &
+   lake_inflow(land_pts,nsurft)
+    ! water from snowpack (kgm-2)
+
 REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
-   snice_runoff_surft(land_pts,nsurft),                                        &
-    ! Excess water out of snowpack kg/m/s
    lake_depth_ml(land_pts,nsurft),                                             & 
     ! Convective rainfall rate (kg/m2/s).
    lake_albedo_ml(land_pts,nsurft)!,                                            &
@@ -166,10 +168,9 @@ DO n = 1,nsurft
           
             IF (l_elev_land_ice .AND. l_lice_surft(n)) THEN
 
-              IF (snice_runoff_surft(i,n) > 0.0) THEN
+              IF (lake_inflow(i,n) > 0.0) THEN
 
-               lake_depth_ml(i,n) = lake_depth_ml(i,n) + &
-              (snice_runoff_surft(i,n)  * timestep) / rho_water
+               lake_depth_ml(i,n) = lake_depth_ml(i,n) + lake_inflow(i,n) / rho_water
 
               lake_albedo_ml(i,n) = (9702.0 + 1000.0 * EXP(3.6 * lake_depth_ml(i,n))) &
              / (-539.0 + 20000.0 * EXP(3.6 * lake_depth_ml(i,n)))

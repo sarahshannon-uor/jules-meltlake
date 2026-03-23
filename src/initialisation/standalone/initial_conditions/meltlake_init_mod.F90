@@ -55,7 +55,9 @@ TYPE(progs_type), INTENT(IN OUT) :: progs
 ! Work variables
 INTEGER :: i, j, k, l, n, m  ! Index variables
 
-REAL(KIND=real_jlslsm), PARAMETER :: T_min = 253.15, T_max = 272.15!263.15
+REAL(KIND=real_jlslsm), PARAMETER :: T_bot = 253.15, T_top = 272.15!idealised tests warm top - cold bottom
+
+!REAL(KIND=real_jlslsm), PARAMETER :: T_bot = 263.15, T_top = 253.15!Larsen C Buzzard paper, cold top (-20oC)- warm bottom (-10oC)
 
 REAL(KIND=real_jlslsm), PARAMETER :: rho_sfc = 500.0
 
@@ -107,7 +109,7 @@ DO n = 1,nsurft
 ! Initialise snowpack temperature. Default is a warm top, cold bottom
 !-------------------------------------------------------------------------------
 
-                    progs%tsnow_surft_ml(i,n,k) = T_max - ( (k-1) * (T_max - T_min) ) / REAL(nsmax_ml-1)
+                    progs%tsnow_surft_ml(i,n,k) = T_top - ( (k-1) * (T_top - T_bot) ) / REAL(nsmax_ml-1)
 ! for idealised test to control where refreezing of meltwater happens in the snowpack
             !IF (k <= 20) THEN
                 ! 0–4 m: warm near-melting snow
@@ -183,9 +185,6 @@ DO n = 1,nsurft
  END DO 
 
   
-
-
-
 !print *, 'rho_firn_efold', rho_firn_efold
 !print *, 'firn_depth_max', firn_depth_max
 !print *, 'progs%ds_surft_ml', progs%ds_surft_ml(:,9,:)
@@ -194,9 +193,9 @@ DO n = 1,nsurft
 !print *, 'progs%rho_snow_surft_ml', progs%rho_snow_surft_ml(:,9,:)
 !print *, 'progs%snow_surft_ml(i)',progs%snow_surft_ml
 !print *, 'progs%snowdepth_surft_ml(i)',progs%snowdepth_surft_ml
-!print*, 'progs%ice_mass_snow_ml(i,n,k)',progs%sice_surft_ml
+!print*, 'progs%ice_mass_snow_ml(i,n,k)',progs%sice_surft_ml(:,9,:)
 
-
+!stop
 
 END IF
 

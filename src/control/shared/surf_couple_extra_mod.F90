@@ -791,8 +791,12 @@ CASE ( jules )
             progs%rho_snow_surft_ml,        & !OUT (land_pts,nsurft,nsmax_ml) snow layer densities
             meltlake_vars%sfrac_ml,         & !OUT ((land_pts,nsurft,nsmax_ml)
             meltlake_vars%lfrac_ml,         & !OUT ((land_pts,nsurft,nsmax_ml)
-            meltlake_vars%lake_depth_ml,    & !IN/OUT (land_pts,nsurft)    
-            meltlake_vars%ice_lens_depth)   ! !IN/OUT (land_pts,nsurft)   
+            meltlake_vars%refreeze_ml,      & !OUT ((land_pts,nsurft,nsmax_ml)
+            meltlake_vars%melt_ml,          & !OUT ((land_pts,nsurft,nsmax_ml)
+            meltlake_vars%lake_depth_ml,    & !IN/OUT (land_pts,nsurft)
+            meltlake_vars%ice_lens_depth,   & !IN/OUT (land_pts,nsurft)   
+            meltlake_vars%ice_lens_index,   & !IN/OUT (land_pts,nsurft)   
+            meltlake_vars%lake_inflow )   ! !IN/OUT (land_pts,nsurft)   
             
     IF (l_meltlake) THEN
         CALL meltlake(land_pts,                    & !IN
@@ -800,7 +804,7 @@ CASE ( jules )
                       nsurft,                      & !IN 
                       surft_pts,                   & !IN
                       ainfo%surft_index,           & !IN
-                      sf_diag%snice_runoff_surft,  & !IN/OUT 
+                      meltlake_vars%lake_inflow,   & !IN 
                       !sf_diag%lw_down_surft,       & !IN
                       !sf_diag%lw_up_surft,         & !IN 
                       !progs%tstar_surft,           & !IN/OUT
