@@ -134,6 +134,7 @@ USE jules_rivers_mod,         ONLY: l_rivers, l_inland, rivers_call
 
 USE jules_meltlake_mod,       ONLY: l_meltlake
 USE meltlake_mod,             ONLY: meltlake
+USE init_meltlake_timestep_mod, ONLY: init_meltlake_timestep
 
 ! Code which isn't currently suitable for building into LFRic
 #if !defined(LFRIC)
@@ -702,9 +703,9 @@ CASE ( jules )
 
     END IF
 
-   
+     IF (l_meltlake) CALL init_meltlake_timestep(meltlake_vars)                    
     
-!print *, 'inside surf_couple_extra before call snow', fluxes%melt_surft(:,9)
+    
        !Snow (standalone and UM)
     CALL snow (a_step,                      & !IN
             land_pts,                       & !IN
