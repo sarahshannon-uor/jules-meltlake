@@ -1118,11 +1118,11 @@ IF (l_elev_land_ice) THEN
           !--------------------------------------------------
           ! Case 1: melt lake present on top of snow
           !--------------------------------------------------
-          IF (l_meltlake .AND. lake_depth_ml(l,n) > 0.0) THEN
-            !print *, 'melt lake is on top of snowpack, reset albedo to water'
+          IF (l_meltlake .AND. lake_depth_ml(l,n) > 0.1) THEN
+            print *, 'melt lake has formed, adjust albedo'
 
-            !alb_snow(l,n,:) = (9702.0 + 1000.0 * EXP(3.6 * lake_depth_ml(l,n))) &
-            !                 /(-539.0 + 20000.0 * EXP(3.6 * lake_depth_ml(l,n)))
+            alb_snow(l,n,:) = (9702.0 + 1000.0 * EXP(3.6 * lake_depth_ml(l,n))) &
+                             /(-539.0 + 20000.0 * EXP(3.6 * lake_depth_ml(l,n)))
 
           ELSE
             !------------------------------------------------

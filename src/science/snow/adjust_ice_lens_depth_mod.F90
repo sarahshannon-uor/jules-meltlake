@@ -99,9 +99,9 @@ DO k = 1,surft_pts
    
    ! If surface lowered past the lens, lens is exposed/removed
    IF (ice_lens_depth(i) < 0.0) THEN
-      print *, 'lens is exposed'
-      ice_lens_depth(i) = -1.0
-      ice_lens_index(i) = -1.0
+     ! print *, 'lens is exposed'
+      !ice_lens_depth(i) = -1.0
+      ice_lens_index(i) = 0.0
    END IF
       
    !If lens lies deeper than the snowpack, clear it

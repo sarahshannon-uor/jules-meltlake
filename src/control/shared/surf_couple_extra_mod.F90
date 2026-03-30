@@ -806,12 +806,12 @@ CASE ( jules )
                       surft_pts,                   & !IN
                       ainfo%surft_index,           & !IN
                       meltlake_vars%lake_inflow,   & !IN 
-                      !sf_diag%lw_down_surft,       & !IN
-                      !sf_diag%lw_up_surft,         & !IN 
-                      !progs%tstar_surft,           & !IN/OUT
-                      !fluxes%sw_surft,             & !IN 
+                      sf_diag%lw_down_surft,       & !IN
+                      progs%tstar_surft,           & !IN/OUT
+                      fluxes%sw_surft,             & !IN 
                       meltlake_vars%lake_depth_ml, & !IN/OUT 
-                      meltlake_vars%lake_albedo_ml,& !IN/OUT 
+                      meltlake_vars%lake_albedo_ml,& !IN/OUT
+                      meltlake_vars%lake_temp_ml,  & !IN/OUT
                       !Ancil info (IN)
                       ainfo%l_lice_point,          & !IN (land_pts)
                       ainfo%l_lice_surft)         !IN (land_pts)  

@@ -71,8 +71,6 @@ USE snowtherm_mod,   ONLY: snowtherm
 
 USE adjust_ice_lens_depth_mod,   ONLY: adjust_ice_lens_depth
      
-!USE percolate_monarchs_mod,  ONLY: adjust_ice_lens_depth
-
 USE water_constants_mod, ONLY:                                                 &
   ! imported scalar parameters
    lf,                                                                         &
@@ -1058,8 +1056,12 @@ END IF
                   ! Optional meltlake variables 
                   sfrac_sl_ml, lfrac_sl_ml, refreeze_sl_ml, melt_sl_ml,        &
                   ice_lens_depth(:,n),ice_lens_index(:,n), lake_inflow(:,n))
-    !print *, 'snowdepth(:,n) after percol:  ',snowdepth(1,n)
-  
+    
+
+   ! IF (nsnow(1,n)==0) THEN
+   !    print *, 'nsnow(:,n) :  ',nsnow(1,n), timestep_number
+   !    stop
+   ! END IF
   ELSE 
   
     CALL snowpack (a_step, n, land_pts, surft_pts(n), n_wtrac_jls, timestep,   &

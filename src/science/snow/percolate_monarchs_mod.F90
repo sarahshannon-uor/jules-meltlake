@@ -177,24 +177,13 @@ INTEGER ::                                                                    &
     ! Layer index, top-down.
   m,                                                                          &
     ! Reverse index used for upward redistribution during perching.
-  i_wt,                                                                       &
+  i_wt
     ! Water tracer index.
-  kk, &
-  !lens_layer, &
-  lens_layer_mass
  
-   
+    
 !-----------------------------------------------------------------------------
 ! Local logicals
 !-----------------------------------------------------------------------------
-LOGICAL :: ice_lens
-  ! True if the *current layer* satisfies the instantaneous pore-closure
-  ! criterion (sice >= rho_firn_pore_closure * ds).
-  ! This indicates that a lens is *forming here now*.
-  !
-  ! NOTE: This is a local, diagnostic flag only.
-  ! It does NOT represent a persistent lens state.
-
 LOGICAL :: blocked
   ! True once an effective impermeable barrier has been encountered above
   ! (lens depth or saturation barrier).
@@ -203,14 +192,16 @@ LOGICAL :: blocked
   ! layers in this timestep (no percolation, no capillary drainage).
   ! Refreezing may still occur below.
 
-LOGICAL :: at_lens_depth
-  ! True if the *persistent uppermost ice lens depth* (ice_lens_depth)
-  ! lies within the vertical extent of the current layer:
-  !   z_top <= ice_lens_depth_m < z_bot
-  !
-  ! This flag enforces the impermeable barrier even if the instantaneous
-! pore-closure criterion is not met in this layer due to regridding.
 LOGICAL :: new_lens
+  ! True if the *current layer* satisfies the instantaneous pore-closure
+  ! criterion (sice >= rho_firn_pore_closure * ds).
+  ! This indicates that a lens is *forming here now*.
+  !
+  ! NOTE: This is a local, diagnostic flag only.
+! It does NOT represent a persistent lens state.
+
+LOGICAL :: ice_lens
+  ! either a new lens or the persistant lens 
 
 !-----------------------------------------------------------------------------
 ! Local scalars
@@ -247,7 +238,8 @@ REAL(KIND=real_jlslsm) ::                                                      &
    ! depth from surface to bottom of current layer (m)
   retain, &
   cap_full_m, &
-  wout
+  wout, &
+  ice_capacity !maximum additional ice mass that can fit in the layer 
 
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
@@ -260,13 +252,14 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='PERCOLATE_MONARCHS'
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
-refreeze(:,:) = 0.0
+refreeze(i,:) = 0.0
+lake_inflow(i) = 0.0
+
 blocked = .FALSE.
 wout    = 0.0
 
 ! running depth to top of current layer (m)
 z_top   = 0.0
-
 
 DO n = 1, nsnow
    
@@ -301,7 +294,15 @@ DO n = 1, nsnow
 
    IF (coldsnow > 0.0 .AND. sliq(i,n) > 0.0) THEN
 
-    dsice = MIN(sliq(i,n), coldsnow / lf)
+    ! --- maximum additional ice mass that can fit in the layer
+    ice_capacity = rho_ice * ds(i,n) - sice(i,n)
+    ice_capacity = MAX(0.0, ice_capacity)
+
+    !--- don't allow refreezing to add more ice into a layer than it can hold
+    !--- otherwise bulk density (rho_snow_ml) can go > 917 and Sfrac > 1
+    dsice = MIN(sliq(i,n), coldsnow / lf, ice_capacity)
+
+!    dsice = MIN(sliq(i,n), coldsnow / lf)
 
    
     IF (l_wtrac_jls) THEN
@@ -357,7 +358,7 @@ DO n = 1, nsnow
   pfrac = MAX(0.0, MIN(1.0, pfrac))
   cap_full = pfrac * rho_water * ds(i,n) ! FULL pore capacity (kg m-2)
 
-
+  
   !---------------------------------------------------------------------------
   ! Instantaneous lens formation test (pore-closure density)
   !---------------------------------------------------------------------------
@@ -370,7 +371,7 @@ DO n = 1, nsnow
      IF (ice_lens_depth(i) < 0.0 .OR. z_mid < ice_lens_depth(i)) THEN
         ice_lens_depth(i) = z_mid
 
-        print *, 'a shallower lens has formed, replace presistant lens'
+        !print *, 'a shallower lens has formed, replace presistant lens'
        
      END IF
   END IF! new_lens
@@ -396,16 +397,21 @@ DO n = 1, nsnow
 
        blocked = .TRUE.
 
+       ! option 1: allow the lens to keep pore capacity liquid
        ! --- compute pore capacity in lens layer
-       pfrac = 1.0 - sice(i,n) / (rho_ice * ds(i,n))
-       pfrac = MAX(0.0, MIN(1.0, pfrac))
-       cap_full = pfrac * rho_water * ds(i,n)
+       !pfrac = 1.0 - sice(i,n) / (rho_ice * ds(i,n))
+       !pfrac = MAX(0.0, MIN(1.0, pfrac))
+       !cap_full = pfrac * rho_water * ds(i,n)
 
        ! --- remove excess liquid 
-       w_up = MAX(0.0, sliq(i,n) - cap_full)
-       sliq(i,n) = MIN(sliq(i,n), cap_full)
-   
-       print *, 'sfrac in lens', timestep_number, n, sice(i,n) / (rho_ice   * ds(i,n))
+       !w_up = MAX(0.0, sliq(i,n) - cap_full)
+       !sliq(i,n) = MIN(sliq(i,n), cap_full)
+
+       ! option 2: make lens completely dry
+       w_up      = sliq(i,n)
+       sliq(i,n) = 0.0!1.0e-6
+       
+       print *, 'sfrac in lens', timestep_number, n, sice(i,n) / (rho_ice   * ds(i,n)), sliq(i,n)
        
      ! upward fill 
        DO m = n-1, 1, -1
