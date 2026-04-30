@@ -185,12 +185,12 @@ DO n = 1,nsurft
  END DO 
 
   
-!print *, 'rho_firn_efold', rho_firn_efold
+print *, 'rho_firn_efold', rho_firn_efold
 !print *, 'firn_depth_max', firn_depth_max
 !print *, 'progs%ds_surft_ml', progs%ds_surft_ml(:,9,:)
 !print *, 'dzsnow_ml', dzsnow_ml
-!print *, 'progs%tsnow_surft_ml', progs%tsnow_surft_ml(:,9,:)-273.15
-!print *, 'progs%rho_snow_surft_ml', progs%rho_snow_surft_ml(:,9,:)
+print *, 'progs%tsnow_surft_ml', progs%tsnow_surft_ml(:,9,:)-273.15
+print *, 'progs%rho_snow_surft_ml', progs%rho_snow_surft_ml(:,9,:)
 !print *, 'progs%snow_surft_ml(i)',progs%snow_surft_ml
 !print *, 'progs%snowdepth_surft_ml(i)',progs%snowdepth_surft_ml
 !print*, 'progs%ice_mass_snow_ml(i,n,k)',progs%sice_surft_ml(:,9,:)

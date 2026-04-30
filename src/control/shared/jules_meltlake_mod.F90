@@ -8,7 +8,7 @@ MODULE jules_meltlake_mod
 
 USE max_dimensions,    ONLY: snow_layers_max_ml
 USE jules_surface_mod, ONLY: l_elev_land_ice
-
+USE jules_science_fixes_mod, ONLY: l_fix_neg_snow
 !-----------------------------------------------------------------------------
 ! Description:
 !   Contains snow options and a namelist for setting them
@@ -89,7 +89,14 @@ END IF
 IF ( .NOT. l_elev_land_ice) THEN
   errorstatus = 101
   CALL ereport(RoutineName, errorstatus,                                       &
-  "Elevated ice tile is needed for the melt lake model")
+  "Melt lake model requires l_elev_land_ice=.true")
+END IF
+
+! fix for negative snow is needed for the melt lake model 
+IF ( .NOT. l_fix_neg_snow) THEN
+  errorstatus = 101
+  CALL ereport(RoutineName, errorstatus,                                       &
+  "Melt lake model requires l_fix_neg_snow=.true.")
 END IF
 
 END SUBROUTINE check_jules_meltlake

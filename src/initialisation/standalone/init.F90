@@ -297,8 +297,8 @@ CALL init_deposition(nml_dir)
 ! Initialise snow options
 CALL init_snow(nml_dir)
 
-! Initialise melt lake options
-CALL init_meltlake(nml_dir)
+! Initialise melt lake options, moved to after science fixes 
+!CALL init_meltlake(nml_dir)
 
 ! Initialise river routing parameters, ancils and grid
 CALL init_rivers(nml_dir)
@@ -312,6 +312,9 @@ CALL init_urban(nml_dir)
 
 ! Initialise science fixes
 CALL init_science_fixes(nml_dir)
+
+! Initialise melt lake options, checks that l_fix_neg_snow=.true. so moved to here
+CALL init_meltlake(nml_dir)
 
 ! Initialise the input, model and output grids **also allocates arrays**
 CALL init_grid(nml_dir, crop_vars_data,psparms_data,top_pdm_data,              &

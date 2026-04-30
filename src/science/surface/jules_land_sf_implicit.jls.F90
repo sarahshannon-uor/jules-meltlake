@@ -236,6 +236,8 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
 ,rhokh_surft(land_pts,nsurft)
                              ! IN Surface exchange coefficients
                              !    for land tiles
+!,exposed_water(land_pts,nsurft)
+                             ! IN if exposed melt lake water is present
 
 ! Water tracers (IN)
 REAL(KIND=real_jlslsm), INTENT(IN) :: snow_surft_wtrac(land_pts,nsurft,        &
@@ -662,7 +664,7 @@ IF (l_flake_model .AND. .NOT. l_aggregate .AND. (n == lake)) THEN
       ei_surft(:,n),fqw_1,ftl_1,fqw_surft(:,n),ftl_surft(:,n),                 &
       tstar_surft(:,n),lake_ice_mass,lake_ice_mass / rho_snow_const,           &
       melt_ice_surft(:,n),snowinc_flake(:,n)                                   &
-        )
+      )
 
   ELSE
 
@@ -674,7 +676,7 @@ IF (l_flake_model .AND. .NOT. l_aggregate .AND. (n == lake)) THEN
     fracaero_s(:,n),resft(:,n),rhokh_surft(:,n),tile_frac(:,n),                &
     timestep,r_gamma, ei_surft(:,n),fqw_1,ftl_1,fqw_surft(:,n),ftl_surft(:,n), &
     tstar_surft(:,n),snow_surft(:,n),snowdep_surft(:,n),                       &
-    melt_surft(:,n),snowinc_surft(:,n)                                         &
+    melt_surft(:,n),snowinc_surft(:,n), meltlake_vars%exposed_water(:,n)       &
     )
 
 	!print *, '----inside jules_land_sf_implicit------------' 

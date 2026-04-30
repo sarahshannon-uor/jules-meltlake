@@ -177,7 +177,7 @@ INTEGER ::                                                                    &
     ! Layer index, top-down.
   m,                                                                          &
     ! Reverse index used for upward redistribution during perching.
-  i_wt
+  i_wt, iw
     ! Water tracer index.
  
     
@@ -384,11 +384,19 @@ DO n = 1, nsnow
      ice_lens = (ice_lens_depth(i) >= z_top .AND. ice_lens_depth(i) < z_bot)
   END IF
 
+ 
+  
 ! output snow layer of ice lens
   IF (ice_lens) THEN
      ice_lens_index(i) = REAL(n)
+     
   END IF
-  
+
+ !OPEN(NEWUNIT=iw, FILE='new_lens_2.txt', STATUS='UNKNOWN', POSITION='APPEND', ACTION='WRITE')
+ !WRITE(iw,'(I4,",",L1,",",ES16.8,",",I8)') &
+ !    n, new_lens, ice_lens_depth(i), timestep_number
+ !CLOSE(iw)
+
   !---------------------------------------------------------------------------
   ! 4) If lens exists here, then upward percoalte water into layer above 
   ! up to pore space capacity
@@ -411,7 +419,7 @@ DO n = 1, nsnow
        w_up      = sliq(i,n)
        sliq(i,n) = 0.0!1.0e-6
        
-       print *, 'sfrac in lens', timestep_number, n, sice(i,n) / (rho_ice   * ds(i,n)), sliq(i,n)
+       !print *, 'sfrac in lens', timestep_number, n, sice(i,n) / (rho_ice   * ds(i,n)), sliq(i,n)
        
      ! upward fill 
        DO m = n-1, 1, -1
@@ -427,9 +435,9 @@ DO n = 1, nsnow
 
           ! --- water to upfill
           sliq(i,m) = sliq(i,m) + w_up
-          if (m==n-1) then
-             print *, 'sliq to move', sliq(i,m) 
-          end if
+          !if (m==n-1) then
+          !   print *, 'sliq to move', sliq(i,m) 
+          !end if
           
           ! --- only allow layers to contain water up to pore capacity 
           IF (sliq(i,m) > cap_full_m) THEN
@@ -439,7 +447,7 @@ DO n = 1, nsnow
              w_up = 0.0 ! no more water to upfill
           END IF
                               
-          print *, m, sliq(i,m), cap_full_m
+          !print *, m, sliq(i,m), cap_full_m
 
           IF (w_up <= 0.0) EXIT
        END DO

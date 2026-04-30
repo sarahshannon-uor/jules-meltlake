@@ -373,7 +373,7 @@ REAL(KIND=real_jlslsm) :: store_before, store_after, win_in, win_out, err_mass
 REAL :: ztop, zbot
 REAL :: band_top, band_bot, overlap, sice_band
 INTEGER :: iw
-CHARACTER(LEN=*), PARAMETER :: dbgfile = 'before_after_perc.txt'
+CHARACTER(LEN=*), PARAMETER :: dbgfile = 'before_after_relayer_compactsnow_fix.txt'
 
 
 
@@ -824,14 +824,15 @@ DO k = 1,surft_pts
 
     IF (l_meltlake .AND. l_elev_land_ice .AND. l_lice_point(i)) THEN
 
-       !OPEN(NEWUNIT=iw, FILE=dbgfile, STATUS='UNKNOWN', POSITION='APPEND', ACTION='WRITE')
-
-       !write(iw,'(A,I8)') 'BEFORE timestep=', timestep_number
-       !DO jj = 1, nsnow(i)
-       !   write(iw,'(I4,",",ES16.8,",",ES16.8,",",ES16.8,",",ES16.8)') &
-       !        jj, sice(i,jj), sliq(i,jj), ds(i,jj), ice_lens_index(i)
-       !END DO
-       
+   !    OPEN(NEWUNIT=iw, FILE=dbgfile, STATUS='UNKNOWN', POSITION='APPEND', ACTION='WRITE')
+       !IF (timestep_number==2184) THEN 
+    !      write(iw,'(A,I8)') 'BEFORE timestep=', timestep_number
+    !      DO jj = 1, nsnow(i)
+    !         write(iw,'(I4,",",ES16.8,",",ES16.8,",",ES16.8,",",ES16.8)') &
+    !              jj, sice(i,jj), sliq(i,jj), ds(i,jj), ice_lens_index(i)
+    !      END DO
+       !END IF
+    
        CALL percolate_monarchs( i, nsnow(i), land_pts, nsmax,     &
             n_wtrac_jls,timestep,                                 &
             csnow, ds, tsnow,                                     &
@@ -841,18 +842,23 @@ DO k = 1,surft_pts
             sf_diag, surft_n, refreeze, ice_lens_depth,           &
             ice_lens_index, lake_inflow )
 
-       !write(iw,'(A,I8)') 'AFTER timestep=', timestep_number
-       !DO jj = 1, nsnow(i)
-       !   write(iw,'(I4,",",ES16.8,",",ES16.8,",",ES16.8,",",ES16.8)') &
-       !        jj, sice(i,jj), sliq(i,jj), ds(i,jj), ice_lens_index(i)
-       !END DO
+
+        !IF (timestep_number==2184) THEN
+     !!      write(iw,'(A,I8)') 'AFTER timestep=', timestep_number
+    
+       !    DO jj = 1, nsnow(i)
+       !       write(iw,'(I4,",",ES16.8,",",ES16.8,",",ES16.8,",",ES16.8)') &
+       !            jj, sice(i,jj), sliq(i,jj), ds(i,jj), ice_lens_index(i)
+       !    END DO
+      !  END IF
+        
        !write(iw,'(A)') '---'
        
        !DO jj = 1, nsnow(i)
        !   write(*,'(A,I0,A,F16.8,A,F16.8,A,F1.8,A,F16.8,A,F16.8,A,F16.8,A,I0)') ' after perc jj=', jj, ' sliq=', sliq(i,jj), ' sice=', sice(i,jj), ' refreeze=', refreeze(i,jj),' tsnow=', tsnow(i,jj)-273.15,'ds=', ds(i,jj), 'lens=', ice_lens_index(i), 't=', timestep_number 
        !END DO
       
-       !CLOSE(iw)
+     !  CLOSE(iw)
       
                      
    ELSE

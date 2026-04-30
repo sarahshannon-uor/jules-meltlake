@@ -704,8 +704,8 @@ CASE ( jules )
     END IF
 
      IF (l_meltlake) CALL init_meltlake_timestep(meltlake_vars)                    
-    
-    
+
+        
        !Snow (standalone and UM)
     CALL snow (a_step,                      & !IN
             land_pts,                       & !IN
@@ -797,24 +797,28 @@ CASE ( jules )
             meltlake_vars%lake_depth_ml,    & !IN/OUT (land_pts,nsurft)
             meltlake_vars%ice_lens_depth,   & !IN/OUT (land_pts,nsurft)   
             meltlake_vars%ice_lens_index,   & !IN/OUT (land_pts,nsurft)   
-            meltlake_vars%lake_inflow )   ! !IN/OUT (land_pts,nsurft)   
+            meltlake_vars%lake_inflow,      & !IN/OUT (land_pts,nsurft)
+            meltlake_vars%exposed_water)      !IN (land_pts,nsurft)
             
+       
     IF (l_meltlake) THEN
         CALL meltlake(land_pts,                    & !IN
                       timestep,                    & !IN
                       nsurft,                      & !IN 
                       surft_pts,                   & !IN
                       ainfo%surft_index,           & !IN
-                      meltlake_vars%lake_inflow,   & !IN 
+                      meltlake_vars%lake_inflow,   & !IN
+                      meltlake_vars%dt_elev_ml,    & !IN
                       sf_diag%lw_down_surft,       & !IN
-                      progs%tstar_surft,           & !IN/OUT
+                      progs%tstar_surft,           & !IN/OUT 
                       fluxes%sw_surft,             & !IN 
                       meltlake_vars%lake_depth_ml, & !IN/OUT 
                       meltlake_vars%lake_albedo_ml,& !IN/OUT
                       meltlake_vars%lake_temp_ml,  & !IN/OUT
+                      meltlake_vars%exposed_water, & !IN/OUT
                       !Ancil info (IN)
                       ainfo%l_lice_point,          & !IN (land_pts)
-                      ainfo%l_lice_surft)         !IN (land_pts)  
+                      ainfo%l_lice_surft)            !IN (land_pts)  
     END IF
 
     IF (l_wtrac_jls) THEN

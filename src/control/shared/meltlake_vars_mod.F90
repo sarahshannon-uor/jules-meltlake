@@ -49,9 +49,12 @@ TYPE :: meltlake_vars_data_type
   REAL(KIND=real_jlslsm), ALLOCATABLE :: ice_lens_depth(:,:)
   REAL(KIND=real_jlslsm), ALLOCATABLE :: ice_lens_index(:,:)
   REAL(KIND=real_jlslsm), ALLOCATABLE :: lake_inflow(:,:)
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: dt_elev_ml(:,:)
   
-  LOGICAL, ALLOCATABLE :: is_meltlake(:,:)
+  LOGICAL, ALLOCATABLE :: exposed_water(:,:)
+  LOGICAL, ALLOCATABLE :: has_lid(:,:)
 
+  
 END TYPE meltlake_vars_data_type
 
 TYPE :: meltlake_vars_type
@@ -66,8 +69,10 @@ TYPE :: meltlake_vars_type
   REAL(KIND=real_jlslsm), POINTER :: ice_lens_depth(:,:)
   REAL(KIND=real_jlslsm), POINTER :: ice_lens_index(:,:)
   REAL(KIND=real_jlslsm), POINTER :: lake_inflow(:,:)
+  REAL(KIND=real_jlslsm), POINTER :: dt_elev_ml(:,:)
   
-  LOGICAL, POINTER :: is_meltlake(:,:)
+  LOGICAL, POINTER :: exposed_water(:,:)
+  LOGICAL, POINTER :: has_lid(:,:)
   
 END TYPE meltlake_vars_type
 
@@ -106,13 +111,17 @@ ALLOCATE(meltlake_vars_data%sfrac_ml(land_pts,nsurft,nsmax_ml))
 ALLOCATE(meltlake_vars_data%lfrac_ml(land_pts,nsurft,nsmax_ml))
 ALLOCATE(meltlake_vars_data%refreeze_ml(land_pts,nsurft,nsmax_ml))
 ALLOCATE(meltlake_vars_data%melt_ml(land_pts,nsurft,nsmax_ml))
-ALLOCATE(meltlake_vars_data%is_meltlake(land_pts,nsurft))
 ALLOCATE(meltlake_vars_data%lake_depth_ml(land_pts,nsurft))
 ALLOCATE(meltlake_vars_data%lake_albedo_ml(land_pts,nsurft))
 ALLOCATE(meltlake_vars_data%lake_temp_ml(land_pts,nsurft))
 ALLOCATE(meltlake_vars_data%ice_lens_depth(land_pts,nsurft))
 ALLOCATE(meltlake_vars_data%ice_lens_index(land_pts,nsurft))
 ALLOCATE(meltlake_vars_data%lake_inflow(land_pts,nsurft))
+ALLOCATE(meltlake_vars_data%dt_elev_ml(land_pts,nsurft))
+
+ALLOCATE(meltlake_vars_data%exposed_water(land_pts,nsurft))
+ALLOCATE(meltlake_vars_data%has_lid(land_pts,nsurft))
+
 
 meltlake_vars_data%sfrac_ml(:,:,:)      = 0.0
 meltlake_vars_data%lfrac_ml(:,:,:)      = 0.0
@@ -121,10 +130,13 @@ meltlake_vars_data%melt_ml(:,:,:)       = 0.0
 meltlake_vars_data%lake_depth_ml(:,:)   = 0.0
 meltlake_vars_data%lake_albedo_ml(:,:)  = 0.85  
 meltlake_vars_data%lake_temp_ml(:,:)    = 273.15  
-meltlake_vars_data%is_meltlake(:,:)     = .FALSE.
 meltlake_vars_data%ice_lens_depth(:,:)  = -1.0
 meltlake_vars_data%ice_lens_index(:,:)  = 0.0
 meltlake_vars_data%lake_inflow(:,:)     = 0.0
+meltlake_vars_data%dt_elev_ml(:,:)      = 0.0
+
+meltlake_vars_data%exposed_water(:,:)   = .FALSE.
+meltlake_vars_data%has_lid(:,:)         = .FALSE.
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN
@@ -163,10 +175,13 @@ DEALLOCATE(meltlake_vars_data%melt_ml)
 DEALLOCATE(meltlake_vars_data%lake_depth_ml)
 DEALLOCATE(meltlake_vars_data%lake_albedo_ml)
 DEALLOCATE(meltlake_vars_data%lake_temp_ml)
-DEALLOCATE(meltlake_vars_data%is_meltlake)
 DEALLOCATE(meltlake_vars_data%ice_lens_depth)
 DEALLOCATE(meltlake_vars_data%ice_lens_index)
 DEALLOCATE(meltlake_vars_data%lake_inflow)
+DEALLOCATE(meltlake_vars_data%dt_elev_ml)
+
+DEALLOCATE(meltlake_vars_data%exposed_water)
+DEALLOCATE(meltlake_vars_data%has_lid)
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN
@@ -204,10 +219,13 @@ meltlake_vars%melt_ml => meltlake_vars_data%melt_ml
 meltlake_vars%lake_depth_ml => meltlake_vars_data%lake_depth_ml
 meltlake_vars%lake_albedo_ml => meltlake_vars_data%lake_albedo_ml
 meltlake_vars%lake_temp_ml => meltlake_vars_data%lake_temp_ml
-meltlake_vars%is_meltlake => meltlake_vars_data%is_meltlake
 meltlake_vars%ice_lens_depth => meltlake_vars_data%ice_lens_depth
 meltlake_vars%ice_lens_index => meltlake_vars_data%ice_lens_index
 meltlake_vars%lake_inflow => meltlake_vars_data%lake_inflow
+meltlake_vars%dt_elev_ml => meltlake_vars_data%dt_elev_ml
+
+meltlake_vars%exposed_water => meltlake_vars_data%exposed_water
+meltlake_vars%has_lid => meltlake_vars_data%has_lid
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN
@@ -242,11 +260,13 @@ NULLIFY(meltlake_vars%melt_ml)
 NULLIFY(meltlake_vars%lake_depth_ml)
 NULLIFY(meltlake_vars%lake_albedo_ml)
 NULLIFY(meltlake_vars%lake_temp_ml)
-NULLIFY(meltlake_vars%is_meltlake)
 NULLIFY(meltlake_vars%ice_lens_depth)
 NULLIFY(meltlake_vars%ice_lens_index)
 NULLIFY(meltlake_vars%lake_inflow)
+NULLIFY(meltlake_vars%dt_elev_ml)
 
+NULLIFY(meltlake_vars%exposed_water)
+NULLIFY(meltlake_vars%has_lid)
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN

@@ -123,7 +123,11 @@ SUBROUTINE jules_land_sf_explicit (                                            &
  !Water tracers (IN)
  snow_surft_wtrac, canopy_wtrac, sthu_soilt_wtrac, qw_1_wtrac,                 &
  ! Water tracers (OUT)
- fqw_1_wtrac, fqw_surft_wtrac, fqw_evapsrce_wtrac, smc_soilt_wtrac             &
+ fqw_1_wtrac, fqw_surft_wtrac, fqw_evapsrce_wtrac, smc_soilt_wtrac,            &
+ !meltlake_mod (IN)
+ exposed_water, lake_temp_ml,                                                  &
+ !meltlake_mod (OUT)
+ dt_elev_ml                                                                    & 
  )
 
 USE ancil_info,              ONLY: dim_cslayer, nsoilt, rad_nband
@@ -141,7 +145,7 @@ USE gen_anthrop_heat_mod,       ONLY: generate_anthropogenic_heat
 USE heat_con_mod,               ONLY: heat_con
 USE physiol_mod,                ONLY: physiol
 USE planet_constants_mod,       ONLY: cp, vkman, r, c_virtual,epsil=>repsilon
-USE qsat_mod,                   ONLY: qsat, qsat_mix
+USE qsat_mod,                   ONLY: qsat, qsat_mix, qsat_wat
 USE sf_diags_mod,               ONLY: strnewsfdiag
 USE sf_flux_mod,                ONLY: sf_flux
 USE sf_orog_mod,                ONLY: sf_orog
@@ -160,7 +164,7 @@ USE urban_param_mod,            ONLY: z0m_mat
 USE urbanz0_mod,                ONLY: urbanz0
 USE veg_param,                  ONLY: secs_per_360days
 USE veg3_field_mod,             ONLY: veg_state_type
-USE water_constants_mod,        ONLY: lc, rho_ice, tm
+USE water_constants_mod,        ONLY: lc, rho_ice, tm, rho_water, hcapw
 
 USE jules_soil_biogeochem_mod, ONLY:                                           &
 ! imported scalar parameters
@@ -405,9 +409,11 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
                              ! IN Surface ozone concentration (ppb).
 ,latitude(tdims%i_start:tdims%i_end,tdims%j_start:tdims%j_end)                 &
                              ! IN Latitude (degree)
-,longitude(tdims%i_start:tdims%i_end,tdims%j_start:tdims%j_end)
+,longitude(tdims%i_start:tdims%i_end,tdims%j_start:tdims%j_end)                &   
                              ! IN Longitude (degree)
-
+,lake_temp_ml(land_pts,nsurft)                                             
+                             ! IN bulk meltlake temperature (K)
+							 
 LOGICAL, INTENT(IN) ::                                                         &
  l_aero_classic                                                                &
                              ! IN switch for using CLASSIC aerosol
@@ -419,9 +425,10 @@ LOGICAL, INTENT(IN) ::                                                         &
                              !    lifting
 ,l_mr_physics                                                                  &
                              ! IN Switch for when mixing ratios are used
-,l_emis_surft_set(nsurft)
+,l_emis_surft_set(nsurft)                                                      & 
                              ! IN Switch for varying grey surface emissivity
-
+,exposed_water(land_pts,nsurft)
+                             ! IN if exposed melt lake water is present   
 !-----------------------------------------------------------------------
 !  In/outs :-
 !-----------------------------------------------------------------------
@@ -793,6 +800,9 @@ REAL(KIND=real_jlslsm), INTENT(OUT) :: smc_soilt_wtrac(land_pts,nsoilt,        &
                                                          n_wtrac_jls)
                              ! OUT Water tracer in available moisture in the
                              !     soil profile (kg/m2).
+
+!meltlake model (OUT)
+REAL(KIND=real_jlslsm), INTENT(OUT) :: dt_elev_ml(land_pts,nsurft)
 
 !-----------------------------------------------------------------------
 ! LOCAL variables
@@ -1878,7 +1888,7 @@ IF (     l_flake_model                                                         &
     CALL ereport(routinename, errcode, cmessage)
   END IF
 
-END IF
+END IF !l_flake
 
 
 DO n = 1,nsurft
@@ -2022,6 +2032,8 @@ DO n = 1,nsurft
       ELSE
         hcons_surf(l,n) = hcondeep
       END IF
+
+     	  
     ELSE
 
       ! Soil
@@ -2089,6 +2101,32 @@ DO n = 1,nsurft
         END IF
       END IF
     END IF
+
+    !-----------------------------------------------------------------------
+    ! The subsurface is exposed water instead of snow
+    ! Pass elevated adjusted lake temp (tsurf) to sf_flux. 
+    ! Pass heat transfer coeff to sf_flux, found by rearranging eqn 16
+    ! Buzzard et al. (2018)  4/3rd law for turbulant convention
+    !-----------------------------------------------------------------------
+    IF ( l_meltlake.AND. exposed_water(l,n) .AND.                             &
+         l_elev_land_ice .AND. l_lice_point(l) ) THEN
+
+       ! when passing the lake lower temperature into the surface solver,
+       ! shift it into the same reference frame as the elevated-tile atmosphere.
+       
+       tsurf(l,n) = lake_temp_ml(l,n) + t_elev(l,n) - tl_1(i,j)
+   
+               
+       ashtf_surft(l,n) = rho_water * hcapw * 1.907e-5 *                      &
+            ABS(tsurf(l,n) - tstar_surft(l,n))**(1.0/3.0)
+
+       ! save orographic temp difference to meltlake_vars
+       dt_elev_ml(l,n) = t_elev(l,n) - tl_1(i,j)
+
+       
+       
+    END IF
+
 
   END DO
 !$OMP END PARALLEL DO
@@ -2294,8 +2332,8 @@ DO n = 1,nsurft
    canopy(:,n),catch(:,n),chn(:,n),dq(:,n),epdt,flake(:,n),gc_surft(:,n),      &
    gc_stom_surft(:,n),snowdep_surft(:,n),snow_surft(:,n),vshr_land,            &
    tstar_surft(:,n),fracaero_t(:,n),fracaero_s(:,n),resfs(:,n),resft(:,n),     &
-   sf_diag%resfs_stom(:,n_diag),sf_diag%l_et_stom,sf_diag%l_et_stom_surft)
-
+   sf_diag%resfs_stom(:,n_diag),sf_diag%l_et_stom,sf_diag%l_et_stom_surft,     &
+   exposed_water(:,n))
 END DO
 
 !-----------------------------------------------------------------------
@@ -2464,7 +2502,7 @@ IF ((l_dust .OR. l_dust_diag) .AND. l_aggregate) THEN
   ! are dummy variables not needed from this call
     cd_surft_soil(:,n),ch_surft_soil(:,n),cd_std_soil(:,n),                    &
     v_s_surft_soil(:,n),v_s_std_soil(:,n),recip_l_mo_surft_soil(:,n),          &
-    u_s_iter_soil(:,n)                                                         &
+    u_s_iter_soil(:,n)                                                         & 
     )
 
 !$OMP PARALLEL IF(nsurft > 1) DEFAULT(NONE) PRIVATE(k, l, n)                   &
@@ -2648,8 +2686,11 @@ DO n = 1,nsurft
    canopy(:,n),catch(:,n),ch_surft(:,n),dq(:,n),epdt,flake(:,n),gc_surft(:,n), &
    gc_stom_surft(:,n),snowdep_surft(:,n),snow_surft(:,n),vshr_land,            &
    tstar_surft(:,n),fracaero_t(:,n),fracaero_s(:,n),resfs(:,n),resft(:,n),     &
-   sf_diag%resfs_stom(:,n_diag),sf_diag%l_et_stom,sf_diag%l_et_stom_surft)
+   sf_diag%resfs_stom(:,n_diag),sf_diag%l_et_stom,sf_diag%l_et_stom_surft,     &
+   exposed_water(:,n)) 
 
+  !print *, 'B fracaero_s(:,n)', fracaero_s(:,n)
+  
   CALL sf_flux (                                                               &
    land_pts,surft_pts(n),                                                      &
    land_index,surft_index(:,n),                                                &
@@ -2661,8 +2702,9 @@ DO n = 1,nsurft
    z0m_eff_surft(:,n),zdt_surft(:,n),z1_tq,lh0,emis_surft(:,n),emis_soil,      &
    1.0,anthrop_heat_surft(:,n),scaling_urban(:,n),l_vegdrag_surft(n),          &
    alpha1(:,n),ashtf_prime_surft(:,n),fqw_surft(:,n),                          &
-   epot_surft(:,n),ftl_surft(:,n),dtstar_surft(:,n),sea_point                  &
- )
+   epot_surft(:,n),ftl_surft(:,n),dtstar_surft(:,n),sea_point,                 &
+   exposed_water(:,n)                                                          &    
+   )
 
   ! update gridbox means and diagnostics
 !$OMP PARALLEL DO IF(surft_pts(n) > 1) DEFAULT(NONE) PRIVATE(i, j, k, l)       &

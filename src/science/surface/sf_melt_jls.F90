@@ -19,13 +19,13 @@ CONTAINS
 !           by melt and sublimation in P251.
 !-----------------------------------------------------------------------
 SUBROUTINE sf_melt (                                                           &
- n,points,pts_index                                                              &
+ n,points,pts_index                                                            &
 ,surft_index,surft_pts,fld_sea                                                 &
 ,alpha1,ashtf_prime,dtrdz_1                                                    &
 ,fracs,resft,rhokh_1,tile_frac,timestep,r_gamma                                &
 ,ei_surft,fqw_1,ftl_1,fqw_surft,ftl_surft                                      &
 ,tstar_surft,snow_surft,snowdepth                                              &
-,melt_surft,snowinc_surft                                                      &
+,melt_surft,snowinc_surft,exposed_water                                        &
  )
 
 USE atm_fields_bounds_mod, ONLY: tdims
@@ -40,6 +40,8 @@ USE jules_science_fixes_mod, ONLY: l_fix_snow_frac, l_fix_neg_snow
 
 USE water_constants_mod, ONLY:                                                 &
  lc, lf, rho_water, tm
+
+USE jules_meltlake_mod,  ONLY: l_meltlake
 
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
@@ -133,6 +135,11 @@ INTEGER ::                                                                     &
 ,l
                       ! Loop counter - land field.
 
+LOGICAL, INTENT(IN), OPTIONAL ::                                               &
+ exposed_water(points)
+                     ! IN flag meltlake depth > 10cm surface is no longer snow
+                     ! but is open water
+
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
 REAL(KIND=jprb)               :: zhook_handle
@@ -215,9 +222,22 @@ DO k = 1,surft_pts
       snowinc_surft(l) = - MIN(snow_surft(l),                                  &
         (lcmelt * (tstar_surft(l) - tm) / lf + ei_surft(l)) * timestep)
     END IF
-    melt_surft(l) = - snowinc_surft(l) / timestep - ei_surft(l)
-    dtstar = - lf * melt_surft(l) / lsmelt
-    tstar_surft(l) = tstar_surft(l) + dtstar
+
+! --- need to replace with stefan condition    
+     IF (l_meltlake .AND. PRESENT(exposed_water)) THEN
+        IF (exposed_water(l)) THEN
+           melt_surft(l) = 0.0
+           dtstar = 0.0
+        ELSE
+           melt_surft(l) = - snowinc_surft(l) / timestep - ei_surft(l)
+           dtstar = - lf * melt_surft(l) / lsmelt
+           tstar_surft(l) = tstar_surft(l) + dtstar
+        END IF !exposed_water
+     END IF ! l_meltlake
+    
+    print *, 'sf_melt: dtstar, tstar', dtstar , tstar_surft(l)
+! --- end sarah
+    
     dftl = cp * rhokh1_prime * dtstar
     dfqw = alpha1(l) * resft(l) * rhokh1_prime * dtstar
     ftl_surft(l) = ftl_surft(l) + dftl

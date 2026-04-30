@@ -12,6 +12,9 @@
 ! Description:
 !     Calling routine for meltlake module
 ! Method:
+!     Increment lake depth using excess water from snowpack
+!     Get lake albedo for nc output
+!     Get lake temp from tile surface temp using 4/3 law
 !
 ! Code Owner: s.r.shannon@reading.ac.uk
 !
@@ -26,13 +29,15 @@ SUBROUTINE  meltlake (land_pts,                 & !IN
                       nsurft,                   & !IN 
                       surft_pts,                & !IN
                       surft_index,              & !IN
-                      lake_inflow,              & !IN 
-                      lw_down_surft,            & !IN  can't highjack these without using switches (set in sf_diag.F90) 
-                      tstar_surft,              & !IN/OUT
-                      sw_surft,                 & !IN  (maybe used by snowpack already!!!)
+                      lake_inflow,              & !IN
+                      dt_elev_ml,               & !IN
+                      lw_down_surft,            & !IN  
+                      tstar_surft,              & !IN/OUT 
+                      sw_surft,                 & !IN  already uses lake albedo
                       lake_depth_ml,            & !IN/OUT
                       lake_albedo_ml,           & !IN/OUT
                       lake_temp_ml,             & !IN/OUT
+                      exposed_water,            & !IN/OUT
                       !Ancil info (IN)
                       l_lice_point,             & !IN (land_pts)
                       l_lice_surft)               !IN (ntype)  
@@ -52,9 +57,13 @@ USE water_constants_mod,     ONLY:                                           &
   ! Specific heat capacity of water (J/kg/K).
  lf,                                                                         &
   ! Latent heat of fusion at 0degC (J kg-1).
- rho_ice
+ rho_ice,                                                                    &
   ! Density of solid ice (kg/m3).
-      
+ tm
+  ! Temperature at which fresh water freezes and ice melts (K).
+
+USE model_time_mod, ONLY: timestep_number
+
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 
@@ -80,19 +89,21 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
     ! Net shortwave radiation on tile (W/m2) using lake albedo
   lw_down_surft(land_pts,nsurft),                                              &
     ! Surface downward LW radiation on tiles (W/m2), jules_land_sf_implicit.F90
-  lake_inflow(land_pts,nsurft)
+  lake_inflow(land_pts,nsurft),                                                &
        ! melt water from snowpack (kgm-2)
-       
+  dt_elev_ml(land_pts,nsurft)
+       ! orographic temp offset (elevated tile temp - gridbox mean temp (oK))  
      
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(in)
 !-----------------------------------------------------------------------------
-INTEGER, INTENT(IN) :: &
+INTEGER, INTENT(IN) ::                                                         &
   surft_pts(nsurft),                                                           &
     ! Number of tile points.
   surft_index(land_pts,nsurft)
     ! Index of tile points.
-  
+
+
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(inout)
 !-----------------------------------------------------------------------------
@@ -110,10 +121,11 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
 ! Array arguments with intent(out)
 !-----------------------------------------------------------------------------
 
-  
 !ancil_info (IN)
 LOGICAL, INTENT(IN) :: l_lice_point(land_pts)
 LOGICAL, INTENT(IN) :: l_lice_surft(ntype)
+
+LOGICAL, INTENT(IN OUT) :: exposed_water(land_pts,nsurft)
 
 !-----------------------------------------------------------------------------
 ! Local scalars
@@ -153,22 +165,32 @@ REAL(KIND=real_jlslsm) ::                                                      &
   flux_upper, &
     ! flux between atmosphere and lake
   delta_t, &
-  dt
+  dt, &
+  dTdt, &
+  q_in, &
+  sw_absorb, &
+  lake_temp_eff_ml
+    ! elevation adjust to lake temp to match sf_flux  
 
 !REAL, DIMENSION(land_pts, nsurft), INTENT(IN) :: q_surface
 
 REAL, PARAMETER :: ftl = 20.0   ! Sensible heat flux (W m-2), positive upward
 REAL, PARAMETER :: le  = 50.0   ! Latent heat flux (W m-2), positive upward
 
-! shortwave attenuation coeff (m-1) 0.5 light penatrates deeper,  2-3 shallow heating
+
 REAL, PARAMETER :: tau   = 1.0
+                 ! shortwave attenuation coeff (m-1)
+                 ! 0.5 light penatrates deeper,  2-3 shallow heating
 
 REAL, PARAMETER :: emis_water  = 0.98
 REAL, PARAMETER :: hcon_snow  = 2.2 !thermal conductivity of ice (~2.2 W m⁻¹ K⁻¹)
 
 REAL, PARAMETER :: dz_lake_base = 0.1 !assumed thickness (m) of the layer controlling heat exchange beneath the lake
 
-REAL, PARAMETER :: tbase = 273.15
+REAL, PARAMETER :: tbase  = 273.15
+
+REAL, PARAMETER :: Jturb  = 1.907e-5
+                 ! Turbulent heat flux factor (ms⁻¹ K⁻¹/3) Eqn 16 Buzzard 
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -176,93 +198,142 @@ REAL(KIND=jprb)               :: zhook_handle
 
 CHARACTER(LEN=*), PARAMETER :: RoutineName='MELTLAKE'
 
+! useful wildcard grep 
+! grep -RInE 'dtstar_surft[[:space:]]*\(.*\)[[:space:]]*='
+
 !-----------------------------------------------------------------------------
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 DO n = 1,nsurft
-    DO k = 1,surft_pts(n)
-        i = surft_index(k,n)
-          
-            IF (l_elev_land_ice .AND. l_lice_surft(n)) THEN
+   DO k = 1,surft_pts(n)
+      i = surft_index(k,n)
+      
+      IF (l_elev_land_ice .AND. l_lice_surft(n)) THEN
+           
+!-----------------------------------------------------------------------------
+! Create an exposed water flag. Use this to modify snowpack upper boundary
+!-----------------------------------------------------------------------------
+               
+         exposed_water(i,n) = (lake_depth_ml(i,n) > 0.1)
+               
+!-----------------------------------------------------------------------------
+! Increment the lake depth
+!-----------------------------------------------------------------------------
+         IF (lake_inflow(i,n) > 0.0) THEN
+            lake_depth_ml(i,n) = lake_depth_ml(i,n) +                          &
+                 lake_inflow(i,n) / rho_water
+         END IF
+!-----------------------------------------------------------------------------
+! Get albedo - doing this again to output albedo to nc. this is already in
+! src/science/radiation/jules_land_albedo_jls_mod.F90
+! assume albedo is constant 0.05 for deep lakes (> 14m approx)
+! that depth is only likely for idealised tests eqn 13
+!-----------------------------------------------------------------------------
+         IF (exposed_water(i,n)) THEN
+                     
+            expon_term = 3.6 * lake_depth_ml(i,n)
 
-              IF (lake_inflow(i,n) > 0.0) THEN
+            IF (expon_term < 50.0) THEN
+               ex = EXP(-expon_term)
+               lake_albedo_ml(i,n) = (9702.0 * ex + 1000.0)                 &
+                    / (-539.0 * ex + 20000.0)
+            ELSE
+               lake_albedo_ml(i,n) = 0.05
+            END IF
+               
+!-----------------------------------------------------------------------------
+! Update lake temp. Assume the lake is turbulently mixed so use a bulk temp
+!-----------------------------------------------------------------------------
+            flux_upper = 0.0
+            flux_lower = 0.0
+            
+!-----------------------------------------------------------------------------
+! Upper flux, lake interior --> tile surface. eqn 16
+! Use elevated tile effective lake temperature so this matches sf_flux
+!-----------------------------------------------------------------------------
+            lake_temp_eff_ml = lake_temp_ml(i,n) + dt_elev_ml(i,n)
+            
+            delta_t = lake_temp_eff_ml - tstar_surft(i,n) 
+                 
+            flux_upper = SIGN(1.0, delta_t) * rho_water * hcapw * Jturb       &
+                 * ABS(delta_t)**(4.0/3.0)
+            
+!-----------------------------------------------------------------------------
+! Lower flux, lake interior --> lens snowpack. eqn 16
+!-----------------------------------------------------------------------------
+                
+            delta_t = lake_temp_ml(i,n)  - tm
+                 
+            flux_lower = SIGN(1.0, delta_t) * rho_water * hcapw * Jturb       &
+                 * ABS(delta_t)**(4.0/3.0)
 
-               lake_depth_ml(i,n) = lake_depth_ml(i,n) + lake_inflow(i,n) / rho_water
+!-----------------------------------------------------------------------------
+! Shortwave absorbed into lake, use a simple Beer-law form.
+! Not using lake layers like in monarchs, can be simple if we only need a
+! bulk lake temperature.                  
+!-----------------------------------------------------------------------------
+                 
+            sw_absorb = sw_surft(i,n) *                                      &
+                 (1.0 - EXP(-tau * lake_depth_ml(i,n)))
 
-               ! --- assume albedo is constant 0.05 for deep lakes (> 14m approx)
-               !---  that depth is only likely for idealised tests
+!-----------------------------------------------------------------------------
+! Change in lake temperature. eqn 15
+!-----------------------------------------------------------------------------
+            dTdt = (- flux_upper - flux_lower + sw_absorb) /                &
+                 (rho_water * hcapw * lake_depth_ml(i,n))
 
-               expon_term = 3.6 * lake_depth_ml(i,n)
+            lake_temp_ml(i,n) = lake_temp_ml(i,n) + timestep * dTdt
+            
+            IF (lake_temp_ml(i,n) < tm) lake_temp_ml(i,n) = tm ! refreezing 
 
-               IF (expon_term < 50.0) THEN
-                  ex = EXP(-expon_term)
-                  lake_albedo_ml(i,n) = (9702.0 * ex + 1000.0) &
-                       / (-539.0 * ex + 20000.0)
-               ELSE
-                  lake_albedo_ml(i,n) = 0.05
-               END IF
-
-                             
-              ! MONARCHS shortwave absorption
-              !q_sw_lake_abs = (1.0 - albedo(i,n)) * sw_down(i,n) *  &
-               !    (1.0 - EXP(-tau * lake_depth_ml(i,n)))
-
+            WRITE(*,*) '--- LAKE ENERGY DIAGNOSTICS ---'
+            
+            WRITE(*,'(A,F16.8)') 'sw_absorb                = ', sw_absorb
+            WRITE(*,'(A,F16.8)') 'flux_upper               = ', flux_upper
+            WRITE(*,'(A,F16.8)') 'flux_lower               = ', flux_lower
+            WRITE(*,'(A,F16.8)') 'lake_temp                = ', lake_temp_ml(i,n) + dt_elev_ml(i,n) 
+            WRITE(*,'(A,F16.8)') 'tstar_surft              = ', tstar_surft(i,n)
+            WRITE(*,'(A,F16.8)') 'lake_inflow              = ', lake_inflow(i,n)
+            WRITE(*,'(A,F16.8)') 'lake_temp - tstar_surft  = ', lake_temp_ml(i,n)-tstar_surft(i,n)
+            WRITE(*,'(A,F16.8)') 'dTdt                     = ', dTdt
+            
+            WRITE(*,*) '--------------------------------', timestep_number
+            !IF (timestep_number==2451) THEN
+            !   stop
+            !END IF
+!-----------------------------------------------------------------------------
+! Lake-snow boundary change from Stefan condition
+!-----------------------------------------------------------------------------  
+               
                !--- net SW absorbed on tile (sw_surft from calc_downward_rad_mod.F90)
                !--- uses albedo (over wrote snow with lake albedo)
-               q_sw = sw_surft(i,n) *  &
-              (1.0 - EXP(-tau * lake_depth_ml(i,n))) / tau
+              ! q_sw = sw_surft(i,n) *  &
+              !(1.0 - EXP(-tau * lake_depth_ml(i,n))) / tau
                             
-              ! --- long wave net but use lake temp
-              tstar_surft(i,n) = lake_temp_ml(i,n)
-              
-              q_lw = lw_down_surft(i,n) - emis_water * sbcon * tstar_surft(i,n)**4
-              
-              q_sens_lat = - ftl - le
-              
-                                          
+
+                 
               !---Stefan condition
               !q_base = hcon_snow * (lake_temp_ml(i,n) - t_base) /  dz_lake_base
 
-              delta_t = lake_temp_ml(i,n) - 273.15
+              !delta_t = lake_temp_ml(i,n) - 273.15
 
-              flux_lower = SIGN(1.0, delta_t) * rho_water * hcapw * 1.907e-5 *  &
-                   ABS(delta_t)**(4.0/3.0)
+              !flux_lower = SIGN(1.0, delta_t) * rho_water * hcapw * 1.907e-5 *  &
+              !     ABS(delta_t)**(4.0/3.0)
 
-              flux_upper =  -(q_lw + q_sens_lat)
+              !flux_upper =  -(q_lw + q_sens_lat)
 
               ! --- net energy into the lake
-              dt = (-flux_lower - flux_upper + q_sw) /  &
-                   (rho_water * hcapw * lake_depth_ml(i,n))
+              !dt = (-flux_lower - flux_upper + q_sw) /  &
+              !     (rho_water * hcapw * lake_depth_ml(i,n))
 
-              lake_temp_ml(i,n) = lake_temp_ml(i,n) + timestep * dt
+              !lake_temp_ml(i,n) = lake_temp_ml(i,n) + timestep * dt
               
              ! lake_depth_ml(i,n) = lake_depth_ml(i,n) - dh_dt * timestep
               
-              WRITE(*,*) '--- LAKE ENERGY DIAGNOSTICS ---'
-              WRITE(*,'(A,F12.4)') 'q_sw        (SW abs)   = ', q_sw
-              WRITE(*,'(A,F12.4)') 'q_lw        (LW net)   = ', q_lw
-              WRITE(*,'(A,F12.4)') 'q_sens_lat  (H+LE)     = ', q_sens_lat
-              !WRITE(*,'(A,F12.4)') 'q_base      (basal)    = ', q_base
-              WRITE(*,'(A,F12.4)') 'lake_temp             = ', lake_temp_ml(i,n)-273.15
-              WRITE(*,'(A,F12.4)') 'tstar_surft           = ', tstar_surft(i,n)-273.15
-              WRITE(*,'(A,F12.4)') 'lake_inflow           = ', lake_inflow(i,n)
-              !WRITE(*,'(A,F12.4)') 'dh_dt                 = ', dh_dt
-              
-              WRITE(*,*) '--------------------------------'
-
-            
-              
-              ! no freezing without lid physics
-              IF (lake_temp_ml(i,n) < 273.15) THEN
-                 lake_temp_ml(i,n) = 273.15
-              END IF
-
-
-            
-            END IF 
-        END IF 
+             END IF ! exposed_water
+          END IF ! elev land ice tile
+       END DO
     END DO
-END DO
 
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)

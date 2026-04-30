@@ -57,8 +57,8 @@ SUBROUTINE snow (a_step, land_pts, timestep, stf_hf_snow_melt, nsurft, n_wtrac_j
                   lake_depth_ml, &     !(land_pts,nsurft)
                   ice_lens_depth,&    !(land_pts,nsurft)
                   ice_lens_index,&
-                  lake_inflow)      !(land_pts,nsurft)
-
+                  lake_inflow,   &      !(land_pts,nsurft)
+                  exposed_water)
 
 USE canopysnow_mod,  ONLY: canopysnow
 USE compactsnow_mod, ONLY: compactsnow
@@ -160,9 +160,9 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
     ! Convective snowfall rate (kg/m2/s).
   tile_frac(land_pts,nsurft),                                                  &
     ! Tile fractions.
-  ei_surft(land_pts,nsurft),                                                   &
+  !ei_surft(land_pts,nsurft),                                                   &
     ! Sublimation of snow (kg/m2/s).
-  snowinc_surft(land_pts,nsurft),                                              &
+  !snowinc_surft(land_pts,nsurft),                                              &
     ! Total increment to snow from the surface scheme, including sublimation
     ! and melting (kg m-2 TS-1).
     ! Using the increment, rather than the rate times the timestep allows
@@ -186,7 +186,7 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
     ! of saturation.
   !surf_htf_surft(land_pts,nsurft),                                             &
     ! Surface heat flux (W/m2).
-  tstar_surft(land_pts,nsurft),                                                &
+  !tstar_surft(land_pts,nsurft),                                                &
     ! Tile surface temperature (K).
   smvcst1_soilt(land_pts,nsoilt),                                              &
     ! Surface soil layer volumetric moisture concentration at saturation.
@@ -204,9 +204,9 @@ INTEGER, INTENT(IN OUT) ::                                                     &
   nsnow(land_pts,nsurft)                                                        
     ! Number of snow layers.
       
-!LOGICAL, INTENT(IN OUT) ::                                                     &
-!  lake_depth_ml(land_pts,nsurft)   
-    ! Melt lake depth (m)
+LOGICAL, INTENT(IN OUT) ::                                                     &
+  exposed_water(land_pts,nsurft)   
+    ! exposed meltlake water 
   
 REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
   con_rain(land_pts),                                                          &
@@ -295,8 +295,19 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Ice lens snow level
   lake_inflow(land_pts,nsurft),                                                &
     ! mass water into lake from snowpack (kgm-2)
-  surf_htf_surft(land_pts,nsurft)                                             
-    ! Surface heat flux (W/m2). 
+  surf_htf_surft(land_pts,nsurft),                                             &                                           
+  ! Surface heat flux (W/m2). moved from intent IN
+  tstar_surft(land_pts,nsurft),                                                &
+    ! Tile surface temperature (K). moved from intent IN
+  ei_surft(land_pts,nsurft),                                                   &                                                 
+    ! Sublimation of snow (kg/m2/s) was in now in/out
+  snowinc_surft(land_pts,nsurft)
+    ! Total increment to snow from the surface scheme, including sublimation
+    ! and melting (kg m-2 TS-1).
+    ! Using the increment, rather than the rate times the timestep allows
+    ! the mass of snow to be reduced to 0, whereas using the rate can
+    ! result in very small presisting amounts of snow because of rounding
+    ! errors. was in now in/out	
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(out)
 !-----------------------------------------------------------------------------
@@ -409,10 +420,10 @@ REAL(KIND=real_jlslsm) ::                                                      &
     ! Temperature of fresh snow (K).
   csnow_ml(land_pts,nsmax_ml),                                                 &
     ! Areal heat capacity of layers for meltlake (J/K/m2).
-  ksnow_ml(land_pts,nsmax_ml),                                                 &                                                       
+  ksnow_ml(land_pts,nsmax_ml)!,                                                 &                                                       
     ! Thermal conductivity of layers for meltlake (W/m/K).
-  tstar_surft_ml(land_pts,nsurft)                                                
-    ! Tile surface temperature (K), a lake can be on top of snowpack
+  !tstar_surft_ml(land_pts,nsurft)                                                
+    ! not necessary Tile surface temperature (K), a lake can be on top of snowpack
 
 ! Snow quantities on a single surft, i.e. over snow layers (sl)
 REAL(KIND=real_jlslsm) ::                                                      &
@@ -454,7 +465,7 @@ REAL(KIND=real_jlslsm) ::                                                      &
        ! Change is snow depth between timesteps (m).
   snowdepth_before_compact(land_pts,nsurft),                                   &
     ! Snow depth (m)
-   snowdepth_after_compact(land_pts,nsurft)
+  snowdepth_after_compact(land_pts,nsurft)
    ! Snow depth (m)
    
 REAL(KIND=real_jlslsm), ALLOCATABLE ::                                         &
@@ -472,6 +483,8 @@ TYPE(wtrac_sn_type) :: wtrac_sn         ! Water tracer working arrays
 INTEGER(KIND=jpim) :: ii, nn, jj
 REAL(KIND=jprb) :: rho_check, mlay, mabove, rhoj, z
 REAL :: band_top, band_bot, overlap, sice_band, ztop, zbot, rho_true
+
+LOGICAL :: any_exposed_water(nsurft)
 
 INTEGER :: iu
 !CHARACTER(LEN=*), PARAMETER :: dbgfile = 'depth.marker.warm.cold.wet.adjust.on.ds.10cm.txt'
@@ -750,6 +763,29 @@ DO n = 1,nsurft
 !$OMP END PARALLEL
 
   END IF
+
+!----- if any tile has exposed water
+  !any_exposed_water(n) = .FALSE.
+  !IF (l_meltlake .AND. l_lice_surft(n)) THEN
+  !   DO k=1,surft_pts(n)
+  !      i = surft_index(k,n)
+  !      IF (exposed_water(i,n)) THEN
+  !         any_exposed_water(n) = .TRUE.
+ !          tstar_surft(i,n) = 273.15
+ !          surf_htf_surft(i,n)  = 0.0!surf_htf_meltlake(i,n)
+ !          ei_surft(i,n)        = 0.0!ei_meltlake(i,n)
+ !          melt_surft(i,n)      = 0.0!melt_meltlake(i,n)
+ !          snowfall(i)          = 0.0
+ !          snowinc_surft(i,n)   = 0.0! increment in snowmass
+   !        EXIT
+   !     END IF
+   !  END DO
+  !END IF
+!------------------------------------------
+!IF (any_exposed_water(n)) THEN
+!  PRINT *, timestep_number, n, any_exposed_water(n)
+!END IF
+
 
   ! Copy data for this surft to the snow layer (sl) arrays
 !$OMP PARALLEL DEFAULT(NONE)                                                   &
@@ -1099,7 +1135,8 @@ END IF
   
   CALL snowgrain ( land_pts, surft_pts(n), timestep, nsnow(:,n),              &
                      surft_index(:,n), nsmax_ml, sice_sl_ml, snowfall,        &
-                     snowmass, tsnow_sl_ml, tstar_surft_ml(:,n),              &
+                    ! snowmass, tsnow_sl_ml, tstar_surft_ml(:,n),              & not sure why I did that ! not necessary for a separate *_ml var 
+                     snowmass, tsnow_sl_ml, tstar_surft(:,n),              &
                      rgrain(:,n), rgrainl_sl_ml, rgrain0 )
   
  ELSE

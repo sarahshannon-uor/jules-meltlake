@@ -21,7 +21,7 @@ SUBROUTINE sf_resist (                                                         &
  land_pts,surft_pts,land_index,surft_index,cansnowtile,                        &
  canopy,catch,ch,dq,epdt,flake,gc,gc_stom_surft,snowdep_surft,snow_surft,      &
  vshr,tstar,fracaero_t, fracaero_s,resfs,resft,                                &
- resfs_stom,l_et_stom,l_et_stom_surft)
+ resfs_stom,l_et_stom,l_et_stom_surft,exposed_water)
 
 USE atm_fields_bounds_mod, ONLY: tdims
 USE theta_field_sizes, ONLY: t_i_length
@@ -31,6 +31,7 @@ USE jules_science_fixes_mod, ONLY: l_fix_snow_frac, l_fix_neg_snow
 USE water_constants_mod, ONLY: tm, rho_ice
 USE jules_surface_mod, ONLY: l_aggregate
 USE jules_vegetation_mod, ONLY: can_model
+USE jules_meltlake_mod,  ONLY: l_meltlake
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 IMPLICIT NONE
@@ -82,9 +83,14 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
                      ! IN Lying snow on tiles (kg/m2)
 ,tstar(land_pts)                                                               &
                      ! IN Surface temperature (K)
-,vshr(tdims%i_start:tdims%i_end,tdims%j_start:tdims%j_end)
+,vshr(tdims%i_start:tdims%i_end,tdims%j_start:tdims%j_end) 
                      ! IN Magnitude of surface-to-lowest-level
 !                          !     windshear
+
+LOGICAL, INTENT(IN), OPTIONAL ::                                               &
+ exposed_water(land_pts)
+                     ! IN flag meltlake depth > 10cm surface is no longer snow
+                     ! but is open water
 
 REAL(KIND=real_jlslsm), INTENT(OUT) ::                                         &
  fracaero_t(land_pts)                                                          &
@@ -141,12 +147,52 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 !$OMP        dq,snowdep_surft,tstar,snow_surft,                                &
 !$OMP        catch,frac_snow_subl_melt,maskd,resfs,gc,ch,vshr,l_et_stom,       &
 !$OMP        l_et_stom_surft,resfs_stom,gc_stom_surft,flake,                   &
-!$OMP        canopy,epdt,resft,l_fix_snow_frac, l_fix_neg_snow)
+!$OMP        canopy,epdt,resft,l_fix_snow_frac,l_fix_neg_snow,l_meltlake,      &
+!$OMP        exposed_water)
 DO k = 1,surft_pts
   l = surft_index(k)
   j=(land_index(l) - 1) / t_i_length + 1
   i = land_index(l) - (j-1) * t_i_length
 
+!-----------------------------------------------------------------------
+! moisture flux resistance factors
+! tile has switched from snow to open water
+! no sublim/deposition only condensation/evap
+!-----------------------------------------------------------------------
+  IF (l_meltlake .AND. PRESENT(exposed_water)) THEN
+     IF (exposed_water(l)) THEN
+
+!-----------------------------------------------------------------------
+! resft = total resistance factor for moisture
+! = 1 open water can evaporate freely, no resistance
+!-----------------------------------------------------------------------
+        resft(l)       = 1.0
+        
+!-----------------------------------------------------------------------
+! fracaero_t = total resistance factor for moisture 
+!-----------------------------------------------------------------------
+        fracaero_t(l)  = 1.0
+
+!-----------------------------------------------------------------------
+! fracaero_s = fraction of tile with sublim/deposition fracs in sf_flux 
+!-----------------------------------------------------------------------        
+        fracaero_s(l)  = 0.0 
+        
+!-----------------------------------------------------------------------
+! resfs = 
+!-----------------------------------------------------------------------
+        resfs(l)       = 1.0
+
+!-----------------------------------------------------------------------
+! resfs_stom = stomatal reistance (transpiration)
+!-----------------------------------------------------------------------
+        resfs_stom(l)  = 1.0
+        
+        CYCLE
+     END IF
+  END IF
+  
+  
   !-----------------------------------------------------------------------
   ! Calculate the fraction of the flux with only aerodynamic resistance
   ! (canopy evaporation).
@@ -155,7 +201,7 @@ DO k = 1,surft_pts
   ! Calculate for a snow-free canopy then adjust for snow. With the fix,
   ! the potential fraction depends on the canopy water content.
   !-----------------------------------------------------------------------
-  IF (l_fix_neg_snow) THEN
+  IF (l_fix_neg_snow) THEN   
     ! Make the logic more transparent.
     IF (dq(l) >= 0.0) THEN
       ! Only aerodynamic resistance for downward fluxes.
@@ -193,7 +239,8 @@ DO k = 1,surft_pts
         ! Set the sublimation fraction to 0.
         fracaero_s(l) = 0.0
       END IF
-    END IF
+   END IF
+
   ELSE
     !   Original code
     fracaero_t(l) = 1.0
@@ -258,6 +305,7 @@ IF ( .NOT. l_aggregate .AND. can_model == 4) THEN
   END IF
 END IF
 
+ 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN
 END SUBROUTINE sf_resist
