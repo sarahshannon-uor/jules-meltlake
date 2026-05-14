@@ -65,7 +65,7 @@ CONTAINS
                                sice_wtrac, sliq_wtrac,                       &
                                win, win_wtrac,                               &
                                sf_diag, surft_n, refreeze, ice_lens_depth,   &
-                               ice_lens_index, lake_inflow)
+                               ice_lens_index, lake_inflow, exposed_water)
 
 
 !-----------------------------------------------------------------------------
@@ -125,6 +125,9 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
   csnow(land_pts,nsmax)
     ! Areal heat capacity of each snow layer (J K-1 m-2).
 
+LOGICAL, INTENT(IN) ::                                                        &
+   exposed_water(land_pts)
+    ! lake depth > 10cm
 !-----------------------------------------------------------------------------
 ! Scalar arguments with intent(inout)
 !-----------------------------------------------------------------------------
@@ -163,8 +166,8 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                    &
     ! Snow level of uppermost lens (as a real) 
   lake_inflow(land_pts)
     ! water mass out of passed to lake (kg m-2)
-  
-  
+ 
+
 REAL(KIND=real_jlslsm), INTENT(OUT) ::                                       &
      refreeze(land_pts,nsmax)
     ! Mass that is refreezing in snow layer (kgm-2)
@@ -260,6 +263,12 @@ wout    = 0.0
 
 ! running depth to top of current layer (m)
 z_top   = 0.0
+
+IF (exposed_water(i)) THEN
+   win = 0
+   print *, 'bypass percoalte_monarchs'
+   RETURN
+END IF
 
 DO n = 1, nsnow
    
@@ -446,9 +455,8 @@ DO n = 1, nsnow
           ELSE
              w_up = 0.0 ! no more water to upfill
           END IF
-                              
-          !print *, m, sliq(i,m), cap_full_m
 
+         
           IF (w_up <= 0.0) EXIT
        END DO
 
@@ -486,7 +494,7 @@ DO n = 1, nsnow
 
   
 END DO ! nsnow
-
+!print *, 'in perc', n, sice(i,1), sliq(i,1)
 !-----------------------------------------------------------------------
 ! 5) water exiting the snowpack (water out bottom + out top)
 !-----------------------------------------------------------------------

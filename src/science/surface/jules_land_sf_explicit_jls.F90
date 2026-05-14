@@ -125,10 +125,7 @@ SUBROUTINE jules_land_sf_explicit (                                            &
  ! Water tracers (OUT)
  fqw_1_wtrac, fqw_surft_wtrac, fqw_evapsrce_wtrac, smc_soilt_wtrac,            &
  !meltlake_mod (IN)
- exposed_water, lake_temp_ml,                                                  &
- !meltlake_mod (OUT)
- dt_elev_ml                                                                    & 
- )
+ exposed_water, lake_temp_ml)
 
 USE ancil_info,              ONLY: dim_cslayer, nsoilt, rad_nband
 USE atm_fields_bounds_mod,      ONLY: pdims_s, pdims, tdims
@@ -802,7 +799,7 @@ REAL(KIND=real_jlslsm), INTENT(OUT) :: smc_soilt_wtrac(land_pts,nsoilt,        &
                              !     soil profile (kg/m2).
 
 !meltlake model (OUT)
-REAL(KIND=real_jlslsm), INTENT(OUT) :: dt_elev_ml(land_pts,nsurft)
+!REAL(KIND=real_jlslsm), INTENT(OUT) :: dt_elev_ml(land_pts,nsurft)
 
 !-----------------------------------------------------------------------
 ! LOCAL variables
@@ -2103,28 +2100,30 @@ DO n = 1,nsurft
     END IF
 
     !-----------------------------------------------------------------------
-    ! The subsurface is exposed water instead of snow
-    ! Pass elevated adjusted lake temp (tsurf) to sf_flux. 
-    ! Pass heat transfer coeff to sf_flux, found by rearranging eqn 16
-    ! Buzzard et al. (2018)  4/3rd law for turbulant convention
+    ! Exposed-water lower boundary for sf_flux
+    ! Pass the melt-lake temperature as the lower-boundary temperature and
+    ! use an effective heat-transfer coefficient derived from the
+    ! rearranged 4/3-law turbulent heat flux of Buzzard et al. (2018).
+    ! note flake is using a linear conductive lower-boundary flux,
+    ! flake hcon_lake = (conductivity ice + conductive water ) * Nusselt number
+    ! to enhance the conductivity to represent convective mixing
+    ! because it is linear in temp there is no need to scale the ashtf when using flake
     !-----------------------------------------------------------------------
     IF ( l_meltlake.AND. exposed_water(l,n) .AND.                             &
          l_elev_land_ice .AND. l_lice_point(l) ) THEN
 
-       ! when passing the lake lower temperature into the surface solver,
-       ! shift it into the same reference frame as the elevated-tile atmosphere.
-       
-       tsurf(l,n) = lake_temp_ml(l,n) + t_elev(l,n) - tl_1(i,j)
+    !-----------------------------------------------------------------------   
+    ! The lake temperature is already in the elevated-tile temperature
+    ! frame, so no further elevation correction is applied here
+    !-----------------------------------------------------------------------
+        
+       tsurf(l,n) = lake_temp_ml(l,n) 
    
                
        ashtf_surft(l,n) = rho_water * hcapw * 1.907e-5 *                      &
             ABS(tsurf(l,n) - tstar_surft(l,n))**(1.0/3.0)
 
-       ! save orographic temp difference to meltlake_vars
-       dt_elev_ml(l,n) = t_elev(l,n) - tl_1(i,j)
-
-       
-       
+                 
     END IF
 
 

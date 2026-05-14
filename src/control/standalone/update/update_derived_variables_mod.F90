@@ -186,53 +186,53 @@ ELSE
   END IF
 
 
-  IF (timestep_number <= 168) THEN
+  !IF (timestep_number <= 168) THEN
     ! hot
-    forcing%tl_1_ij(:,:)     = 275.15
-    forcing%qw_1_ij(:,:)     = 0.003
-    forcing%con_rain_ij(:,:) = 0.0!forcing%con_rain_ij(:,:)
-    forcing%ls_rain_ij(:,:)  = 0.0!forcing%ls_rain_ij(:,:)
-    forcing%con_snow_ij(:,:) = 0.0!forcing%con_snow_ij(:,:)
-    forcing%ls_snow_ij(:,:)  = 0.0!forcing%ls_snow_ij(:,:)
-    forcing%sw_down_ij(:,:)  = 600.0
-    forcing%lw_down_ij(:,:)  = 350.0
-    forcing%u_0_ij(:,:)      = 2.0
-    forcing%v_0_ij(:,:)      = 0.0
-    u_1_ij(:,:)              = 2.0
-    v_1_ij(:,:)              = 0.0
-    forcing%pstar_ij(:,:)    = 95000
- ELSEIF (timestep_number > 168.AND.timestep_number <= 2160) THEN
+   ! forcing%tl_1_ij(:,:)     = 275.15
+   ! forcing%qw_1_ij(:,:)     = 0.003
+   ! forcing%con_rain_ij(:,:) = 0.0!forcing%con_rain_ij(:,:)
+   ! forcing%ls_rain_ij(:,:)  = 0.0!forcing%ls_rain_ij(:,:)
+   ! forcing%con_snow_ij(:,:) = 0.0!forcing%con_snow_ij(:,:)
+   ! forcing%ls_snow_ij(:,:)  = 0.0!forcing%ls_snow_ij(:,:)
+   ! forcing%sw_down_ij(:,:)  = 600.0
+   ! forcing%lw_down_ij(:,:)  = 350.0
+   ! forcing%u_0_ij(:,:)      = 2.0
+   ! forcing%v_0_ij(:,:)      = 0.0
+   ! u_1_ij(:,:)              = 2.0
+   ! v_1_ij(:,:)              = 0.0
+   ! forcing%pstar_ij(:,:)    = 95000
+ !ELSEIF (timestep_number > 168.AND.timestep_number <= 2160) THEN
     ! cold
-    forcing%tl_1_ij(:,:)     = 253.15
-    forcing%qw_1_ij(:,:)     = 0.0005
-    forcing%con_rain_ij(:,:) = 0.0
-    forcing%ls_rain_ij(:,:)  = 0.0
-    forcing%con_snow_ij(:,:) = 0.0
-    forcing%ls_snow_ij(:,:)  = 0.0
-    forcing%sw_down_ij(:,:)  = 0.0
-    forcing%lw_down_ij(:,:)  = 5.0!140.0
-    forcing%u_0_ij(:,:)      = 2.0
-    forcing%v_0_ij(:,:)      = 0.0
-    u_1_ij(:,:)              = 2.0
-    v_1_ij(:,:)              = 0.0
-    forcing%pstar_ij(:,:)    = 95000 
- ELSEIF (timestep_number > 2160 ) THEN
+  !  forcing%tl_1_ij(:,:)     = 253.15
+  !  forcing%qw_1_ij(:,:)     = 0.0005
+  !  forcing%con_rain_ij(:,:) = 0.0
+  !  forcing%ls_rain_ij(:,:)  = 0.0
+  !  forcing%con_snow_ij(:,:) = 0.0
+  !  forcing%ls_snow_ij(:,:)  = 0.0
+  !  forcing%sw_down_ij(:,:)  = 0.0
+  !  forcing%lw_down_ij(:,:)  = 5.0!140.0
+  !  forcing%u_0_ij(:,:)      = 2.0
+  !  forcing%v_0_ij(:,:)      = 0.0
+  !  u_1_ij(:,:)              = 2.0
+  !  v_1_ij(:,:)              = 0.0
+  !  forcing%pstar_ij(:,:)    = 95000 
+ !ELSEIF (timestep_number > 2160 ) THEN
     ! warm 
-    forcing%tl_1_ij(:,:)     = 275.15
-    forcing%qw_1_ij(:,:)     = 0.003
-    forcing%con_rain_ij(:,:) = 0.0!0.0001
-    forcing%ls_rain_ij(:,:)  = 0.0!0.0001 ! moderate rain rate kg m−2s−1=0.001×3600=3.6 mm h−1
-    forcing%con_snow_ij(:,:) = 0.0 
-    forcing%ls_snow_ij(:,:)  = 0.0!6.5e-5 !0.0
-    forcing%sw_down_ij(:,:)  = 600.0
-    forcing%lw_down_ij(:,:)  = 350.0
-    forcing%u_0_ij(:,:)      = 2.0
-    forcing%v_0_ij(:,:)      = 0.0
-    u_1_ij(:,:)              = 2.0
-    v_1_ij(:,:)              = 0.0
-    forcing%pstar_ij(:,:)    = 95000 
+  !  forcing%tl_1_ij(:,:)     = 275.15
+  !  forcing%qw_1_ij(:,:)     = 0.003
+  !  forcing%con_rain_ij(:,:) = 0.0!0.0001
+  !  forcing%ls_rain_ij(:,:)  = 0.0!0.0001 ! moderate rain rate kg m−2s−1=0.001×3600=3.6 mm h−1
+  !  forcing%con_snow_ij(:,:) = 0.0 
+  !  forcing%ls_snow_ij(:,:)  = 0.0!6.5e-5 !0.0
+  !  forcing%sw_down_ij(:,:)  = 600.0
+  !  forcing%lw_down_ij(:,:)  = 350.0
+  !  forcing%u_0_ij(:,:)      = 2.0
+  !  forcing%v_0_ij(:,:)      = 0.0
+  !  u_1_ij(:,:)              = 2.0
+  !  v_1_ij(:,:)              = 0.0
+  !  forcing%pstar_ij(:,:)    = 95000 
     
- END IF
+ !END IF
 
 
   ! sarah hack the forcing data

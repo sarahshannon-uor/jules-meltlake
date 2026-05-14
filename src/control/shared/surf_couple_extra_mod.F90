@@ -798,8 +798,9 @@ CASE ( jules )
             meltlake_vars%ice_lens_depth,   & !IN/OUT (land_pts,nsurft)   
             meltlake_vars%ice_lens_index,   & !IN/OUT (land_pts,nsurft)   
             meltlake_vars%lake_inflow,      & !IN/OUT (land_pts,nsurft)
-            meltlake_vars%exposed_water)      !IN (land_pts,nsurft)
-            
+            meltlake_vars%exposed_water,    & !IN (land_pts,nsurft)
+            meltlake_vars%ksnow0_ml,        & !OUT 
+            meltlake_vars%kdtdz_ml)           !IN 
        
     IF (l_meltlake) THEN
         CALL meltlake(land_pts,                    & !IN
@@ -807,15 +808,22 @@ CASE ( jules )
                       nsurft,                      & !IN 
                       surft_pts,                   & !IN
                       ainfo%surft_index,           & !IN
+                      progs%nsnow_surft,           & !IN
                       meltlake_vars%lake_inflow,   & !IN
-                      meltlake_vars%dt_elev_ml,    & !IN
+                      meltlake_vars%kdtdz_ml,      & !IN
                       sf_diag%lw_down_surft,       & !IN
                       progs%tstar_surft,           & !IN/OUT 
-                      fluxes%sw_surft,             & !IN 
+                      fluxes%sw_surft,             & !IN
+                      progs%tsnow_surft_ml,        & !IN/OUT
+                      progs%ds_surft_ml,           & !IN/OUT
+                      progs%sice_surft_ml,         & !IN/OUT
+                      progs%sliq_surft_ml,         & !IN/OUT
+                      progs%snow_surft,            & !IN/OUT 
                       meltlake_vars%lake_depth_ml, & !IN/OUT 
                       meltlake_vars%lake_albedo_ml,& !IN/OUT
                       meltlake_vars%lake_temp_ml,  & !IN/OUT
                       meltlake_vars%exposed_water, & !IN/OUT
+                      meltlake_vars%ksnow0_ml,     & !IN
                       !Ancil info (IN)
                       ainfo%l_lice_point,          & !IN (land_pts)
                       ainfo%l_lice_surft)            !IN (land_pts)  

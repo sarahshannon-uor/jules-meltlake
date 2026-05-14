@@ -55,9 +55,9 @@ TYPE(progs_type), INTENT(IN OUT) :: progs
 ! Work variables
 INTEGER :: i, j, k, l, n, m  ! Index variables
 
-REAL(KIND=real_jlslsm), PARAMETER :: T_bot = 253.15, T_top = 272.15!idealised tests warm top - cold bottom
+!REAL(KIND=real_jlslsm), PARAMETER :: T_bot = 253.15, T_top = 272.15!idealised tests warm top - cold bottom
 
-!REAL(KIND=real_jlslsm), PARAMETER :: T_bot = 263.15, T_top = 253.15!Larsen C Buzzard paper, cold top (-20oC)- warm bottom (-10oC)
+REAL(KIND=real_jlslsm), PARAMETER :: T_bot = 263.15, T_top = 253.15!Larsen C Buzzard paper, cold top (-20oC)- warm bottom (-10oC)
 
 REAL(KIND=real_jlslsm), PARAMETER :: rho_sfc = 500.0
 

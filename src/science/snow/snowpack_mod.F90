@@ -41,7 +41,7 @@ SUBROUTINE snowpack ( a_step, surft_n, land_pts, surft_pts, n_wtrac_jls, timeste
                       lake_h_ice_gb, lake_h_mxl_gb, lake_depth_gb,             &
                       ! optional meltlake 
                       sfrac, lfrac, refreeze, melt_mass, ice_lens_depth,       &
-                      ice_lens_index, lake_inflow)
+                      ice_lens_index, lake_inflow, exposed_water)
 
 USE tridag_mod, ONLY: tridag
 USE percolate_monarchs_mod,  ONLY: percolate_monarchs
@@ -269,6 +269,14 @@ real(kind=real_jlslsm), intent(out), optional ::                               &
     ! Melting mass (kg/m2).
   lake_inflow(land_pts)
     ! excess water from snowpack into lake (kgm-2)
+
+LOGICAL, intent(IN), optional ::                                               &
+   exposed_water(land_pts)
+    ! lake depth > 10 cm
+
+!real(kind=real_jlslsm), intent(in), optional ::                               & 
+!  kdtdz_ml(land_pts)
+  
   
 !ancil_info (IN)
 LOGICAL, INTENT(IN) :: l_lice_point(land_pts)
@@ -420,7 +428,7 @@ DO k = 1,surft_pts
   i = surft_index(k)
   
   IF (l_elev_land_ice .AND. l_lice_point(i)) THEN
-    tsoilw  = 253.15!tsurf_elev_surft(i)
+    tsoilw  = tsurf_elev_surft(i)
     dzsoilw = dzsoil_elev
     IF (l_lice_surft(surft_n)) THEN
       hconsw = snow_hcon
@@ -695,15 +703,18 @@ DO k = 1,surft_pts
 
     DO n = 1,nsnow(i)
        melt_mass(i,n) = 0.0 ! sarah hack for diag
+       if (n.eq.1) then
+          print *, 'tsnow before melt reset', tsnow(i,n)-273.15
+       end if
        
-    ! sarah energy per unit area needed to warm the layer to 0 °C.
+    ! energy per unit area needed to warm the layer to 0 °C.
       coldsnow = csnow(i,n) * (tm - tsnow(i,n))
       IF ( coldsnow < 0.0 ) THEN
         tsnow(i,n) = tm
-    !sarah convert excess energy to melt depth
+    ! convert excess energy to melt depth
         dsice = -coldsnow / lf
         IF ( dsice > sice(i,n) ) dsice = sice(i,n)
-    !sarah reduce layer depth 
+    ! reduce layer depth 
         ds(i,n)   = ( 1.0 - dsice / sice(i,n) ) * ds(i,n)
 
         ! Update water tracers first, so ratio calculation can use sice before
@@ -725,16 +736,19 @@ DO k = 1,surft_pts
         ! melting at each snow level for output diagnostics
         !-------------------------------------------------------------------------
         melt_mass(i,n) = dsice   
-              
+
+        !if (n.eq.1) then
+        !   write(*,'(A,I0,A,F16.8,A,F16.8,A,F16.12,A,F16.8,A,F16.8,A,F16.8,A,I0)') ' after melt jj=', n, ' sliq=', sliq(i,n), ' sice=', sice(i,n), ' melt_mass=', melt_mass(i,n),' tsnow=', tsnow(i,n)-273.15,'ds=', ds(i,n),'lens=', ice_lens_index(i), 't=', timestep_number  
+        !end if
+     
         IF (sf_diag%l_snice) THEN
           sf_diag%snice_m_surft(i,surft_n) = sf_diag%snice_m_surft(i,surft_n)  &
                                              + dsice / timestep
         END IF
      END IF
-
-     !write(*,'(A,I0,A,F16.8,A,F16.8,A,F16.12,A,F16.8,A,F16.8,A,F16.8,A,I0)') ' after melt jj=', n, ' sliq=', sliq(i,n), ' sice=', sice(i,n), ' melt_mass=', melt_mass(i,n),' tsnow=', tsnow(i,n)-273.15,'ds=', ds(i,n),'lens=', ice_lens_index(i), 't=', timestep_number  
      
-    END DO
+  END DO
+  
     ! Melt still > 0? - no snow left
 
     !print *, 'after melt', sice(i,44)
@@ -824,15 +838,7 @@ DO k = 1,surft_pts
 
     IF (l_meltlake .AND. l_elev_land_ice .AND. l_lice_point(i)) THEN
 
-   !    OPEN(NEWUNIT=iw, FILE=dbgfile, STATUS='UNKNOWN', POSITION='APPEND', ACTION='WRITE')
-       !IF (timestep_number==2184) THEN 
-    !      write(iw,'(A,I8)') 'BEFORE timestep=', timestep_number
-    !      DO jj = 1, nsnow(i)
-    !         write(iw,'(I4,",",ES16.8,",",ES16.8,",",ES16.8,",",ES16.8)') &
-    !              jj, sice(i,jj), sliq(i,jj), ds(i,jj), ice_lens_index(i)
-    !      END DO
-       !END IF
-    
+       
        CALL percolate_monarchs( i, nsnow(i), land_pts, nsmax,     &
             n_wtrac_jls,timestep,                                 &
             csnow, ds, tsnow,                                     &
@@ -840,27 +846,13 @@ DO k = 1,surft_pts
             sice_wtrac, sliq_wtrac,                               &
             win, win_wtrac,                                       &
             sf_diag, surft_n, refreeze, ice_lens_depth,           &
-            ice_lens_index, lake_inflow )
-
-
-        !IF (timestep_number==2184) THEN
-     !!      write(iw,'(A,I8)') 'AFTER timestep=', timestep_number
-    
-       !    DO jj = 1, nsnow(i)
-       !       write(iw,'(I4,",",ES16.8,",",ES16.8,",",ES16.8,",",ES16.8)') &
-       !            jj, sice(i,jj), sliq(i,jj), ds(i,jj), ice_lens_index(i)
-       !    END DO
-      !  END IF
-        
-       !write(iw,'(A)') '---'
-       
-       !DO jj = 1, nsnow(i)
-       !   write(*,'(A,I0,A,F16.8,A,F16.8,A,F1.8,A,F16.8,A,F16.8,A,F16.8,A,I0)') ' after perc jj=', jj, ' sliq=', sliq(i,jj), ' sice=', sice(i,jj), ' refreeze=', refreeze(i,jj),' tsnow=', tsnow(i,jj)-273.15,'ds=', ds(i,jj), 'lens=', ice_lens_index(i), 't=', timestep_number 
-       !END DO
-      
-     !  CLOSE(iw)
-      
-                     
+            ice_lens_index, lake_inflow, exposed_water )
+       print *, 'after perc', sice(1,1), sliq(1,1), ds(1,1), exposed_water(1)
+       if ((sliq(1,1) + sliq(1,1)) > 1000.0) then
+          print *, 'sliq(1,1) + sliq(1,1)) > 1000.0'
+          print *, exposed_water(1)
+          !stop
+       end if
    ELSE
 
        

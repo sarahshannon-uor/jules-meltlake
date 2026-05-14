@@ -232,7 +232,9 @@ REAL(KIND=real_jlslsm) ::                                                      &
   rho_snow_surf,                                                               &
   snow_alb_vis_as,                                                             &
   snow_alb_nir_as,                                                             &
-  ssum
+  ssum,                                                                        &
+  ex,                                                                          &
+  expon_term
 
 LOGICAL ::                                                                     &
   l_getprofile,                                                                &
@@ -1119,10 +1121,21 @@ IF (l_elev_land_ice) THEN
           ! Case 1: melt lake present on top of snow
           !--------------------------------------------------
           IF (l_meltlake .AND. lake_depth_ml(l,n) > 0.1) THEN
-            print *, 'melt lake has formed, adjust albedo'
 
-            alb_snow(l,n,:) = (9702.0 + 1000.0 * EXP(3.6 * lake_depth_ml(l,n))) &
-                             /(-539.0 + 20000.0 * EXP(3.6 * lake_depth_ml(l,n)))
+             print *, 'melt lake has formed, adjust albedo'
+
+             expon_term = 3.6 * lake_depth_ml(l,n)
+
+             IF (expon_term < 50.0) THEN
+                ex = EXP(-expon_term)
+                alb_snow(l,n,:) = (9702.0 * ex + 1000.0)                 &
+                     / (-539.0 * ex + 20000.0)
+             ELSE
+                alb_snow(l,n,:) = 0.05
+             END IF
+            
+            !alb_snow(l,n,:) = (9702.0 + 1000.0 * EXP(3.6 * lake_depth_ml(l,n))) &
+            !                 /(-539.0 + 20000.0 * EXP(3.6 * lake_depth_ml(l,n)))
 
           ELSE
             !------------------------------------------------

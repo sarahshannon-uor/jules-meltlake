@@ -223,37 +223,37 @@ DO k = 1,surft_pts
    i = pts_index(l) - (j-1) * t_i_length
 
 
-   WRITE(*,*) '------ sf_flux inputs for point l = ', l, ' ------'
-   WRITE(*,'(A,I8)')    'l        (index)                    = ', l
-   WRITE(*,'(A,I8)')    't                                   = ', timestep_number
-   WRITE(*,'(A,L1)')    'l_fix_neg_snow                      = ', l_fix_neg_snow
-   WRITE(*,'(A,F18.8)') 'canhc    (canopy heat cap)          = ', canhc(l)
-   WRITE(*,'(A,F18.8)') 'dzsurf   (surface layer thick)      = ', dzsurf(l)
-   WRITE(*,'(A,F18.8)') 'ashtf    (surf heat transfer coeff) = ', ashtf(l)
-   WRITE(*,'(A,F18.8)') 'qstar    (surface qsat)             = ', qstar(l)
-   WRITE(*,'(A,F18.8)') 'q_elev   (air specific humidity)    = ', q_elev(l)
-   WRITE(*,'(A,F18.8)') 'radnet   (net surface radiation)    = ', radnet(l)
-   WRITE(*,'(A,F18.8)') 'fracs    (snow fraction)            = ', fracs(l)
-   WRITE(*,'(A,F18.8)') 'resft    (resistance factor)        = ', resft(l)
-   WRITE(*,'(A,F18.8)') 'rhokh_1  (surface exch coeff)       = ', rhokh_1(l)
-   WRITE(*,'(A,F18.8)') 'snowd    (snow depth)               = ', snowdepth(l)
-   WRITE(*,'(A,F18.8)') 'dt       (timestep)                 = ', timestep
-   WRITE(*,'(A,F18.8)') 't_elev   (air temp, elev tile)      = ', t_elev(l)
-   WRITE(*,'(A,F18.8)') 'ts1_el   (lower surface temp)       = ', ts1_elev(l)
-   WRITE(*,'(A,F18.8)') 'tstar    (surface temp)             = ', tstar(l)
-   WRITE(*,'(A,F18.8)') 'vfrac    (veg fraction)             = ', vfrac(l)
-   WRITE(*,'(A,F18.8)') 'rhk_can  (canopy exch coeff)        = ', rhokh_can(l)
-   WRITE(*,'(A,F18.8)') 'z0h      (roughness heat/moisture)  = ', z0h(l)
-   WRITE(*,'(A,F18.8)') 'z0m_eff  (roughness momentum)       = ', z0m_eff(l)
-   WRITE(*,'(A,F18.8)') 'zdt      (canopy h - disp h)        = ', zdt(l)
-   WRITE(*,'(A,F18.8)') 'emis_sf  (surface emissivity)       = ', emis_surft(l)
-   WRITE(*,'(A,F18.8)') 'emis_soi (soil emissivity)          = ', emis_soil(l)
-   WRITE(*,'(A,F18.8)') 'lh0      (latent heat base)         = ', lh0
-   WRITE(*,'(A,F18.8)') 'salfac   (salinity factor)          = ', salinityfactor
-   WRITE(*,'(A,F18.8)') 'anth_h   (anthrop heat)             = ', anthrop_heat(l)
-   WRITE(*,'(A,F18.8)') 'scal_urb (urban scaling)            = ', scaling_urban(l)
-   WRITE(*,'(A,F18.8)') 'alpha1   (dqsat/dT)                 = ', alpha1(l)
-   WRITE(*,'(A,F18.8)') 'z1_tq    (lowest atm level hgt)     = ', z1_tq(i,j)
+   WRITE(*,*) '------ sf_flux inputs for point l              = ', l, ' ------'
+   WRITE(*,'(A,I8)')    'l        (index)                     = ', l
+   WRITE(*,'(A,I8)')    't                                    = ', timestep_number
+  ! WRITE(*,'(A,L1)')    'l_fix_neg_snow                      = ', l_fix_neg_snow
+  ! WRITE(*,'(A,F18.8)') 'canhc    (canopy heat cap)          = ', canhc(l)
+  ! WRITE(*,'(A,F18.8)') 'dzsurf   (surface layer thick)      = ', dzsurf(l)
+  ! WRITE(*,'(A,F18.8)') 'ashtf    (surf heat transfer coeff) = ', ashtf(l)
+  ! WRITE(*,'(A,F18.8)') 'qstar    (surface qsat)             = ', qstar(l)
+  ! WRITE(*,'(A,F18.8)') 'q_elev   (air specific humidity)    = ', q_elev(l)
+  ! WRITE(*,'(A,F18.8)') 'radnet   (net surface radiation)    = ', radnet(l)
+   WRITE(*,'(A,F18.8)') 'fracs    (snow fraction)             = ', fracs(l)
+   WRITE(*,'(A,F18.8)') 'resft    (resistance factor)         = ', resft(l)
+   WRITE(*,'(A,F18.8)') 'rhokh_1  (surface exch coeff)        = ', rhokh_1(l)
+  ! WRITE(*,'(A,F18.8)') 'snowd    (snow depth)               = ', snowdepth(l)
+  ! WRITE(*,'(A,F18.8)') 'dt       (timestep)                 = ', timestep
+   WRITE(*,'(A,F18.8)') 't_elev   (air temp, elev tile)       = ', t_elev(l) -273.15
+   WRITE(*,'(A,F18.8)') 'ts1_el   (lower surface temp)        = ', ts1_elev(l) -273.15
+   WRITE(*,'(A,F18.8)') 'tstar    (surface temp)              = ', tstar(l)-273.15
+  ! WRITE(*,'(A,F18.8)') 'vfrac    (veg fraction)             = ', vfrac(l)
+  ! WRITE(*,'(A,F18.8)') 'rhk_can  (canopy exch coeff)        = ', rhokh_can(l)
+  ! WRITE(*,'(A,F18.8)') 'z0h      (roughness heat/moisture)  = ', z0h(l)
+  ! WRITE(*,'(A,F18.8)') 'z0m_eff  (roughness momentum)       = ', z0m_eff(l)
+  ! WRITE(*,'(A,F18.8)') 'zdt      (canopy h - disp h)        = ', zdt(l)
+  ! WRITE(*,'(A,F18.8)') 'emis_sf  (surface emissivity)       = ', emis_surft(l)
+  ! WRITE(*,'(A,F18.8)') 'emis_soi (soil emissivity)          = ', emis_soil(l)
+  ! WRITE(*,'(A,F18.8)') 'lh0      (latent heat base)         = ', lh0
+  ! WRITE(*,'(A,F18.8)') 'salfac   (salinity factor)          = ', salinityfactor
+  ! WRITE(*,'(A,F18.8)') 'anth_h   (anthrop heat)             = ', anthrop_heat(l)
+  ! WRITE(*,'(A,F18.8)') 'scal_urb (urban scaling)            = ', scaling_urban(l)
+  ! WRITE(*,'(A,F18.8)') 'alpha1   (dqsat/dT)                 = ', alpha1(l)
+  ! WRITE(*,'(A,F18.8)') 'z1_tq    (lowest atm level hgt)     = ', z1_tq(i,j)
    WRITE(*,*) '-----------------------------------------------'
 
   ! Calculate the attenuation factor if different from 1.
@@ -328,8 +328,8 @@ DO k = 1,surft_pts
 
   WRITE(*,'(A,F16.8)') 'tstar(l) - ts1_elev(l)               = ', tstar(l) - ts1_elev(l)
   WRITE(*,'(A,F16.8)') 'surf_ht_flux                         = ', surf_ht_flux
-  WRITE(*,'(A,F16.8)') 'ashtf_prime(l)                       = ', ashtf_prime(l)
-  WRITE(*,'(A,F16.8)') 'dtstar(l)                            = ', dtstar(l)
+  !WRITE(*,'(A,F16.8)') 'ashtf_prime(l)                       = ', ashtf_prime(l)
+  WRITE(*,'(A,F16.8)') 'dtstar(l) + dstar(l)                 = ', tstar(l) +  dtstar(l) -273.15
 
      
   WRITE(*,*) '================================================'

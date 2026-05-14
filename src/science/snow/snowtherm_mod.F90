@@ -143,7 +143,10 @@ DO k = 1,surft_pts
     DO n = 1,nsnow(l)
       rho_snow   = (sice(l,n) + sliq(l,n)) / ds(l,n)
       ksnow(l,n) = 0.024 - 1.23e-4 * rho_snow + 2.5e-6 * rho_snow**2
-    END DO
+   END DO
+   print *, 'snowtherm', sice(l,1), sliq(l,1),ds(l,1),ksnow(1,1)
+  
+   
   END SELECT
 END DO
 !$OMP END PARALLEL DO
