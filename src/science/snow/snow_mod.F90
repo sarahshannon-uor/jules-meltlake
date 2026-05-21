@@ -58,7 +58,7 @@ SUBROUTINE snow (a_step, land_pts, timestep, stf_hf_snow_melt, nsurft, n_wtrac_j
                   ice_lens_depth,&     !(land_pts,nsurft)
                   ice_lens_index,&     !(land_pts,nsurft)
                   lake_inflow,   &     !(land_pts,nsurft)
-                  exposed_water, &     !(land_pts,nsurft)
+                  has_lake,      &     !(land_pts,nsurft)
 	          ksnow0_ml,     &       !(land_pts,nsurft)
                   kdtdz_ml) 
                   
@@ -209,8 +209,8 @@ INTEGER, INTENT(IN OUT) ::                                                     &
     ! Number of snow layers.
       
 LOGICAL, INTENT(IN) ::                                                         &
-  exposed_water(land_pts,nsurft)
-    ! exposed meltlake water 
+  has_lake(land_pts,nsurft)
+    ! meltlake water present 
   
 
 REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
@@ -490,7 +490,7 @@ INTEGER(KIND=jpim) :: ii, nn, jj
 REAL(KIND=jprb) :: rho_check, mlay, mabove, rhoj, z
 REAL :: band_top, band_bot, overlap, sice_band, ztop, zbot, rho_true
 
-LOGICAL :: any_exposed_water(nsurft)
+!LOGICAL :: any_exposed_water(nsurft)
 
 INTEGER :: iu
 !CHARACTER(LEN=*), PARAMETER :: dbgfile = 'depth.marker.warm.cold.wet.adjust.on.ds.10cm.txt'
@@ -771,19 +771,6 @@ DO n = 1,nsurft
 
   END IF
 
-!----- if any tile has exposed water
- ! any_exposed_water(n) = .FALSE.
- ! IF (l_meltlake .AND. l_lice_surft(n)) THEN
- !    DO k=1,surft_pts(n)
- !       i = surft_index(k,n)
- !       IF (exposed_water(i,n)) THEN
- !          any_exposed_water(n) = .TRUE.
- !          melt_surft(i,n)      = 0.0!melt_meltlake(i,n)
- !          snowinc_surft(i,n)   = 0.0! increment in snowmass
- !          EXIT
- !       END IF
- !    END DO
- ! END IF
 
   ! Copy data for this surft to the snow layer (sl) arrays
 !$OMP PARALLEL DEFAULT(NONE)                                                   &
@@ -913,11 +900,11 @@ END IF
     
 
 !---------------------------------------------------------------------------
-! Exposed water sitting on snowpack
+! Water sitting on top of snowpack
 !---------------------------------------------------------------------------
      DO k=1,surft_pts(n)
         i = surft_index(k,n)
-        IF (exposed_water(i,n)) THEN
+        IF (has_lake(i,n)) THEN
 
            !--- No melting
            melt_surft(i,n)      = 0.0
@@ -1107,7 +1094,7 @@ END IF
                   ! Optional meltlake variables 
                   sfrac_sl_ml, lfrac_sl_ml, refreeze_sl_ml, melt_sl_ml,        &
                   ice_lens_depth(:,n),ice_lens_index(:,n), lake_inflow(:,n),   &
-                  exposed_water(:,n))
+                  has_lake(:,n))
 
    ! IF (nsnow(1,n)==0) THEN
    !    print *, 'nsnow(:,n) :  ',nsnow(1,n), timestep_number
@@ -1150,7 +1137,6 @@ END IF
   
   CALL snowgrain ( land_pts, surft_pts(n), timestep, nsnow(:,n),              &
                      surft_index(:,n), nsmax_ml, sice_sl_ml, snowfall,        &
-                    ! snowmass, tsnow_sl_ml, tstar_surft_ml(:,n),              & not sure why I did that ! not necessary for a separate *_ml var 
                      snowmass, tsnow_sl_ml, tstar_surft(:,n),              &
                      rgrain(:,n), rgrainl_sl_ml, rgrain0 )
   

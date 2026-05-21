@@ -25,7 +25,7 @@ SUBROUTINE sf_melt (                                                           &
 ,fracs,resft,rhokh_1,tile_frac,timestep,r_gamma                                &
 ,ei_surft,fqw_1,ftl_1,fqw_surft,ftl_surft                                      &
 ,tstar_surft,snow_surft,snowdepth                                              &
-,melt_surft,snowinc_surft,exposed_water                                        &
+,melt_surft,snowinc_surft,has_lake                                             &
  )
 
 USE atm_fields_bounds_mod, ONLY: tdims
@@ -136,9 +136,9 @@ INTEGER ::                                                                     &
                       ! Loop counter - land field.
 
 LOGICAL, INTENT(IN), OPTIONAL ::                                               &
- exposed_water(points)
+ has_lake(points)
                      ! IN flag meltlake depth > 10cm surface is no longer snow
-                     ! but is open water
+                     ! covered
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -223,19 +223,19 @@ DO k = 1,surft_pts
         (lcmelt * (tstar_surft(l) - tm) / lf + ei_surft(l)) * timestep)
     END IF
 
-! --- need to replace with stefan condition    
-     IF (l_meltlake .AND. PRESENT(exposed_water)) THEN
-        IF (exposed_water(l)) THEN
+! --- no melting if lake is present
+     IF (l_meltlake .AND. PRESENT(has_lake)) THEN
+        IF (has_lake(l)) THEN
            melt_surft(l) = 0.0
            dtstar = 0.0
         ELSE
            melt_surft(l) = - snowinc_surft(l) / timestep - ei_surft(l)
            dtstar = - lf * melt_surft(l) / lsmelt
            tstar_surft(l) = tstar_surft(l) + dtstar
-        END IF !exposed_water
+        END IF !lake water is present
      END IF ! l_meltlake
     
-    print *, 'sf_melt: dtstar, tstar', dtstar , tstar_surft(l)
+    !print *, 'sf_melt: dtstar, tstar', dtstar , tstar_surft(l)
 ! --- end sarah
     
     dftl = cp * rhokh1_prime * dtstar

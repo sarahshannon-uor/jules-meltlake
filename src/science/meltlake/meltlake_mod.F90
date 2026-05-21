@@ -43,16 +43,20 @@ SUBROUTINE  meltlake (land_pts,                 & !IN
                       lake_depth_ml,            & !IN/OUT
                       lake_albedo_ml,           & !IN/OUT
                       lake_temp_ml,             & !IN/OUT
+                      lid_temp_ml,              & !IN/OUT
+                      lid_depth_ml,             & !IN/OUT
+                      has_lake,                 & !IN/OUT
                       exposed_water,            & !IN/OUT
-                      ksnow0_ml,                &! IN
+                      has_lid,                  & !IN/OUT
+                      ksnow0_ml,                & !IN
+                      lake_state_ml,            & !OUT
                       !Ancil info (IN)
                       l_lice_point,             & !IN (land_pts)
                       l_lice_surft)               !IN (ntype)  
 
-USE meltlake_evolve_mod, ONLY: meltlake_evolve
-USE relayersnow_mod, ONLY: relayersnow
-  
-!USE sf_diags_mod,            ONLY: strnewsfdiag
+USE meltlake_evolve_mod,     ONLY: meltlake_evolve
+USE lid_evolve_mod,          ONLY: lid_evolve
+    
 USE jules_surface_types_mod, ONLY: ntype
 USE jules_surface_mod,       ONLY: l_elev_land_ice
 USE theta_field_sizes,       ONLY: t_i_length, t_j_length
@@ -139,20 +143,28 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Depth of snowpack layers (m)
    sice_ml(land_pts,nsurft,nsmax_ml),                                          &
     ! Snowpack layer ice mass (kg m-2).
-   sliq_ml(land_pts,nsurft,nsmax_ml)
+   sliq_ml(land_pts,nsurft,nsmax_ml),                                          &
     ! Snowpack layer liquid mass (kg m-2)
-
+   lid_depth_ml(land_pts,nsurft),                                              & 
+        ! Lid depth (m)
+   lid_temp_ml(land_pts,nsurft)
+        ! Lid temp (K)     
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(out)
 !-----------------------------------------------------------------------------
-REAL(KIND=real_jlslsm), INTENT(OUT) ::                                      &
-     kdtdz_ml(land_pts,nsurft)
+REAL(KIND=real_jlslsm), INTENT(OUT) ::                                        &
+   kdtdz_ml(land_pts,nsurft),                                                 &
+      ! conductive heat flux from lake into snowpack 
+   lake_state_ml(land_pts,nsurft)
 
 !ancil_info (IN)
 LOGICAL, INTENT(IN) :: l_lice_point(land_pts)
 LOGICAL, INTENT(IN) :: l_lice_surft(ntype)
 
-LOGICAL, INTENT(IN OUT) :: exposed_water(land_pts,nsurft)
+LOGICAL, INTENT(IN OUT) ::                                                    &
+ exposed_water(land_pts,nsurft),                                              &
+ has_lid(land_pts,nsurft), &
+ has_lake(land_pts,nsurft)
 
 !-----------------------------------------------------------------------------
 ! Local scalars
@@ -201,45 +213,34 @@ DO n = 1,nsurft
            tsnow_ml(:,n,1),               & !IN
            lw_down_surft(:,n),            & !IN  
            tstar_surft(:,n),              & !IN 
-           sw_surft(:,n),                 & !IN already uses lake albedo
+           sw_surft(:,n),                 & !IN 
+           lid_depth_ml,                  & !IN
            snow_surft(:,n),               & !IN/OUT
            lake_depth_ml(:,n),            & !IN/OUT
            lake_albedo_ml(:,n),           & !IN/OUT
            lake_temp_ml(:,n),             & !IN/OUT
+           has_lake(:,n),                 & !IN/OUT
            exposed_water(:,n),            & !IN/OUT
+           has_lid(:,n),                  & !IN
            sice_ml(:,n,:),                & !IN/OUT
            sliq_ml(:,n,:),                & !IN/OUT
            ds_ml(:,n,:),                  & !IN/OUT
-           kdtdz_ml(:,n))                  !OUT
+           kdtdz_ml(:,n))                   !OUT
            
           
-                   
-      !CALL relayersnow (                                                     
-      !     land_pts,                     & !in                                                     
-      !     surft_pts(n),                 & !in                                                     
-      !     n_wtrac_jls,                  & !in                                                     
-      !     surft_index(:,n),             & !in                                                 
-      !     nsmax_ml,                     & !in                                                 
-      !     dzsnow_ml,                    & !in                                                 
-      !     rgrain0,                      & !in                                                 
-      !     rho0,                         & !in                                                 
-      !     sice0,                        & !in                                                 
-      !     snowfall,                     & !in
-      !     snowmass,                     & !in                                                   
-      !     tsnow0,                       & !in                                                   
-      !     wtrac_sn%sice0,               & !in                                                   
-      !     nsnow(:,n),                   & !in/out                                               
-      !     ds_sl_ml,                     & !in/out                                               
-      !     rgrain(:,n),                  & !in/out                                               
-      !     rgrainl_sl_ml,                & !in/out                                               
-      !     sice_sl_ml,                   & !in/out                                               
-      !     rho_snow_grnd(:,n),           & !in/out                                              
-      !     sliq_sl_ml,                   & !in/out                                               
-      !     tsnow_sl_ml,                  & !in/out                                               
-      !     wtrac_sn%sice_sl,             & !in/out                                               
-      !     wtrac_sn%sliq_sl,             & !in/out                                               
-      !     rho_snow_sl_ml,               & !out                                                  
-      !     snowdepth(:,n) )              & !out
+      CALL lid_evolve(land_pts,           & !IN
+           timestep,                      & !IN
+           surft_pts(n),                  & !IN
+           surft_index(:,n),              & !IN
+           tstar_surft(:,n),              & !IN 
+           lake_temp_ml(:,n),             & !IN/OUT
+           lake_depth_ml(:,n),            & !IN/OUT
+           lid_temp_ml(:,n),              & !IN/OUT
+           lid_depth_ml(:,n),             & !IN/OUT
+           has_lake(:,n),                 & !IN/OUT
+           exposed_water(:,n),            & !IN/OUT
+           has_lid(:,n),                  & !IN/OUT
+           lake_state_ml(:,n))              !OUT
 
                           
          

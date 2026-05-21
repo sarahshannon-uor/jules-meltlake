@@ -51,9 +51,13 @@ TYPE :: meltlake_vars_data_type
   REAL(KIND=real_jlslsm), ALLOCATABLE :: lake_inflow(:,:)
   REAL(KIND=real_jlslsm), ALLOCATABLE :: kdtdz_ml(:,:)
   REAL(KIND=real_jlslsm), ALLOCATABLE :: ksnow0_ml(:,:)
-  
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: lid_depth_ml(:,:)
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: lid_temp_ml(:,:)
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: lake_state_ml(:,:)
+    
   LOGICAL, ALLOCATABLE :: exposed_water(:,:)
   LOGICAL, ALLOCATABLE :: has_lid(:,:)
+  LOGICAL, ALLOCATABLE :: has_lake(:,:)
 
   
 END TYPE meltlake_vars_data_type
@@ -72,9 +76,13 @@ TYPE :: meltlake_vars_type
   REAL(KIND=real_jlslsm), POINTER :: lake_inflow(:,:)
   REAL(KIND=real_jlslsm), POINTER :: kdtdz_ml(:,:)
   REAL(KIND=real_jlslsm), POINTER :: ksnow0_ml(:,:)
+  REAL(KIND=real_jlslsm), POINTER :: lid_depth_ml(:,:)
+  REAL(KIND=real_jlslsm), POINTER :: lid_temp_ml(:,:)
+  REAL(KIND=real_jlslsm), POINTER :: lake_state_ml(:,:)
   
   LOGICAL, POINTER :: exposed_water(:,:)
   LOGICAL, POINTER :: has_lid(:,:)
+  LOGICAL, POINTER :: has_lake(:,:)
   
 END TYPE meltlake_vars_type
 
@@ -121,9 +129,13 @@ ALLOCATE(meltlake_vars_data%ice_lens_index(land_pts,nsurft))
 ALLOCATE(meltlake_vars_data%lake_inflow(land_pts,nsurft))
 ALLOCATE(meltlake_vars_data%kdtdz_ml(land_pts,nsurft))
 ALLOCATE(meltlake_vars_data%ksnow0_ml(land_pts,nsurft))
+ALLOCATE(meltlake_vars_data%lid_depth_ml(land_pts,nsurft))
+ALLOCATE(meltlake_vars_data%lid_temp_ml(land_pts,nsurft))
+ALLOCATE(meltlake_vars_data%lake_state_ml(land_pts,nsurft))
 
 ALLOCATE(meltlake_vars_data%exposed_water(land_pts,nsurft))
 ALLOCATE(meltlake_vars_data%has_lid(land_pts,nsurft))
+ALLOCATE(meltlake_vars_data%has_lake(land_pts,nsurft))
 
 
 meltlake_vars_data%sfrac_ml(:,:,:)      = 0.0
@@ -138,9 +150,13 @@ meltlake_vars_data%ice_lens_index(:,:)  = 0.0
 meltlake_vars_data%lake_inflow(:,:)     = 0.0
 meltlake_vars_data%kdtdz_ml(:,:)        = 0.0
 meltlake_vars_data%ksnow0_ml(:,:)       = 0.0
+meltlake_vars_data%lid_depth_ml(:,:)    = 0.0
+meltlake_vars_data%lid_temp_ml(:,:)     = 273.15
+meltlake_vars_data%lake_state_ml(:,:)   = 0.0
 
 meltlake_vars_data%exposed_water(:,:)   = .FALSE.
 meltlake_vars_data%has_lid(:,:)         = .FALSE.
+meltlake_vars_data%has_lake(:,:)        = .FALSE.
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN
@@ -184,9 +200,13 @@ DEALLOCATE(meltlake_vars_data%ice_lens_index)
 DEALLOCATE(meltlake_vars_data%lake_inflow)
 DEALLOCATE(meltlake_vars_data%kdtdz_ml)
 DEALLOCATE(meltlake_vars_data%ksnow0_ml)
+DEALLOCATE(meltlake_vars_data%lid_depth_ml)
+DEALLOCATE(meltlake_vars_data%lid_temp_ml)
+DEALLOCATE(meltlake_vars_data%lake_state_ml)
 
 DEALLOCATE(meltlake_vars_data%exposed_water)
 DEALLOCATE(meltlake_vars_data%has_lid)
+DEALLOCATE(meltlake_vars_data%has_lake)
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN
@@ -229,9 +249,13 @@ meltlake_vars%ice_lens_index => meltlake_vars_data%ice_lens_index
 meltlake_vars%lake_inflow => meltlake_vars_data%lake_inflow
 meltlake_vars%kdtdz_ml => meltlake_vars_data%kdtdz_ml
 meltlake_vars%ksnow0_ml => meltlake_vars_data%ksnow0_ml
+meltlake_vars%lid_depth_ml => meltlake_vars_data%lid_depth_ml
+meltlake_vars%lid_temp_ml => meltlake_vars_data%lid_temp_ml
+meltlake_vars%lake_state_ml => meltlake_vars_data%lake_state_ml
 
 meltlake_vars%exposed_water => meltlake_vars_data%exposed_water
 meltlake_vars%has_lid => meltlake_vars_data%has_lid
+meltlake_vars%has_lake => meltlake_vars_data%has_lake
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN
@@ -271,9 +295,13 @@ NULLIFY(meltlake_vars%ice_lens_index)
 NULLIFY(meltlake_vars%lake_inflow)
 NULLIFY(meltlake_vars%kdtdz_ml)
 NULLIFY(meltlake_vars%ksnow0_ml)
+NULLIFY(meltlake_vars%lid_depth_ml)
+NULLIFY(meltlake_vars%lid_depth_ml)
+NULLIFY(meltlake_vars%lake_state_ml)
 
 NULLIFY(meltlake_vars%exposed_water)
 NULLIFY(meltlake_vars%has_lid)
+NULLIFY(meltlake_vars%has_lake)
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN

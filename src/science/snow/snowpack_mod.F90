@@ -41,7 +41,7 @@ SUBROUTINE snowpack ( a_step, surft_n, land_pts, surft_pts, n_wtrac_jls, timeste
                       lake_h_ice_gb, lake_h_mxl_gb, lake_depth_gb,             &
                       ! optional meltlake 
                       sfrac, lfrac, refreeze, melt_mass, ice_lens_depth,       &
-                      ice_lens_index, lake_inflow, exposed_water)
+                      ice_lens_index, lake_inflow, has_lake)
 
 USE tridag_mod, ONLY: tridag
 USE percolate_monarchs_mod,  ONLY: percolate_monarchs
@@ -271,7 +271,7 @@ real(kind=real_jlslsm), intent(out), optional ::                               &
     ! excess water from snowpack into lake (kgm-2)
 
 LOGICAL, intent(IN), optional ::                                               &
-   exposed_water(land_pts)
+   has_lake(land_pts)
     ! lake depth > 10 cm
 
 !real(kind=real_jlslsm), intent(in), optional ::                               & 
@@ -702,10 +702,10 @@ DO k = 1,surft_pts
     !-------------------------------------------------------------------------
 
     DO n = 1,nsnow(i)
-       melt_mass(i,n) = 0.0 ! sarah hack for diag
-       if (n.eq.1) then
-          print *, 'tsnow before melt reset', tsnow(i,n)-273.15
-       end if
+       melt_mass(i,n) = 0.0 ! sarah hack for diag out to nc
+       !if (n.eq.1) then
+       !   print *, 'tsnow before melt reset', tsnow(i,n)-273.15
+       !end if
        
     ! energy per unit area needed to warm the layer to 0 °C.
       coldsnow = csnow(i,n) * (tm - tsnow(i,n))
@@ -846,13 +846,13 @@ DO k = 1,surft_pts
             sice_wtrac, sliq_wtrac,                               &
             win, win_wtrac,                                       &
             sf_diag, surft_n, refreeze, ice_lens_depth,           &
-            ice_lens_index, lake_inflow, exposed_water )
-       print *, 'after perc', sice(1,1), sliq(1,1), ds(1,1), exposed_water(1)
-       if ((sliq(1,1) + sliq(1,1)) > 1000.0) then
-          print *, 'sliq(1,1) + sliq(1,1)) > 1000.0'
-          print *, exposed_water(1)
+            ice_lens_index, lake_inflow, has_lake )
+       !print *, 'after perc', sice(1,1), sliq(1,1), ds(1,1), exposed_water(1)
+       !if ((sliq(1,1) + sliq(1,1)) > 1000.0) then
+       !   print *, 'sliq(1,1) + sliq(1,1)) > 1000.0'
+       !   print *, exposed_water(1)
           !stop
-       end if
+       !end if
    ELSE
 
        

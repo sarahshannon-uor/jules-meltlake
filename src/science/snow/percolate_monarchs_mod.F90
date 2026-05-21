@@ -65,7 +65,7 @@ CONTAINS
                                sice_wtrac, sliq_wtrac,                       &
                                win, win_wtrac,                               &
                                sf_diag, surft_n, refreeze, ice_lens_depth,   &
-                               ice_lens_index, lake_inflow, exposed_water)
+                               ice_lens_index, lake_inflow, has_lake)
 
 
 !-----------------------------------------------------------------------------
@@ -126,7 +126,7 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
     ! Areal heat capacity of each snow layer (J K-1 m-2).
 
 LOGICAL, INTENT(IN) ::                                                        &
-   exposed_water(land_pts)
+   has_lake(land_pts)
     ! lake depth > 10cm
 !-----------------------------------------------------------------------------
 ! Scalar arguments with intent(inout)
@@ -264,9 +264,9 @@ wout    = 0.0
 ! running depth to top of current layer (m)
 z_top   = 0.0
 
-IF (exposed_water(i)) THEN
+IF (has_lake(i)) THEN
    win = 0
-   print *, 'bypass percoalte_monarchs'
+   print *, 'lake present bypass percolate_monarchs'
    RETURN
 END IF
 

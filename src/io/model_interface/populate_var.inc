@@ -2042,7 +2042,32 @@ CASE ( 'lake_temp_ml' )
     CALL cube_get_data(cube_land, meltlake_vars%lake_temp_ml)
   ELSE
     meltlake_vars%lake_temp_ml(:,:) = const_val
-  END IF   
+  END IF
+
+CASE ( 'lid_depth_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, meltlake_vars%lid_depth_ml)
+  ELSE
+    meltlake_vars%lid_depth_ml(:,:) = const_val
+  END IF  
+
+CASE ( 'lid_temp_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, meltlake_vars%lid_temp_ml)
+  ELSE
+    meltlake_vars%lid_temp_ml(:,:) = const_val
+  END IF
+
+CASE ( 'lake_state_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, meltlake_vars%lake_state_ml)
+  ELSE
+    meltlake_vars%lake_state_ml(:,:) = const_val
+  END IF
+
 
 !CASE ( 'is_meltlake' )
  ! IF ( PRESENT(cube) ) THEN

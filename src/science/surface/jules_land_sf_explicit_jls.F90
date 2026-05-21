@@ -125,7 +125,7 @@ SUBROUTINE jules_land_sf_explicit (                                            &
  ! Water tracers (OUT)
  fqw_1_wtrac, fqw_surft_wtrac, fqw_evapsrce_wtrac, smc_soilt_wtrac,            &
  !meltlake_mod (IN)
- exposed_water, lake_temp_ml)
+ has_lake, exposed_water, has_lid, lake_temp_ml, lid_temp_ml, lid_depth_ml)
 
 USE ancil_info,              ONLY: dim_cslayer, nsoilt, rad_nband
 USE atm_fields_bounds_mod,      ONLY: pdims_s, pdims, tdims
@@ -408,9 +408,13 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
                              ! IN Latitude (degree)
 ,longitude(tdims%i_start:tdims%i_end,tdims%j_start:tdims%j_end)                &   
                              ! IN Longitude (degree)
-,lake_temp_ml(land_pts,nsurft)                                             
+,lake_temp_ml(land_pts,nsurft)                                                 &                                             
                              ! IN bulk meltlake temperature (K)
-							 
+,lid_temp_ml(land_pts,nsurft)                                                  &
+                             ! IN lid temp (K) 
+,lid_depth_ml(land_pts,nsurft)
+                             ! IN lid depth (m)
+
 LOGICAL, INTENT(IN) ::                                                         &
  l_aero_classic                                                                &
                              ! IN switch for using CLASSIC aerosol
@@ -424,8 +428,12 @@ LOGICAL, INTENT(IN) ::                                                         &
                              ! IN Switch for when mixing ratios are used
 ,l_emis_surft_set(nsurft)                                                      & 
                              ! IN Switch for varying grey surface emissivity
-,exposed_water(land_pts,nsurft)
+,exposed_water(land_pts,nsurft)                                                &
                              ! IN if exposed melt lake water is present   
+,has_lid(land_pts,nsurft)                                                      & 
+
+,has_lake(land_pts,nsurft)
+
 !-----------------------------------------------------------------------
 !  In/outs :-
 !-----------------------------------------------------------------------
@@ -2109,22 +2117,35 @@ DO n = 1,nsurft
     ! to enhance the conductivity to represent convective mixing
     ! because it is linear in temp there is no need to scale the ashtf when using flake
     !-----------------------------------------------------------------------
-    IF ( l_meltlake.AND. exposed_water(l,n) .AND.                             &
-         l_elev_land_ice .AND. l_lice_point(l) ) THEN
+    !IF ( l_meltlake .AND. l_elev_land_ice .AND. l_lice_point(l) ) THEN
 
+       IF (exposed_water(l,n)) THEN
     !-----------------------------------------------------------------------   
     ! The lake temperature is already in the elevated-tile temperature
     ! frame, so no further elevation correction is applied here
     !-----------------------------------------------------------------------
         
-       tsurf(l,n) = lake_temp_ml(l,n) 
+          tsurf(l,n) = lake_temp_ml(l,n) 
    
                
-       ashtf_surft(l,n) = rho_water * hcapw * 1.907e-5 *                      &
-            ABS(tsurf(l,n) - tstar_surft(l,n))**(1.0/3.0)
+          ashtf_surft(l,n) = rho_water * hcapw * 1.907e-5 *                   &
+               ABS(tsurf(l,n) - tstar_surft(l,n))**(1.0/3.0)
 
-                 
-    END IF
+       ELSE IF (has_lid(l,n)) THEN
+
+    !-----------------------------------------------------------------
+    ! Lid present: treat lid as a solid surface layer, similar to snow
+    !-----------------------------------------------------------------
+          tsurf(l,n)  = lid_temp_ml(l,n)
+
+          dzsurf(l,n) = MAX(lid_depth_ml(l,n), 0.1)
+          
+          ashtf_surft(l,n) = 2.0 * 2.2 / dzsurf(l,n)
+          
+       
+    END IF ! exposed_water/has_lid
+    
+ !END IF
 
 
   END DO
@@ -2702,7 +2723,7 @@ DO n = 1,nsurft
    1.0,anthrop_heat_surft(:,n),scaling_urban(:,n),l_vegdrag_surft(n),          &
    alpha1(:,n),ashtf_prime_surft(:,n),fqw_surft(:,n),                          &
    epot_surft(:,n),ftl_surft(:,n),dtstar_surft(:,n),sea_point,                 &
-   exposed_water(:,n)                                                          &    
+   exposed_water(:,n)                                                          &
    )
 
   ! update gridbox means and diagnostics

@@ -2699,6 +2699,18 @@ CASE ( 'lake_inflow' )
   cube_land = cube_from_array(meltlake_vars%lake_inflow)
   cube = map_from_land(cube_land)
 
+CASE ( 'lid_depth_ml' )
+  cube_land = cube_from_array(meltlake_vars%lid_depth_ml)
+  cube = map_from_land(cube_land)
+
+CASE ( 'lid_temp_ml' )
+  cube_land = cube_from_array(meltlake_vars%lid_temp_ml)
+  cube = map_from_land(cube_land)
+
+CASE ( 'lake_state_ml' )
+  cube_land = cube_from_array(meltlake_vars%lake_state_ml)
+  cube = map_from_land(cube_land)
+
 !CASE ( 'is_meltlake' )
   !cube_land = cube_from_array(meltlake_vars%is_meltlake)
 !  cube_land = cube_from_array( merge(1.0, 0.0, meltlake_vars%is_meltlake) )

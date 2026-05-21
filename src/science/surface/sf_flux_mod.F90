@@ -146,7 +146,8 @@ LOGICAL, INTENT(IN), OPTIONAL ::                                               &
  exposed_water(points)
                           ! IN flag meltlake depth > 10cm surface is no longer snow
                           ! but is open water
-
+ 
+ 
 REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
  ashtf_prime(points)
                           ! INOUT Adjusted SEB coefficient
@@ -223,9 +224,9 @@ DO k = 1,surft_pts
    i = pts_index(l) - (j-1) * t_i_length
 
 
-   WRITE(*,*) '------ sf_flux inputs for point l              = ', l, ' ------'
-   WRITE(*,'(A,I8)')    'l        (index)                     = ', l
-   WRITE(*,'(A,I8)')    't                                    = ', timestep_number
+ !  WRITE(*,*) '------ sf_flux inputs for point l              = ', l, ' ------'
+ !  WRITE(*,'(A,I8)')    'l        (index)                     = ', l
+ !  WRITE(*,'(A,I8)')    't                                    = ', timestep_number
   ! WRITE(*,'(A,L1)')    'l_fix_neg_snow                      = ', l_fix_neg_snow
   ! WRITE(*,'(A,F18.8)') 'canhc    (canopy heat cap)          = ', canhc(l)
   ! WRITE(*,'(A,F18.8)') 'dzsurf   (surface layer thick)      = ', dzsurf(l)
@@ -233,14 +234,14 @@ DO k = 1,surft_pts
   ! WRITE(*,'(A,F18.8)') 'qstar    (surface qsat)             = ', qstar(l)
   ! WRITE(*,'(A,F18.8)') 'q_elev   (air specific humidity)    = ', q_elev(l)
   ! WRITE(*,'(A,F18.8)') 'radnet   (net surface radiation)    = ', radnet(l)
-   WRITE(*,'(A,F18.8)') 'fracs    (snow fraction)             = ', fracs(l)
-   WRITE(*,'(A,F18.8)') 'resft    (resistance factor)         = ', resft(l)
-   WRITE(*,'(A,F18.8)') 'rhokh_1  (surface exch coeff)        = ', rhokh_1(l)
+  ! WRITE(*,'(A,F18.8)') 'fracs    (snow fraction)             = ', fracs(l)
+  ! WRITE(*,'(A,F18.8)') 'resft    (resistance factor)         = ', resft(l)
+  ! WRITE(*,'(A,F18.8)') 'rhokh_1  (surface exch coeff)        = ', rhokh_1(l)
   ! WRITE(*,'(A,F18.8)') 'snowd    (snow depth)               = ', snowdepth(l)
   ! WRITE(*,'(A,F18.8)') 'dt       (timestep)                 = ', timestep
-   WRITE(*,'(A,F18.8)') 't_elev   (air temp, elev tile)       = ', t_elev(l) -273.15
-   WRITE(*,'(A,F18.8)') 'ts1_el   (lower surface temp)        = ', ts1_elev(l) -273.15
-   WRITE(*,'(A,F18.8)') 'tstar    (surface temp)              = ', tstar(l)-273.15
+  ! WRITE(*,'(A,F18.8)') 't_elev   (air temp, elev tile)       = ', t_elev(l) -273.15
+  ! WRITE(*,'(A,F18.8)') 'ts1_el   (lower surface temp)        = ', ts1_elev(l) -273.15
+  ! WRITE(*,'(A,F18.8)') 'tstar    (surface temp)              = ', tstar(l)-273.15
   ! WRITE(*,'(A,F18.8)') 'vfrac    (veg fraction)             = ', vfrac(l)
   ! WRITE(*,'(A,F18.8)') 'rhk_can  (canopy exch coeff)        = ', rhokh_can(l)
   ! WRITE(*,'(A,F18.8)') 'z0h      (roughness heat/moisture)  = ', z0h(l)
@@ -254,7 +255,7 @@ DO k = 1,surft_pts
   ! WRITE(*,'(A,F18.8)') 'scal_urb (urban scaling)            = ', scaling_urban(l)
   ! WRITE(*,'(A,F18.8)') 'alpha1   (dqsat/dT)                 = ', alpha1(l)
   ! WRITE(*,'(A,F18.8)') 'z1_tq    (lowest atm level hgt)     = ', z1_tq(i,j)
-   WRITE(*,*) '-----------------------------------------------'
+   !WRITE(*,*) '-----------------------------------------------'
 
   ! Calculate the attenuation factor if different from 1.
   IF (l_vegcan_soilfx)                                                         &
@@ -293,16 +294,14 @@ DO k = 1,surft_pts
                   lambda * (tstar(l)**4.0 - ts1_elev(l)**4.0)
 
   ashtf_deriv_fac = 1.0
-  
+
   IF (l_meltlake .AND. PRESENT(exposed_water)) THEN
      IF (exposed_water(l)) THEN
         ashtf_deriv_fac = 4.0 / 3.0
      END IF
   END IF
 
-  !--- change ashtf_prime = 4 ε σ tstar^3 + ashtf  to
-  !---        ashtf_prime = 4 ε σ tstar^3 + (4/3) ashtf
-  
+    
   ashtf_prime(l) = 4.0 * (1.0 + lambda * emis_soil(l) * vfrac(l)) *            &
                  emis_surft(l) * sbcon * tstar(l)**3.0 +                       &
                  lambda * vfrac(l) * rhokh_can(l) +                            &
@@ -317,6 +316,26 @@ DO k = 1,surft_pts
                     ashtf_prime(l) )
 
 
+    WRITE(*,*) '------ sf_flux ----------------------------'
+ 
+    WRITE(*,'(A,I8)')    't                                   = ', timestep_number
+    WRITE(*,*)           'exposed_water                       = ', exposed_water(l)
+    WRITE(*,'(A,F18.8)') 'dzsurf   (surface layer thick)      = ', dzsurf(l)
+    WRITE(*,'(A,F18.8)') 'ashtf    (surf heat transfer coeff) = ', ashtf(l)
+    WRITE(*,'(A,F18.8)') 'fracs    (snow fraction)            = ', fracs(l)
+    WRITE(*,'(A,F18.8)') 'resft    (resistance factor)        = ', resft(l)
+    WRITE(*,'(A,F18.8)') 'rhokh_1  (surface exch coeff)       = ', rhokh_1(l)
+    WRITE(*,'(A,F18.8)') 'snowd    (snow depth)               = ', snowdepth(l)
+    WRITE(*,'(A,F18.8)') 'dt       (timestep)                 = ', timestep
+    WRITE(*,'(A,F18.8)') 'tstar    (surface temp)             = ', tstar(l)-273.15
+    WRITE(*,'(A,F16.8)') 'tstar(l) - ts1_elev(l)              = ', tstar(l) - ts1_elev(l)
+    WRITE(*,'(A,F16.8)') 'surf_ht_flux                        = ', surf_ht_flux
+    WRITE(*,'(A,F16.8)') 'ashtf_prime(l)                      = ', ashtf_prime(l)
+    WRITE(*,'(A,F16.8)') 'dtstar(l) + dstar(l)                = ', tstar(l) +  dtstar(l) -273.15
+
+  WRITE(*,*) '-----------------------------------------------'
+
+  
  ! for snow simplifies to
  ! surft_hgt_flux = ashft*(tstar-ts1_elev) ashtf = heat ftr coeff
  ! ftl_1 sensible heat flux coeff
@@ -326,13 +345,9 @@ DO k = 1,surft_pts
  ! into surface / sensivity of SEB to change in temp i.e. 
  ! derivative of individual energy bal components with respect to T 
 
-  WRITE(*,'(A,F16.8)') 'tstar(l) - ts1_elev(l)               = ', tstar(l) - ts1_elev(l)
-  WRITE(*,'(A,F16.8)') 'surf_ht_flux                         = ', surf_ht_flux
-  !WRITE(*,'(A,F16.8)') 'ashtf_prime(l)                       = ', ashtf_prime(l)
-  WRITE(*,'(A,F16.8)') 'dtstar(l) + dstar(l)                 = ', tstar(l) +  dtstar(l) -273.15
-
+  
      
-  WRITE(*,*) '================================================'
+  !WRITE(*,*) '================================================'
 
 
   ! Correction to surface fluxes due to change in surface temperature
@@ -349,6 +364,10 @@ DO k = 1,surft_pts
     epot(l) = epot(l) + rhokh_1(l) * alpha1(l) * dtstar(l)
   END IF
 
+
+
+
+  
 END DO
 !$OMP END DO
 !$OMP END PARALLEL

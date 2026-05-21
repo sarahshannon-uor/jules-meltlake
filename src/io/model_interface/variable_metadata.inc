@@ -9550,9 +9550,35 @@ DATA metadata(737) / var_metadata(                                             &
     "-"                                                                        &
  ) /
 !-----------------------------------------------------------------------------
-!! Metadata for water into lake from snowpack
+!! Metadata for lid depth 
 !!-----------------------------------------------------------------------------
 DATA metadata(738) / var_metadata(                                             &
+! String identifier 
+    'lid_depth_ml',                                                            &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    "Lid depth",                                                               &
+! Units
+    "m"                                                                        &
+ ) /
+ !-----------------------------------------------------------------------------
+!! Metadata for lid temperature 
+!!-----------------------------------------------------------------------------
+DATA metadata(739) / var_metadata(                                             &
+! String identifier 
+    'lid_temp_ml',                                                             &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    "Lid temperature",                                                         &
+! Units
+    "K"                                                                        &
+ ) / 
+!-----------------------------------------------------------------------------
+!! Metadata for water into lake from snowpack
+!!-----------------------------------------------------------------------------
+DATA metadata(740) / var_metadata(                                             &
 ! String identifier 
     'lake_inflow',                                                             &
 ! Variable type
@@ -9561,5 +9587,18 @@ DATA metadata(738) / var_metadata(                                             &
     "Mass of water from snowpack into melt lake",                              &
 ! Units
     "kgm-2"                                                                    &
+ ) /
+!-----------------------------------------------------------------------------
+!! Metadata for melt lake state 
+!!-----------------------------------------------------------------------------
+DATA metadata(741) / var_metadata(                                             &
+! String identifier 
+    'lake_state_ml',                                                           &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    "Lake state 0=nolake 1=exposed water 2=lid",                               &
+! Units
+    " "                                                                        &
  ) /
 #endif
