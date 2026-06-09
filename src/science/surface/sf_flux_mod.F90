@@ -316,24 +316,24 @@ DO k = 1,surft_pts
                     ashtf_prime(l) )
 
 
-    WRITE(*,*) '------ sf_flux ----------------------------'
+    !WRITE(*,*) '------ sf_flux ----------------------------'
  
-    WRITE(*,'(A,I8)')    't                                   = ', timestep_number
-    WRITE(*,*)           'exposed_water                       = ', exposed_water(l)
-    WRITE(*,'(A,F18.8)') 'dzsurf   (surface layer thick)      = ', dzsurf(l)
-    WRITE(*,'(A,F18.8)') 'ashtf    (surf heat transfer coeff) = ', ashtf(l)
-    WRITE(*,'(A,F18.8)') 'fracs    (snow fraction)            = ', fracs(l)
-    WRITE(*,'(A,F18.8)') 'resft    (resistance factor)        = ', resft(l)
-    WRITE(*,'(A,F18.8)') 'rhokh_1  (surface exch coeff)       = ', rhokh_1(l)
-    WRITE(*,'(A,F18.8)') 'snowd    (snow depth)               = ', snowdepth(l)
-    WRITE(*,'(A,F18.8)') 'dt       (timestep)                 = ', timestep
-    WRITE(*,'(A,F18.8)') 'tstar    (surface temp)             = ', tstar(l)-273.15
-    WRITE(*,'(A,F16.8)') 'tstar(l) - ts1_elev(l)              = ', tstar(l) - ts1_elev(l)
-    WRITE(*,'(A,F16.8)') 'surf_ht_flux                        = ', surf_ht_flux
-    WRITE(*,'(A,F16.8)') 'ashtf_prime(l)                      = ', ashtf_prime(l)
-    WRITE(*,'(A,F16.8)') 'dtstar(l) + dstar(l)                = ', tstar(l) +  dtstar(l) -273.15
+    !WRITE(*,'(A,I8)')    't                                   = ', timestep_number
+    !WRITE(*,*)           'exposed_water                       = ', exposed_water(l)
+    !WRITE(*,'(A,F18.8)') 'dzsurf   (surface layer thick)      = ', dzsurf(l)
+    !WRITE(*,'(A,F18.8)') 'ashtf    (surf heat transfer coeff) = ', ashtf(l)
+    !WRITE(*,'(A,F18.8)') 'fracs    (snow fraction)            = ', fracs(l)
+    !WRITE(*,'(A,F18.8)') 'resft    (resistance factor)        = ', resft(l)
+    !WRITE(*,'(A,F18.8)') 'rhokh_1  (surface exch coeff)       = ', rhokh_1(l)
+    !WRITE(*,'(A,F18.8)') 'snowd    (snow depth)               = ', snowdepth(l)
+    !WRITE(*,'(A,F18.8)') 'dt       (timestep)                 = ', timestep
+    !WRITE(*,'(A,F18.8)') 'tstar    (surface temp)             = ', tstar(l)-273.15
+    !WRITE(*,'(A,F16.8)') 'tstar(l) - ts1_elev(l)              = ', tstar(l) - ts1_elev(l)
+    !WRITE(*,'(A,F16.8)') 'surf_ht_flux                        = ', surf_ht_flux
+    !WRITE(*,'(A,F16.8)') 'ashtf_prime(l)                      = ', ashtf_prime(l)
+    !WRITE(*,'(A,F16.8)') 'dtstar(l) + dstar(l)                = ', tstar(l) +  dtstar(l) -273.15
 
-  WRITE(*,*) '-----------------------------------------------'
+  !WRITE(*,*) '-----------------------------------------------'
 
   
  ! for snow simplifies to

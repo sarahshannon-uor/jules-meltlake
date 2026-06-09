@@ -55,11 +55,16 @@ SUBROUTINE snow (a_step, land_pts, timestep, stf_hf_snow_melt, nsurft, n_wtrac_j
                   refreeze_ml,   &     !(land_pts,nsurft,nsmax_ml)
                   melt_ml,       &     !(land_pts,nsurft,nsmax_ml)
                   lake_depth_ml, &     !(land_pts,nsurft)
+                  lid_depth_ml,  &     !(land_pts,nsurft)
+                  lid_temp_ml,   &     !(land_pts,nsurft)   
+                  has_lake,      &     !(land_pts,nsurft)
+                  has_lid,       &     !(land_pts,nsurft)
+                  has_vlid,      &     !(land_pts,nsurft)
+                  exposed_water, &     !(land_pts,nsurft) 
                   ice_lens_depth,&     !(land_pts,nsurft)
                   ice_lens_index,&     !(land_pts,nsurft)
                   lake_inflow,   &     !(land_pts,nsurft)
-                  has_lake,      &     !(land_pts,nsurft)
-	          ksnow0_ml,     &       !(land_pts,nsurft)
+                  ksnow0_ml,     &       !(land_pts,nsurft)
                   kdtdz_ml) 
                   
 USE canopysnow_mod,  ONLY: canopysnow
@@ -72,6 +77,7 @@ USE snowpack_mod,    ONLY: snowpack
 USE snowtherm_mod,   ONLY: snowtherm
 
 USE adjust_ice_lens_depth_mod,   ONLY: adjust_ice_lens_depth
+USE insert_lid_mod,   ONLY: insert_lid
      
 USE water_constants_mod, ONLY:                                                 &
   ! imported scalar parameters
@@ -209,9 +215,12 @@ INTEGER, INTENT(IN OUT) ::                                                     &
     ! Number of snow layers.
       
 LOGICAL, INTENT(IN) ::                                                         &
-  has_lake(land_pts,nsurft)
+  has_lake(land_pts,nsurft),                                                   &
     ! meltlake water present 
-  
+  has_lid(land_pts, nsurft),                                                   & 
+    ! permanent lid present
+  has_vlid(land_pts, nsurft),                                                  &
+  exposed_water(land_pts, nsurft)
 
 REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
   con_rain(land_pts),                                                          &
@@ -294,6 +303,10 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Melt mass in snow layers (kg/m2).   
   lake_depth_ml(land_pts,nsurft),                                              &    
     ! Melt lake depth (m)
+  lid_depth_ml(land_pts,nsurft),                                               &    
+    ! Frozen lid depth (m)
+  lid_temp_ml(land_pts,nsurft),                                                &    
+    ! Frozen lid temp (K)
   ice_lens_depth(land_pts,nsurft),                                             &
     ! Ice lens depth (m)
   ice_lens_index(land_pts,nsurft),                                             &                                             
@@ -686,9 +699,7 @@ DO n = 1,nsurft
    ! add l_meltlake here
    !---------------------------------------------------------------------------
    snowdepth_before(:,n) = snowdepth(:,n)
-   !IF (n == 9 )THEN
-   !   print *, 'snowdepth before all:',snowdepth(1,n)
-   !END IF
+   
   !---------------------------------------------------------------------------
   ! Set snow mass variables
   !---------------------------------------------------------------------------
@@ -904,6 +915,8 @@ END IF
 !---------------------------------------------------------------------------
      DO k=1,surft_pts(n)
         i = surft_index(k,n)
+
+        
         IF (has_lake(i,n)) THEN
 
            !--- No melting
@@ -916,7 +929,10 @@ END IF
            surf_htf_surft(i,n)  = kdtdz_ml(i,n)
            
            !--- Stefan condition needs thermal conductitivy of top snow layer
-           ksnow0_ml(i,n)       = ksnow_ml(i,1)  
+           ksnow0_ml(i,n)       = ksnow_ml(i,1)
+
+           !--- No snowfall (either falls on lid or into lake 
+           snowfall(i)          = 0.0
           
         END IF
      END DO
@@ -1096,10 +1112,7 @@ END IF
                   ice_lens_depth(:,n),ice_lens_index(:,n), lake_inflow(:,n),   &
                   has_lake(:,n))
 
-   ! IF (nsnow(1,n)==0) THEN
-   !    print *, 'nsnow(:,n) :  ',nsnow(1,n), timestep_number
-   !    stop
-   ! END IF
+   
   ELSE 
   
     CALL snowpack (a_step, n, land_pts, surft_pts(n), n_wtrac_jls, timestep,   &
@@ -1159,62 +1172,12 @@ END IF
     !-------------------------------------------------------------------------
     ! Mechanical compaction of snow
     !-------------------------------------------------------------------------
-      ! --- BEFORE compaction ---
-     ! DO k = 1, surft_pts(n)
-     !    i = surft_index(k,n)
-     !    snowdepth_before_compact(i,n) = 0.0
-     !    DO jj = 1, nsnow(i,n)
-     !       snowdepth_before_compact(i,n) = snowdepth_before_compact(i,n) + ds_sl_ml(i,jj)
-     !    END DO
-     ! END DO
-
-
       
     CALL compactsnow ( land_pts, surft_pts(n), timestep, nsnow(:,n),           &
                        surft_index(:,n), nsmax_ml, sice_sl_ml, sliq_sl_ml,     &
                        tsnow_sl_ml, rho_snow_sl_ml, ds_sl_ml)
 
-    !DO k = 1, surft_pts(n)
-    !   i = surft_index(k,n)
-    !   snowdepth_after_compact(i,n) = 0.0
-    !   DO jj = 1, nsnow(i,n)
-    !      snowdepth_after_compact(i,n) = snowdepth_after_compact(i,n) + ds_sl_ml(i,jj)
-    !   END DO
-    !END DO
-
-    ! --- STOP if compaction increased depth ---
-    !IF (snowdepth_after_compact(i,n) > snowdepth_before_compact(i,n) + 1.0e-2) THEN
-    !   print *, 'ERROR: compaction increased snowdepth'
-    !   print *, 'before = ', snowdepth_before_compact(i,n)
-    !   print *, 'after  = ', snowdepth_after_compact(i,n)
-
-     !  DO jj = 1, nsnow(i,n)
-     !     rho_true = (sice_sl_ml(i,jj) + sliq_sl_ml(i,jj)) / ds_sl_ml(i,jj)
-     !     print *, jj, rho_snow_sl_ml(i,jj), rho_true
-     !  END DO
-     !  STOP
-    !END IF
-    
-   
-    !-------------------------------------------------------------------------
-    ! Redivide snowpack after changes in depth, conserving mass and energy
-    !-------------------------------------------------------------------------
-
-    !OPEN(NEWUNIT=iu, FILE=dbgfile, STATUS='UNKNOWN', POSITION='APPEND', ACTION='WRITE')
-    !write(iu,'(A,I8)') 'BEFORE timestep=', timestep_number
-  
-    
-    !DO jj = 1, nsmax_ml
-    !   write(*,'(A,I0,A,F16.8,A,F16.8,A,F16.8,A,F16.8,A,F16.8)') ' before relayer jj=', jj, ' sliq=', sliq_sl_ml(1,jj), ' sice=', sice_sl_ml(1,jj),' tsnow=', tsnow_sl_ml(1,jj)-273.15,'ds=', ds_sl_ml(1,jj), 'ice_lens_depth=', ice_lens_depth(1)
-    !END DO
-    
-
-    !DO jj = 1, nsnow(1,n)
-    !   write(iu,'(I4,",",ES16.8,",",ES16.8,",",ES16.8,",",ES16.8)') &
-    !              jj, sice_sl_ml(1,jj), sliq_sl_ml(1,jj), ds_sl_ml(1,jj), ice_lens_index(1,n)
-    !END DO
-
-  
+             
     CALL relayersnow ( land_pts, surft_pts(n), n_wtrac_jls, surft_index(:,n),  &
                        nsmax_ml, dzsnow_ml, rgrain0, rho0, sice0, snowfall,    &
                        snowmass, tsnow0, wtrac_sn%sice0, nsnow(:,n), ds_sl_ml, &
@@ -1224,21 +1187,6 @@ END IF
                        rho_snow_sl_ml, snowdepth(:,n) )
 
 
-
-    !print *, 'snowdepth(:,n) after relayer:  ',snowdepth(1,n)
-    !write(iu,'(A,I8)') 'AFTER timestep=', timestep_number
-    !DO jj = 1, nsnow(i,n)
-    !   write(iu,'(I4,",",ES16.8,",",ES16.8,",",ES16.8,",",ES16.8)') &
-    !        jj, sice_sl_ml(1,jj), sliq_sl_ml(1,jj), ds_sl_ml(1,jj), ice_lens_index(1,n)
-    !END DO
-    !write(iu,'(A)') '---'
-
-    
-    !DO jj = 1, nsmax_ml
-    !   write(*,'(A,I0,A,F16.8,A,F16.8,A,F16.8,A,F16.8)') ' after relayer jj=', jj, ' sliq=', sliq_sl_ml(1,jj), ' sice=', sice_sl_ml(1,jj),' tsnow=', tsnow_sl_ml(1,jj)-273.15,'ds=', ds_sl_ml(1,jj)
-    !END DO
-    !WRITE(iu,'(A)') '---'
-    !CLOSE(iu)
     
     !-------------------------------------------------------------------------
     ! Adjust the location of the ice lens 

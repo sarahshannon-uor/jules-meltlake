@@ -1,6 +1,6 @@
 ! *****************************COPYRIGHT*******************************
 
-! (c) [University of Edinburgh]. All rights reserved.
+! (c) [University of Reading]. All rights reserved.
 ! This routine has been licensed to the Met Office for use and
 ! distribution under the JULES collaboration agreement, subject
 ! to the terms and conditions set out therein.

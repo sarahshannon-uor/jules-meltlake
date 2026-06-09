@@ -2533,7 +2533,7 @@ DATA metadata(200) / var_metadata(                                             &
 ! Variable type
     var_type_surface,                                                          &
 ! Long name
-    "Gridbox ice/liquid water temperature",                                    &
+    "Gridbox forcing temperature",                                             &
 ! Units
     "K"                                                                        &
   ) /
@@ -9532,7 +9532,7 @@ DATA metadata(736) / var_metadata(                                             &
 ! Variable type
     var_type_surft,                                                            &
 ! Long name
-    "Ice lens depth",                                                          &
+    "Ice lens depth below surface",                                            &
 ! Units
     "m"                                                                        &
  ) /
@@ -9562,10 +9562,23 @@ DATA metadata(738) / var_metadata(                                             &
 ! Units
     "m"                                                                        &
  ) /
- !-----------------------------------------------------------------------------
-!! Metadata for lid temperature 
+!-----------------------------------------------------------------------------
+!! Metadata for virtual lid depth 
 !!-----------------------------------------------------------------------------
 DATA metadata(739) / var_metadata(                                             &
+! String identifier 
+    'vlid_depth_ml',                                                           &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    "virtual lid depth",                                                       &
+! Units
+    "m"                                                                        &
+ ) /
+!-----------------------------------------------------------------------------
+!! Metadata for lid temperature 
+!!-----------------------------------------------------------------------------
+DATA metadata(740) / var_metadata(                                             &
 ! String identifier 
     'lid_temp_ml',                                                             &
 ! Variable type
@@ -9578,7 +9591,7 @@ DATA metadata(739) / var_metadata(                                             &
 !-----------------------------------------------------------------------------
 !! Metadata for water into lake from snowpack
 !!-----------------------------------------------------------------------------
-DATA metadata(740) / var_metadata(                                             &
+DATA metadata(741) / var_metadata(                                             &
 ! String identifier 
     'lake_inflow',                                                             &
 ! Variable type
@@ -9591,14 +9604,40 @@ DATA metadata(740) / var_metadata(                                             &
 !-----------------------------------------------------------------------------
 !! Metadata for melt lake state 
 !!-----------------------------------------------------------------------------
-DATA metadata(741) / var_metadata(                                             &
+DATA metadata(742) / var_metadata(                                             &
 ! String identifier 
     'lake_state_ml',                                                           &
 ! Variable type
     var_type_surft,                                                            &
 ! Long name
-    "Lake state 0=nolake 1=exposed water 2=lid",                               &
+    "Lake state 0=nolake 1=exposed water 2=vlid 3=lid",                               &
 ! Units
     " "                                                                        &
+ ) /
+!-----------------------------------------------------------------------------
+!! Metadata for Stefan boundary movement between lake bottom and snowpack top  
+!!-----------------------------------------------------------------------------
+DATA metadata(743) / var_metadata(                                             &
+! String identifier 
+    'dhdt_lake_snow_ml',                                                       &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    "Stefan boundary movement lake bottom snowpack top",                       &
+! Units
+    "m hr-1 ice equiv"                                                                    &
+ ) /
+!-----------------------------------------------------------------------------
+!! Metadata for Stefan boundary movement between lid bottom and lake top  
+!!-----------------------------------------------------------------------------
+DATA metadata(744) / var_metadata(                                             &
+! String identifier 
+    'dhdt_lid_lake_ml',                                                        &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    "Stefan boundary movement lid bottom lake top",                            &
+! Units
+    "m hr-1 ice equiv"                                                         &
  ) /
 #endif

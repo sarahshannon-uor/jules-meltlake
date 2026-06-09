@@ -692,10 +692,24 @@ DO k = 1,surft_pts
       snow_soil_htf(i) = asnow(n) * ( tsnow(i,n) + r_gamma * dt(n) - tsoilw )
       DO n = 1,nsnow(i)
         tsnow(i,n) = tsnow(i,n) + dt(n)
-		 !print *, 'tsnow(i,n)', tsnow(i,n)
-      END DO
+     END DO
 
-    END IF  !  NSNOW
+  END IF  !  NSNOW
+
+  IF (timestep_number >= 46523) THEN
+     WRITE(*,*) '-----------------------------'
+     WRITE(*,*) 'timestep_number   = ', timestep_number
+     WRITE(*,*) 'i                 = ', i
+     WRITE(*,'(A,F16.8)') 'g_snow_surf    = ', g_snow_surf
+     WRITE(*,'(A,F16.8)') 'asnow(1)       = ', asnow(1)
+     WRITE(*,'(A,F16.8)') 'tsnow(1) oC    = ', tsnow(i,1) - 273.15
+     WRITE(*,'(A,F16.8)') 'tsnow(2) oC    = ', tsnow(i,2) - 273.15
+     WRITE(*,'(A,F16.8)') 'cond term      = ', asnow(1) * (tsnow(i,1) - tsnow(i,2))
+     WRITE(*,'(A,F16.8)') 'r(1)           = ', r(1)
+     WRITE(*,'(A,F16.8)') 'dt(1)          = ', dt(1)
+  END IF
+
+  
 
     !-------------------------------------------------------------------------
     ! Melt snow in layers with temperature exceeding melting point
@@ -847,12 +861,7 @@ DO k = 1,surft_pts
             win, win_wtrac,                                       &
             sf_diag, surft_n, refreeze, ice_lens_depth,           &
             ice_lens_index, lake_inflow, has_lake )
-       !print *, 'after perc', sice(1,1), sliq(1,1), ds(1,1), exposed_water(1)
-       !if ((sliq(1,1) + sliq(1,1)) > 1000.0) then
-       !   print *, 'sliq(1,1) + sliq(1,1)) > 1000.0'
-       !   print *, exposed_water(1)
-          !stop
-       !end if
+       
    ELSE
 
        

@@ -185,55 +185,167 @@ ELSE
     forcing%ls_snow_ij(:,:)  = precip_rel_perturbation * forcing%ls_snow_ij(:,:)
   END IF
 
-  l_ideal_forcing=.FALSE.
+  l_ideal_forcing=.TRUE.
+
   
-  IF (l_ideal_forcing) THEN 
-     IF (timestep_number <= 168) THEN
+  IF (l_ideal_forcing) THEN
+! --- warm vlid
+IF (timestep_number <= 800) THEN
+   ! Buzzard-style imposed high forcing phase
+   forcing%tl_1_ij(:,:)     = 275.15
+   forcing%qw_1_ij(:,:)     = 0.003
+   forcing%con_rain_ij(:,:) = 0.0
+   forcing%ls_rain_ij(:,:)  = 0.0
+   forcing%con_snow_ij(:,:) = 0.0
+   forcing%ls_snow_ij(:,:)  = 0.0
+   forcing%sw_down_ij(:,:)  = 800.0
+   forcing%lw_down_ij(:,:)  = 350.0
+   forcing%u_0_ij(:,:)      = 2.0
+   forcing%v_0_ij(:,:)      = 0.0
+   u_1_ij(:,:)              = 2.0
+   v_1_ij(:,:)              = 0.0
+   forcing%pstar_ij(:,:)    = 95000.0
+
+ELSE IF (timestep_number > 800 .AND. timestep_number <= 847) THEN
+   ! Keep original cold phase until the virtual lid exists
+   forcing%tl_1_ij(:,:)     = 263.15
+   forcing%qw_1_ij(:,:)     = 0.0005
+   forcing%con_rain_ij(:,:) = 0.0
+   forcing%ls_rain_ij(:,:)  = 0.0
+   forcing%con_snow_ij(:,:) = 0.0
+   forcing%ls_snow_ij(:,:)  = 0.0
+   forcing%sw_down_ij(:,:)  = 50.0
+   forcing%lw_down_ij(:,:)  = 180.0
+   forcing%u_0_ij(:,:)      = 2.0
+   forcing%v_0_ij(:,:)      = 0.0
+   u_1_ij(:,:)              = 2.0
+   v_1_ij(:,:)              = 0.0
+   forcing%pstar_ij(:,:)    = 95000.0
+
+ELSE IF (timestep_number > 847 .AND. timestep_number <= 8761) THEN
+   ! Stay warm so the first virtual lid melts and does not reform
+   forcing%tl_1_ij(:,:)     = 283.15
+   forcing%qw_1_ij(:,:)     = 0.003
+   forcing%con_rain_ij(:,:) = 0.0
+   forcing%ls_rain_ij(:,:)  = 0.0
+   forcing%con_snow_ij(:,:) = 0.0
+   forcing%ls_snow_ij(:,:)  = 0.0
+   forcing%sw_down_ij(:,:)  = 800.0
+   forcing%lw_down_ij(:,:)  = 350.0
+   forcing%u_0_ij(:,:)      = 2.0
+   forcing%v_0_ij(:,:)      = 0.0
+   u_1_ij(:,:)              = 2.0
+   v_1_ij(:,:)              = 0.0
+   forcing%pstar_ij(:,:)    = 95000.0
+END IF
+
+
+     
+       ! default   
+    ! IF (timestep_number <= 800) THEN
+        ! Buzzard-style imposed high forcing phase
+     !   forcing%tl_1_ij(:,:)     = 275.15
+      !  forcing%qw_1_ij(:,:)     = 0.003
+      !  forcing%con_rain_ij(:,:) = 0.0
+      !  forcing%ls_rain_ij(:,:)  = 0.0
+      !  forcing%con_snow_ij(:,:) = 0.0
+      !  forcing%ls_snow_ij(:,:)  = 0.0
+      !  forcing%sw_down_ij(:,:)  = 800.0
+      !  forcing%lw_down_ij(:,:)  = 350.0
+      ! forcing%u_0_ij(:,:)      = 2.0
+      ! forcing%v_0_ij(:,:)      = 0.0
+      !  u_1_ij(:,:)              = 2.0
+      !  v_1_ij(:,:)              = 0.0
+      !  forcing%pstar_ij(:,:)    = 95000.0
+
+     !ELSE IF (timestep_number > 800.AND.timestep_number <= 8761) THEN
+        ! Buzzard-style imposed low forcing phase
+      !  forcing%tl_1_ij(:,:)     = 263.15
+      !  forcing%qw_1_ij(:,:)     = 0.0005
+      !  forcing%con_rain_ij(:,:) = 0.0
+      !  forcing%ls_rain_ij(:,:)  = 0.0
+      !  forcing%con_snow_ij(:,:) = 0.0
+      !  forcing%ls_snow_ij(:,:)  = 0.0
+      ! forcing%sw_down_ij(:,:)  = 50.0
+      !  forcing%lw_down_ij(:,:)  = 180.0
+      !  forcing%u_0_ij(:,:)      = 2.0
+      !  forcing%v_0_ij(:,:)      = 0.0
+      !  u_1_ij(:,:)              = 2.0
+      !  v_1_ij(:,:)              = 0.0
+      !  forcing%pstar_ij(:,:)    = 95000.0
+     !END IF
+     
+   !IF (timestep_number <= 800) THEN
+      ! Buzzard-style imposed high forcing phase
+   !   forcing%tl_1_ij(:,:)     = 275.15
+   !   forcing%qw_1_ij(:,:)     = 0.003
+   !   forcing%con_rain_ij(:,:) = 0.0
+   !   forcing%ls_rain_ij(:,:)  = 0.0
+   !   forcing%con_snow_ij(:,:) = 0.0
+   !   forcing%ls_snow_ij(:,:)  = 0.0
+   !   forcing%sw_down_ij(:,:)  = 800.0
+   !   forcing%lw_down_ij(:,:)  = 350.0
+   !   forcing%u_0_ij(:,:)      = 2.0
+   !   forcing%v_0_ij(:,:)      = 0.0
+   !   u_1_ij(:,:)              = 2.0
+   !   v_1_ij(:,:)              = 0.0
+   !   forcing%pstar_ij(:,:)    = 95000.0
+
+   !ELSE IF (timestep_number > 800 .AND. timestep_number <= 8761) THEN
+      ! Buzzard-style imposed low forcing phase
+    !  forcing%tl_1_ij(:,:)     = 263.15
+    !  forcing%qw_1_ij(:,:)     = 0.0005
+    !  forcing%con_rain_ij(:,:) = 0.0
+    !  forcing%ls_rain_ij(:,:)  = 0.0
+    !  forcing%con_snow_ij(:,:) = 0.0
+    !  forcing%ls_snow_ij(:,:)  = 0.0
+    !  forcing%sw_down_ij(:,:)  = 50.0
+    !  forcing%lw_down_ij(:,:)  = 180.0
+    !  forcing%u_0_ij(:,:)      = 2.0
+    !  forcing%v_0_ij(:,:)      = 0.0
+    !  u_1_ij(:,:)              = 2.0
+    !  v_1_ij(:,:)              = 0.0
+    !  forcing%pstar_ij(:,:)    = 95000.0
+   !END IF
+
+   ! Heavy rain and snow pulse for timesteps 535 to 583 inclusive - exposed_water
+  ! IF (timestep_number >= 535 .AND. timestep_number <= 583) THEN
+  !    forcing%con_rain_ij(:,:) = 0.0
+  !    forcing%ls_rain_ij(:,:)  = 5.0e-4
+  !    forcing%con_snow_ij(:,:) = 0.0
+  !    forcing%ls_snow_ij(:,:)  = 2.0e-4
+  ! END IF
+
+   ! Heavy rain and snow pulse for timesteps 535 to 583 inclusive - has_lid
+  ! IF (timestep_number >= 967 .AND. timestep_number <= 1014) THEN
+  !    forcing%con_rain_ij(:,:) = 0.0
+  !    forcing%ls_rain_ij(:,:)  = 5.0e-4
+  !    forcing%con_snow_ij(:,:) = 0.0
+  !    forcing%ls_snow_ij(:,:)  = 2.0e-4
+  ! END IF
+
+
+
+     
+   
+
+     !-------------------------------------------------
+     !IF (timestep_number <= 168) THEN
         ! hot
-        forcing%tl_1_ij(:,:)     = 275.15
-        forcing%qw_1_ij(:,:)     = 0.003
-        forcing%con_rain_ij(:,:) = 0.0
-        forcing%ls_rain_ij(:,:)  = 0.0
-        forcing%con_snow_ij(:,:) = 0.0
-        forcing%ls_snow_ij(:,:)  = 0.0
-        forcing%sw_down_ij(:,:)  = 600.0
-        forcing%lw_down_ij(:,:)  = 350.0
-        forcing%u_0_ij(:,:)      = 2.0
-        forcing%v_0_ij(:,:)      = 0.0
-        u_1_ij(:,:)              = 2.0
-        v_1_ij(:,:)              = 0.0
-        forcing%pstar_ij(:,:)    = 95000
-     ELSEIF (timestep_number > 168.AND.timestep_number <= 2160) THEN
-        ! cold
-        forcing%tl_1_ij(:,:)     = 253.15
-        forcing%qw_1_ij(:,:)     = 0.0005
-        forcing%con_rain_ij(:,:) = 0.0
-        forcing%ls_rain_ij(:,:)  = 0.0
-        forcing%con_snow_ij(:,:) = 0.0
-        forcing%ls_snow_ij(:,:)  = 0.0
-        forcing%sw_down_ij(:,:)  = 0.0
-        forcing%lw_down_ij(:,:)  = 5.0
-        forcing%u_0_ij(:,:)      = 2.0
-        forcing%v_0_ij(:,:)      = 0.0
-        u_1_ij(:,:)              = 2.0
-        v_1_ij(:,:)              = 0.0
-        forcing%pstar_ij(:,:)    = 95000 
-     ELSEIF (timestep_number > 2160) THEN !.AND.timestep_number <= 3336 ) THEN
-        ! hot 
-        forcing%tl_1_ij(:,:)     = 275.15
-        forcing%qw_1_ij(:,:)     = 0.003
-        forcing%con_rain_ij(:,:) = 0.0!0.0001
-        forcing%ls_rain_ij(:,:)  = 0.0!0.0001 ! moderate rain rate kg m−2s−1=0.001×3600=3.6 mm h−1
-        forcing%con_snow_ij(:,:) = 0.0 
-        forcing%ls_snow_ij(:,:)  = 0.0!6.5e-5 !0.0
-        forcing%sw_down_ij(:,:)  = 600.0
-        forcing%lw_down_ij(:,:)  = 350.0
-        forcing%u_0_ij(:,:)      = 2.0
-        forcing%v_0_ij(:,:)      = 0.0
-        u_1_ij(:,:)              = 2.0
-        v_1_ij(:,:)              = 0.0
-        forcing%pstar_ij(:,:)    = 95000 
-     !ELSEIF (timestep_number > 3336) THEN
+      !  forcing%tl_1_ij(:,:)     = 275.15
+      !  forcing%qw_1_ij(:,:)     = 0.003
+      !  forcing%con_rain_ij(:,:) = 0.0
+      !  forcing%ls_rain_ij(:,:)  = 0.0
+      !  forcing%con_snow_ij(:,:) = 0.0
+      !  forcing%ls_snow_ij(:,:)  = 0.0
+      !  forcing%sw_down_ij(:,:)  = 600.0
+      !  forcing%lw_down_ij(:,:)  = 350.0
+      !  forcing%u_0_ij(:,:)      = 2.0
+      !  forcing%v_0_ij(:,:)      = 0.0
+      !  u_1_ij(:,:)              = 2.0
+      !  v_1_ij(:,:)              = 0.0
+      !  forcing%pstar_ij(:,:)    = 95000
+     !ELSEIF (timestep_number > 168.AND.timestep_number <= 2160) THEN
         ! cold
       !  forcing%tl_1_ij(:,:)     = 253.15
       !  forcing%qw_1_ij(:,:)     = 0.0005
@@ -248,7 +360,22 @@ ELSE
       !  u_1_ij(:,:)              = 2.0
       !  v_1_ij(:,:)              = 0.0
       !  forcing%pstar_ij(:,:)    = 95000 
-     END IF
+     !ELSEIF (timestep_number > 2160) THEN !.AND.timestep_number <= 3336 ) THEN
+        ! hot 
+      !  forcing%tl_1_ij(:,:)     = 275.15
+      !  forcing%qw_1_ij(:,:)     = 0.003
+      !  forcing%con_rain_ij(:,:) = 0.0!0.0001
+      !  forcing%ls_rain_ij(:,:)  = 0.0!0.0001 ! moderate rain rate kg m−2s−1=0.001×3600=3.6 mm h−1
+      !  forcing%con_snow_ij(:,:) = 0.0 
+      !  forcing%ls_snow_ij(:,:)  = 0.0!6.5e-5 !0.0
+      !  forcing%sw_down_ij(:,:)  = 600.0
+      !  forcing%lw_down_ij(:,:)  = 350.0
+      !  forcing%u_0_ij(:,:)      = 2.0
+      !  forcing%v_0_ij(:,:)      = 0.0
+      !  u_1_ij(:,:)              = 2.0
+      !  v_1_ij(:,:)              = 0.0
+      !  forcing%pstar_ij(:,:)    = 95000 
+     !END IF
 
 END IF ! (l_ideal_forcing)
 

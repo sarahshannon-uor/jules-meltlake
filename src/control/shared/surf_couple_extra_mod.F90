@@ -795,10 +795,15 @@ CASE ( jules )
             meltlake_vars%refreeze_ml,      & !OUT ((land_pts,nsurft,nsmax_ml)
             meltlake_vars%melt_ml,          & !OUT ((land_pts,nsurft,nsmax_ml)
             meltlake_vars%lake_depth_ml,    & !IN/OUT (land_pts,nsurft)
+            meltlake_vars%lid_depth_ml,     & !IN/OUT (land_pts,nsurft)
+            meltlake_vars%lid_temp_ml,      & !IN/OUT (land_pts,nsurft)
+            meltlake_vars%has_lake,          & !IN/OUT (land_pts,nsurft
+            meltlake_vars%has_lid,          & !IN/OUT (land_pts,nsurft)
+            meltlake_vars%has_vlid,         & !IN/OUT (land_pts,nsurft)
+            meltlake_vars%exposed_water,    & !IN (land_pts,nsurft)
             meltlake_vars%ice_lens_depth,   & !IN/OUT (land_pts,nsurft)   
             meltlake_vars%ice_lens_index,   & !IN/OUT (land_pts,nsurft)   
             meltlake_vars%lake_inflow,      & !IN/OUT (land_pts,nsurft)
-            meltlake_vars%exposed_water,    & !IN (land_pts,nsurft)
             meltlake_vars%ksnow0_ml,        & !OUT 
             meltlake_vars%kdtdz_ml)           !IN 
        
@@ -806,6 +811,7 @@ CASE ( jules )
         CALL meltlake(land_pts,                    & !IN
                       timestep,                    & !IN
                       nsurft,                      & !IN 
+                      n_wtrac_jls,                 & !IN 
                       surft_pts,                   & !IN
                       ainfo%surft_index,           & !IN
                       progs%nsnow_surft,           & !IN
@@ -818,17 +824,29 @@ CASE ( jules )
                       progs%ds_surft_ml,           & !IN/OUT
                       progs%sice_surft_ml,         & !IN/OUT
                       progs%sliq_surft_ml,         & !IN/OUT
-                      progs%snow_surft,            & !IN/OUT 
+                      ls_snow_gb,                  & !IN/OUT
+                      con_snow_gb,                 & !IN/OUT
+                      ls_rain_gb,                  & !IN/OUT
+                      con_rain_gb,                 & !IN/OUT
                       meltlake_vars%lake_depth_ml, & !IN/OUT 
                       meltlake_vars%lake_albedo_ml,& !IN/OUT
                       meltlake_vars%lake_temp_ml,  & !IN/OUT
                       meltlake_vars%lid_temp_ml,   & !IN/OUT
                       meltlake_vars%lid_depth_ml,  & !IN/OUT
+                      meltlake_vars%vlid_depth_ml, & !IN/OUT
                       meltlake_vars%has_lake,      & !IN/OUT
                       meltlake_vars%exposed_water, & !IN/OUT
                       meltlake_vars%has_lid,       & !IN/OUT
+                      meltlake_vars%has_vlid,      & !IN/OUT
+                      meltlake_vars%did_insert_lid,& !IN/OUT
                       meltlake_vars%ksnow0_ml,     & !IN
                       meltlake_vars%lake_state_ml, & !OUT
+                      progs%snow_surft,            & !OUT
+                      progs%snowdepth_surft,       & !OUT
+                      progs%rho_snow_grnd_surft,   & !IN/OUT
+                      progs%rho_snow_surft_ml,     & !OUT
+                      meltlake_vars%dhdt_lake_snow_ml, & !OUT
+                      meltlake_vars%dhdt_lid_lake_ml,  & !OUT
                       !Ancil info (IN)
                       ainfo%l_lice_point,          & !IN (land_pts)
                       ainfo%l_lice_surft)            !IN (land_pts)  

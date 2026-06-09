@@ -1,13 +1,13 @@
 ! ****************************rCOPYRIGHT*******************************
 
-! (c) [University of Edinburgh]. All rights reserved.
+! (c) [University of Reading]. All rights reserved.
 ! This routine has been licensed to the Met Office for use and
 ! distribution under the JULES collaboration agreement, subject
 ! to the terms and conditions set out therein.
 ! [Met Office Ref SC237]
 
 ! *****************************COPYRIGHT*******************************
-!  SUBROUTINE RELAYERSNOW-----------------------------------------------
+!  SUBROUTINE MELTLAKE_EVOLVE-----------------------------------------------
 ! Description:
 !     Calling routine for meltlake module
 ! Method:
@@ -19,7 +19,9 @@
 !     Use Stefan condition to reduce the sice at the stop of the snowpack
 !     Add the extra water from that sice to the lake depth.
 !     When sice is reduced from the Stefan condition then also drain sliq
-!     into the lake. Output adjusted sice, sliq and ds 
+!     into the lake. Output adjusted sice, sliq and ds
+!     flux_lower heat from lake to snowpack interface
+!     kdtdz heat conducted from snow interface to top layer of snowpack
 ! Code Owner: s.r.shannon@reading.ac.uk
 ! Subroutine Interface:
 MODULE meltlake_evolve_mod
@@ -37,19 +39,26 @@ CONTAINS
                       tsnow_ml,                 & !IN
                       lw_down_surft,            & !IN  
                       tstar_surft,              & !IN
-                      sw_surft,                 & !IN  already uses lake albedo
+                      sw_surft,                 & !IN  
                       lid_depth_ml,             & !IN
+                      vlid_depth_ml,            & !IN
                       snow_surft,               & !IN/OUT
+                      ls_snow,                  & !IN/OUT
+                      con_snow,                 & !IN/OUT
+                      ls_rain,                  & !IN/OUT
+                      con_rain,                 & !IN/OUT
                       lake_depth_ml,            & !IN/OUT
                       lake_albedo_ml,           & !IN/OUT
                       lake_temp_ml,             & !IN/OUT
                       has_lake,                 & !IN/OUT
                       exposed_water,            & !IN/OUT
                       has_lid,                  & !IN/OUT
+                      has_vlid,                 & !IN/OUT
                       sice_ml,                  & !IN/OUT
                       sliq_ml,                  & !IN/OUT
                       ds_ml,                    & !IN/OUT 
-                      kdtdz_ml)                   !OUT
+                      kdtdz_ml,                 & !OUT
+                      dhdt_lake_snow_ml)          !OUT
                       
                      
 USE model_time_mod, ONLY: timestep_number
@@ -102,7 +111,7 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
 
 REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
   sw_surft(land_pts),                                                          &                                                   
-    ! Net shortwave radiation on tile (W/m2) using lake albedo
+    ! Net shortwave radiation on tile (W/m2). Lake albedo used
   lw_down_surft(land_pts),                                                     &
     ! Surface downward LW radiation on tiles (W/m2), jules_land_sf_implicit.F90
   tstar_surft(land_pts),                                                       &
@@ -113,9 +122,11 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
        ! snowpack top level temp (K)  
   ksnow0_ml(land_pts),                                                         &
        ! thermal conductivity of top snow layer (W m⁻¹ K⁻¹)
-  lid_depth_ml(land_pts) 
+  lid_depth_ml(land_pts),                                                      &
        ! depth of frozen lid (m)
-
+  vlid_depth_ml(land_pts) 
+   ! depth of frozen virtual lid (m)
+   
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(in)
 !-----------------------------------------------------------------------------
@@ -137,6 +148,14 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Temperature of melt lake (K)
    snow_surft(land_pts),                                                       &
     ! Snow mass on tiles (kgm-2)
+   con_rain(land_pts),                                                         &
+    ! Convective rainfall rate (kg/m2/s).
+   ls_rain(land_pts),                                                          &
+    ! Large-scale rainfall fall rate (kg/m2/s).
+   con_snow(land_pts),                                                         &
+    ! Convective frozen rainfall rate (kg/m2/s).
+   ls_snow(land_pts),                                                          &
+    ! Large-scale frozen precip fall rate (kg/m2/s).
    sice_ml(land_pts,nsmax_ml),                                                 &
     ! Ice content of snow layers (kg/m2)
    sliq_ml(land_pts,nsmax_ml),                                                 &
@@ -145,14 +164,17 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
       ! snowpack top level depth (m)
       
 REAL(KIND=real_jlslsm), INTENT(OUT) ::                                         &
-   kdtdz_ml(land_pts)
+   kdtdz_ml(land_pts),                                                         &
      ! Conductive heat flux from lake into snowpack. pass this to snow module
      ! so the heat flux will be adjusted if there is exposed water 
+   dhdt_lake_snow_ml(land_pts)
+     ! Stefan boundary movement (ms-1 ice equivalent) 
 
 LOGICAL, INTENT(IN OUT) ::                                                     &
-     has_lake(land_pts),                                                       &
-     exposed_water(land_pts),                                                  &
-     has_lid(land_pts)
+   has_lake(land_pts),                                                         &
+   exposed_water(land_pts),                                                    &
+   has_lid(land_pts),                                                          &
+   has_vlid(land_pts)
 
 
 !-----------------------------------------------------------------------------
@@ -199,19 +221,35 @@ REAL(KIND=real_jlslsm) ::                                                      &
   frac_melt, &
   dsice, &
   dsliq, &
-  ds_old
+  ds_old, &
+  rain_add, &
+  snow_add
 
 ! --- diagnostic to check how much lake depth is from inflow versus stefan
 REAL, SAVE       :: cum_inflow_m = 0.0
 REAL, SAVE       :: cum_stefan_m = 0.0
 
-REAL, PARAMETER :: tau   = 1.0
-                 ! shortwave attenuation coeff (m-1)
-                 ! 0.5 light penatrates deeper,  2-3 shallow heating
+REAL(KIND=real_jlslsm), PARAMETER :: lid_seed_depth = 0.01!1.0e-3
 
-REAL, PARAMETER :: emis_water  = 0.98
 
-REAL, PARAMETER :: Jturb  = 1.907e-5
+REAL(KIND=real_jlslsm), PARAMETER :: tau_water   = 0.36
+                     ! shortwave attenuation coeff (m-1)
+                     ! Table 1, panchromatic absorption coefficient,
+                     ! Pope et al. (2016), The Cryosphere,
+                     ! doi:10.5194/tc-10-15-2016
+                     ! 0.5 light penatrates deeper,  2-3 shallow heating
+
+REAL(KIND=real_jlslsm), PARAMETER :: tau_ice   = 1.5
+                     ! black ice extinction coefficient
+                     ! rough value taking into account:
+                     ! https://tc.copernicus.org/articles/15/1931/2021/#section3
+                     ! Cooper, M.G., et al., 2021. Spectral attenuation coefficients from
+                     ! measurements of light transmission in bare ice on the Greenland Ice Sheet.
+                     ! The Cryosphere, 15(4), pp.1931-1953.
+
+REAL(KIND=real_jlslsm), PARAMETER :: emis_water  = 0.98
+
+REAL(KIND=real_jlslsm), PARAMETER :: Jturb  = 1.907e-5
                  ! Turbulent heat flux factor (ms⁻¹ K⁻¹/3) Eqn 16 Buzzard 
 
 REAL(KIND=real_jlslsm), PARAMETER :: lid_min_depth = 0.1
@@ -237,31 +275,58 @@ DO k = 1,surft_pts
    i = surft_index(k)
 
 !-----------------------------------------------------------------------------
-! Create an exposed water flag. Use this to modify snowpack upper boundary
+! Get lake states. exposed_water flag used in snowpack to modify heat flux into
+! snowpack top. 
 !-----------------------------------------------------------------------------
-   has_lake(i) = (lake_depth_ml(i) > lake_min_depth)
-   has_lid(i)  = has_lake(i) .AND. (lid_depth_ml(i) > lid_min_depth)
-   exposed_water(i) = has_lake(i) .AND. .NOT. has_lid(i)
-   
+   CALL update_lake_states(i)
+
 !-----------------------------------------------------------------------------
 ! No lake yet grow one using meltwater 
 !-----------------------------------------------------------------------------
    IF (.NOT. has_lake(i)) THEN
       IF (lake_inflow(i) > 0.0) THEN
+                     
          lake_depth_ml(i) = lake_depth_ml(i) +                          &
               lake_inflow(i) / rho_water
-         print *, 'has_lake(i), has_lid(i), exposed_water(i)',has_lake(i), has_lid(i), exposed_water(i)
+            
       END IF
    END IF
 
    cum_inflow_m = cum_inflow_m + lake_inflow(i) / rho_water
 
 !-----------------------------------------------------------------------------
-! Re-calculate flags after lake growth
+! Re-calculate lake state after lake growth
 !-----------------------------------------------------------------------------
-   has_lake(i) = (lake_depth_ml(i) > lake_min_depth)
-   has_lid(i)  = has_lake(i) .AND. (lid_depth_ml(i) > lid_min_depth)
-   exposed_water(i) = has_lake(i) .AND. .NOT. has_lid(i)
+   CALL update_lake_states(i)
+
+
+!-----------------------------------------------------------------------------
+! Add all precip to lake and reset fields - maybe only do if precip > 0
+!-----------------------------------------------------------------------------
+   IF (exposed_water(i)) THEN
+      IF (ls_rain(i) > 0.0 .OR. con_rain(i) > 0.0 .OR.                         &
+           ls_snow(i) > 0.0 .OR. con_snow(i) > 0.0) THEN
+
+         rain_add = ls_rain(i) + con_rain(i)
+         snow_add = ls_snow(i) + con_snow(i)
+
+         
+         lake_depth_ml(i) = lake_depth_ml(i)                                   &
+              + (rain_add + snow_add) * timestep / rho_water
+         
+         !WRITE(*,*) '--- PRECIP ADDED TO LAKE/LID ---'
+         !WRITE(*,*) 'i                  = ', i
+         !WRITE(*,'(A,F16.8)') 'ls_rain       = ', ls_rain(i)
+         !WRITE(*,'(A,F16.8)') 'con_rain      = ', con_rain(i)
+         !WRITE(*,'(A,F16.8)') 'ls_snow       = ', ls_snow(i)
+         !WRITE(*,'(A,F16.8)') 'con_snow      = ', con_snow(i)
+         
+         ls_rain(i)  = 0.0
+         con_rain(i) = 0.0
+         ls_snow(i)  = 0.0
+         con_snow(i) = 0.0
+      END IF
+   END IF
 
 !-----------------------------------------------------------------------------
 ! Get albedo - doing this again to output albedo to nc. this is already in
@@ -277,7 +342,9 @@ DO k = 1,surft_pts
    dhdt = 0.0
    dh_ice = 0.0
    dh_water = 0.0
-     
+   kdtdz_ml(i) = 0.0
+   dhdt_lake_snow_ml(i) = 0.0
+   
    IF (exposed_water(i)) THEN
                      
       expon_term = 3.6 * lake_depth_ml(i)
@@ -292,8 +359,16 @@ DO k = 1,surft_pts
                
    END IF
 
+   
 !-----------------------------------------------------------------------------
-! Lower flux from lake --> snowpack eqn 16
+! Lower flux eqn 16
+! lake water (lake_temp_ml)
+!
+!   ↓
+!   │ flux_lower
+!   │
+!
+! snowpack top (tm)
 !-----------------------------------------------------------------------------
    IF (has_lake(i)) THEN
 
@@ -304,14 +379,19 @@ DO k = 1,surft_pts
 
    END IF
 
-!-----------------------------------------------------------------------------
-! Update lake temp. Assume the lake is turbulently mixed so use a bulk temp
-!-----------------------------------------------------------------------------
             
 !-----------------------------------------------------------------------------
-! Upper flux, lake interior --> tile surface or lake interior to lid base eqn 16.
+! Upper flux, eqn 16
+!
+! air / tile surface (tstar_surft)  | lid bottom (tm)       
+!                                   |
+!   ↑                               |    !   ↑
+!   │ flux_upper                    |    │ flux_upper
+!   │                               |    |
+!                                   |
+! lake water (lake_temp_ml)         | lake water (lake_temp_ml)
 !-----------------------------------------------------------------------------
-   IF (exposed_water(i) .OR. has_lid(i)) THEN
+   IF (exposed_water(i) .OR. has_vlid(i) .OR. has_lid(i)) THEN
 
       IF (exposed_water(i)) THEN
          delta_t = lake_temp_ml(i) - tstar_surft(i)
@@ -327,13 +407,18 @@ DO k = 1,surft_pts
 ! Not using lake layers like in monarchs, can be simple if we only need a
 ! bulk lake temperature.                  
 !-----------------------------------------------------------------------------
-      IF (exposed_water(i)) THEN
-         sw_absorb = sw_surft(i) *                                        &
-              (1.0 - EXP(-tau * lake_depth_ml(i)))
-      ELSE
-         sw_absorb = 0.0
+
+      IF (has_vlid(i)) THEN
+         sw_absorb = sw_surft(i) * EXP(-tau_ice * vlid_depth_ml(i)) *              &
+              (1.0 - EXP(-tau_water * lake_depth_ml(i)))
+      ELSE IF (has_lid(i)) THEN
+         sw_absorb = sw_surft(i) * EXP(-tau_ice * lid_depth_ml(i)) *               &
+              (1.0 - EXP(-tau_water * lake_depth_ml(i)))
+      ELSE IF (exposed_water(i)) THEN
+         sw_absorb = sw_surft(i) * (1.0 - EXP(-tau_water * lake_depth_ml(i)))
       END IF
 
+      
 !-----------------------------------------------------------------------------
 ! Change in lake temperature. eqn 15
 !-----------------------------------------------------------------------------
@@ -343,13 +428,7 @@ DO k = 1,surft_pts
             
       lake_temp_ml(i) = lake_temp_ml(i) + timestep * dTdt
 
-!-----------------------------------------------------------------------------
-! Under a lid, keep bulk lake at melting point
-!-----------------------------------------------------------------------------
-      IF (has_lid(i)) THEN
-         lake_temp_ml(i) = tm
-      END IF
-      
+   
       IF (lake_temp_ml(i) > 273.15 + 27.0) THEN
          
          WRITE(*,*) '*** meltlake temp > 27C ***'
@@ -371,14 +450,14 @@ DO k = 1,surft_pts
    END IF ! exposed_water or has_lid
     
 !-----------------------------------------------------------------------------
-! Refreezing will trigger lid formation, dont cap lake_temp but refer to
-! lid_evolve subroutine
+! Refreezing will trigger lid formation, see lid_evolve subroutine
 !-----------------------------------------------------------------------------
-         IF (lake_temp_ml(i) < tm) lake_temp_ml(i) = tm 
+   IF (lake_temp_ml(i) < tm) lake_temp_ml(i) = tm 
 
 
 !-----------------------------------------------------------------------------
-! Bottom Stefan condition is active for lid and expsosed water
+! Bottom Stefan condition is active when virtual or permanent lids are 
+! present or there is exposed water
 !-----------------------------------------------------------------------------         
    IF (has_lake(i)) THEN
 
@@ -399,7 +478,17 @@ DO k = 1,surft_pts
 
 !-----------------------------------------------------------------------------
 ! heat conducted away from lake bottom into colder snowpack 
-!  eqn 14. direction format:  from the T1 to the T2  
+! eqn 14. direction format:  from the T1 to the T2
+! if lake present on top of snowpack then use kdtdz as heat flux into
+! snowpack top (surf_htf_surft)
+!
+! interface / snowpack top (tm)
+!
+!   ↓
+!   │ kdtdz
+!   │
+!
+! top snow layer (tsnow_ml)
 !-----------------------------------------------------------------------------                   
             
       kdtdz_ml(i) = ksnow0_ml(i) * (tm - tsnow_ml(i)) / ds_ml(i,1)
@@ -415,6 +504,19 @@ DO k = 1,surft_pts
          dhdt = (flux_lower - kdtdz_ml(i)) / (rho_ice * lf)
       END IF
 
+     !IF (has_lid(i) .OR. has_vlid(i)) THEN
+      !   WRITE(*,*) '--- BOTTOM STEFAN UNDER LID ---'
+      !   WRITE(*,*) 'has_lake                 = ', has_lake(i)
+      !   WRITE(*,*) 'has_lid                  = ', has_lid(i)
+      !   WRITE(*,*) 'has_vlid                 = ', has_vlid(i)
+      !   WRITE(*,'(A,F16.8)') 'lake_depth_ml      = ', lake_depth_ml(i)
+      !   WRITE(*,'(A,F16.8)') 'lake_temp_ml       = ', lake_temp_ml(i) - 273.15
+      !   WRITE(*,'(A,F16.8)') 'flux_lower         = ', flux_lower
+      !   WRITE(*,'(A,F16.8)') 'kdtdz_ml           = ', kdtdz_ml(i)
+      !   WRITE(*,'(A,F16.8)') 'flux_lower-kdtdz   = ', flux_lower - kdtdz_ml(i)
+      !   WRITE(*,'(A,F16.8)') 'dhdt               = ', dhdt
+      !   stop
+      !END IF
 !-----------------------------------------------------------------------------
 ! dhdt (m of ice per sec) --> dh_water (m of water per timestep)
 !-----------------------------------------------------------------------------
@@ -423,20 +525,27 @@ DO k = 1,surft_pts
       dh_water = dh_ice * rho_ice / rho_water
             
 !-----------------------------------------------------------------------------
+! output Stefan boundary as diagnostic
+!-----------------------------------------------------------------------------
+      dhdt_lake_snow_ml(i) = dh_ice
+      
+!-----------------------------------------------------------------------------
 ! add water from boundary retreat to the lake.
-! remove the equivalent sice from the snow mass. This is working if there is a lid 
+! remove the equivalent sice from the snow mass. This is works if there is a lid
+! of vlid
 !-----------------------------------------------------------------------------           
-      !IF (dh_ice > 0.0) THEN
-     
-         IF (dh_ice > 0.0 .AND. lid_depth_ml(i) < 0.001) THEN ! to deactive if there is a lid
+      IF (dh_ice > 0.0) THEN
 
+      ! freeze over test, switch off stefan condition of there is any type of lid
+      !IF (dh_ice > 0.0 .AND. .NOT. has_vlid(i) .AND. .NOT. has_lid(i)) THEN
+               
             dh_remain = dh_ice
 
 !-----------------------------------------------------------------------------
 ! looping over snowpack levels and removing sice.  This might be overkill since 
 ! Stefan retreat will be small compared to ds(1) i.e. 0.1 m, but guarding against 
 ! a setup with smaller top layer depth . Removal is based on fraction of top 
-! snow layer retreating i.e. stefan retreat/ds top snow layer
+! snow layer depth that is retreating i.e. stefan retreat/ds top snow layer
 ! remove ice mass fraction, and liq mass fraction
 !-----------------------------------------------------------------------------                
          DO n = 1, nsnow(i)
@@ -485,7 +594,7 @@ DO k = 1,surft_pts
       !WRITE(*,*) '--------------------------------', timestep_number
       !WRITE(*,*) 'nsnow(i)                           = ', nsnow(i) 
       !WRITE(*,'(A,F16.8)') 'sw_absorb                = ', sw_absorb
-       WRITE(*,'(A,F16.8)') 'flux_upper_diag          = ', flux_upper_diag
+       !WRITE(*,'(A,F16.8)') 'flux_upper_diag          = ', flux_upper_diag
       !WRITE(*,'(A,F16.8)') 'flux_lower               = ', flux_lower
       !WRITE(*,'(A,F16.8)') 'lake_temp after          = ', lake_temp_ml(i) -273.15 
       !WRITE(*,'(A,F16.8)') 'tstar_surft              = ', tstar_surft(i) - 273.15
@@ -511,11 +620,9 @@ DO k = 1,surft_pts
    END IF !has_lake
 
 !-----------------------------------------------------------------------------
-! Re-calculate flags after bottom Stefan melt
+! Re-calculate state after bottom Stefan melt
 !-----------------------------------------------------------------------------
-   has_lake(i) = (lake_depth_ml(i) > lake_min_depth)
-   has_lid(i)  = has_lake(i) .AND. (lid_depth_ml(i) > lid_min_depth)
-   exposed_water(i) = has_lake(i) .AND. .NOT. has_lid(i)
+   CALL update_lake_states(i)
 
      
     WRITE(*,'(A,F16.8)') 'cum_inflow_m', cum_inflow_m
@@ -529,6 +636,30 @@ END DO ! land_pts
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN
+
+CONTAINS
+
+SUBROUTINE update_lake_states(i)
+
+   INTEGER, INTENT(IN) :: i
+
+   has_lid(i)  = (lid_depth_ml(i)  > lid_min_depth)
+
+   has_vlid(i) = (vlid_depth_ml(i) >= lid_seed_depth) .AND.                 &
+              (vlid_depth_ml(i) <  lid_min_depth) .AND.                     &
+              .NOT. has_lid(i)
+   
+   !has_vlid(i) = (vlid_depth_ml(i) >= lid_seed_depth) .AND. .NOT. has_lid(i)
+
+   has_lake(i) = (lake_depth_ml(i) > lake_min_depth) .OR.                    &
+                 ((lake_depth_ml(i) > 0.0) .AND.                             &
+                  (has_lid(i) .OR. has_vlid(i)))
+
+   exposed_water(i) = (lake_depth_ml(i) > lake_min_depth) .AND.              &
+                      .NOT. has_lid(i) .AND. .NOT. has_vlid(i)
+
+END SUBROUTINE update_lake_states
+
 
 END SUBROUTINE meltlake_evolve
 END MODULE meltlake_evolve_mod

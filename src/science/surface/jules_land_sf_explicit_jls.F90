@@ -125,7 +125,8 @@ SUBROUTINE jules_land_sf_explicit (                                            &
  ! Water tracers (OUT)
  fqw_1_wtrac, fqw_surft_wtrac, fqw_evapsrce_wtrac, smc_soilt_wtrac,            &
  !meltlake_mod (IN)
- has_lake, exposed_water, has_lid, lake_temp_ml, lid_temp_ml, lid_depth_ml)
+ has_lake, exposed_water, has_lid, has_vlid, lake_temp_ml, lid_temp_ml,        &
+ lid_depth_ml, vlid_depth_ml)
 
 USE ancil_info,              ONLY: dim_cslayer, nsoilt, rad_nband
 USE atm_fields_bounds_mod,      ONLY: pdims_s, pdims, tdims
@@ -412,8 +413,10 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
                              ! IN bulk meltlake temperature (K)
 ,lid_temp_ml(land_pts,nsurft)                                                  &
                              ! IN lid temp (K) 
-,lid_depth_ml(land_pts,nsurft)
+,lid_depth_ml(land_pts,nsurft)                                                 & 
                              ! IN lid depth (m)
+,vlid_depth_ml(land_pts, nsurft)
+                             ! IN virtual lid depth (m)
 
 LOGICAL, INTENT(IN) ::                                                         &
  l_aero_classic                                                                &
@@ -431,7 +434,7 @@ LOGICAL, INTENT(IN) ::                                                         &
 ,exposed_water(land_pts,nsurft)                                                &
                              ! IN if exposed melt lake water is present   
 ,has_lid(land_pts,nsurft)                                                      & 
-
+,has_vlid(land_pts,nsurft)                                                     &
 ,has_lake(land_pts,nsurft)
 
 !-----------------------------------------------------------------------
@@ -2120,6 +2123,7 @@ DO n = 1,nsurft
     !IF ( l_meltlake .AND. l_elev_land_ice .AND. l_lice_point(l) ) THEN
 
        IF (exposed_water(l,n)) THEN
+
     !-----------------------------------------------------------------------   
     ! The lake temperature is already in the elevated-tile temperature
     ! frame, so no further elevation correction is applied here
@@ -2131,19 +2135,21 @@ DO n = 1,nsurft
           ashtf_surft(l,n) = rho_water * hcapw * 1.907e-5 *                   &
                ABS(tsurf(l,n) - tstar_surft(l,n))**(1.0/3.0)
 
-       ELSE IF (has_lid(l,n)) THEN
 
-    !-----------------------------------------------------------------
-    ! Lid present: treat lid as a solid surface layer, similar to snow
-    !-----------------------------------------------------------------
-          tsurf(l,n)  = lid_temp_ml(l,n)
+          ELSE IF (has_lid(l,n)) THEN
 
-          dzsurf(l,n) = MAX(lid_depth_ml(l,n), 0.1)
-          
-          ashtf_surft(l,n) = 2.0 * 2.2 / dzsurf(l,n)
-          
-       
-    END IF ! exposed_water/has_lid
+             tsurf(l,n)  = lid_temp_ml(l,n)
+             dzsurf(l,n) = lid_depth_ml(l,n)
+             ashtf_surft(l,n) = 2.0 * 2.2 / dzsurf(l,n)
+
+          ELSE IF (has_vlid(l,n)) THEN
+             
+             tsurf(l,n)  = tm
+             dzsurf(l,n) = MAX(vlid_depth_ml(l,n), 0.001)
+             ashtf_surft(l,n) = 2.0 * 2.2 / dzsurf(l,n)
+
+             
+    END IF ! exposed_water/has_lid/has_vlid
     
  !END IF
 

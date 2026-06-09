@@ -147,7 +147,23 @@ DO k = 1,surft_pts
   DO n = 1,nsnow(l)
     mass = mass + 0.5 * (sice(l,n) + sliq(l,n))
     rho  = rho_snow(l,n)
-    
+
+
+
+    IF (tsnow(l,n) < 100.0 .OR. tsnow(l,n) > 350.0 .OR.                        &
+         14.643 - 4.0e3 / tsnow(l,n) - 0.02 * rho > 80.0) THEN
+
+       WRITE(*,*) '--- BAD COMPACTION STATE ---'
+       WRITE(*,*) 'l,n                = ', l, n
+       WRITE(*,'(A,F16.8)') 'rho             = ', rho
+       WRITE(*,'(A,F16.8)') 'mass            = ', mass
+       WRITE(*,'(A,F16.8)') 'tsnow(l,n) oC   = ', tsnow(l,n)-273.15
+       WRITE(*,'(A,F16.8)') 'argument to exp = ',                               &
+            14.643 - 4.0e3 / tsnow(l,n) - 0.02 * rho
+       STOP
+    END IF
+
+
     rho  = rho + 0.5e-7 * rho * g * mass * timestep *                          &
                 EXP(14.643-4.0e3 / tsnow(l,n) - 0.02 * rho)
     

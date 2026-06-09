@@ -43,7 +43,7 @@ SUBROUTINE jules_land_albedo(                                                  &
         snowdepth_surft, rho_snow_grnd_surft, nsnow_surft, sice_surft,         &
         sliq_surft, ds_surft,                                                  &
         sice_surft_ml, sliq_surft_ml, ds_surft_ml, lake_depth_ml,              &
-        exposed_water, has_lid)
+        exposed_water, has_lid, has_vlid)
 
 !Use in subroutines
 USE albpft_mod,               ONLY: albpft
@@ -202,6 +202,7 @@ REAL(KIND=real_jlslsm), INTENT(IN) :: sliq_surft_ml(land_pts,nsurft,nsmax_ml)
 REAL(KIND=real_jlslsm), INTENT(IN) :: ds_surft_ml(land_pts,nsurft,nsmax_ml)
 REAL(KIND=real_jlslsm), INTENT(IN) :: lake_depth_ml(land_pts,nsurft)
 LOGICAL, INTENT(IN) :: has_lid(land_pts,nsurft)
+LOGICAL, INTENT(IN) :: has_vlid(land_pts,nsurft)
 LOGICAL, INTENT(IN) :: exposed_water(land_pts,nsurft)
 
 
@@ -1132,13 +1133,14 @@ IF (l_elev_land_ice) THEN
           !------------------------------------------------------------
           IF (l_meltlake) THEN
 
-            IF (has_lid(l,n)) THEN
+             !IF (has_lid(l,n)) THEN
+                IF (has_vlid(l,n) .OR. has_lid(l,n)) THEN
 
               !--------------------------------------------------------
               ! Lid present, fixed lid albedo
               !--------------------------------------------------------
               alb_snow(l,n,:) = 0.6
-              print *, 'lid_present', has_lid(l,n)
+              !print *, 'lid_present', has_lid(l,n)
 
             ELSE IF (exposed_water(l,n)) THEN
 

@@ -2703,6 +2703,10 @@ CASE ( 'lid_depth_ml' )
   cube_land = cube_from_array(meltlake_vars%lid_depth_ml)
   cube = map_from_land(cube_land)
 
+CASE ( 'vlid_depth_ml' )
+  cube_land = cube_from_array(meltlake_vars%vlid_depth_ml)
+  cube = map_from_land(cube_land)
+
 CASE ( 'lid_temp_ml' )
   cube_land = cube_from_array(meltlake_vars%lid_temp_ml)
   cube = map_from_land(cube_land)
@@ -2711,11 +2715,14 @@ CASE ( 'lake_state_ml' )
   cube_land = cube_from_array(meltlake_vars%lake_state_ml)
   cube = map_from_land(cube_land)
 
-!CASE ( 'is_meltlake' )
-  !cube_land = cube_from_array(meltlake_vars%is_meltlake)
-!  cube_land = cube_from_array( merge(1.0, 0.0, meltlake_vars%is_meltlake) )
-!  cube = map_from_land(cube_land)
-  
+CASE ( 'dhdt_lake_snow_ml' )
+  cube_land = cube_from_array(meltlake_vars%dhdt_lake_snow_ml)
+  cube = map_from_land(cube_land)
+
+CASE ( 'dhdt_lid_lake_ml' )
+  cube_land = cube_from_array(meltlake_vars%dhdt_lid_lake_ml)
+  cube = map_from_land(cube_land)
+
 CASE ( 'rflow' )
   cube_land = cube_from_array(fluxes%rflow_gb)
   cube = map_from_land(cube_land)
