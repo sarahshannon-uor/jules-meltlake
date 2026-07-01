@@ -55,6 +55,8 @@ SUBROUTINE  meltlake (land_pts,                 & !IN
                       has_lid,                  & !IN/OUT
                       has_vlid,                 & !IN/OUT
                       did_insert_lid,           & !IN/OUT
+                      snow_on_lid,              & !IN/OUT
+                      cold_puddle_hrs_ml,       & !IN/OUT 
                       ksnow0_ml,                & !IN
                       lake_state_ml,            & !OUT
                       snow_surft,               & !IN/OUT
@@ -63,6 +65,8 @@ SUBROUTINE  meltlake (land_pts,                 & !IN
                       rho_snow_ml,              & !OUT
                       dhdt_lake_snow_ml,        & !OUT
                       dhdt_lid_lake_ml,         & !OUT
+                      lid_snow_depth_ml,        & !IN/OUT
+                      lid_snow_temp_ml,         & !IN/OUT
                       !Ancil info (IN)
                       l_lice_point,             & !IN (land_pts)
                       l_lice_surft)               !IN (ntype)  
@@ -117,7 +121,7 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
 
 
 REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
-  sw_surft(land_pts,nsurft),                                                   &                            ! Net shortwave radiation on tile (W/m2) using lake albedo
+  sw_surft(land_pts,nsurft),                                                   &                            
   lw_down_surft(land_pts,nsurft),                                              &
     ! Surface downward LW radiation on tiles (W/m2), jules_land_sf_implicit.F90
   lake_inflow(land_pts,nsurft),                                                &
@@ -176,8 +180,15 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Virtual lid depth (m)
    lid_temp_ml(land_pts,nsurft),                                               &
     ! Lid temp (K)
-   rho_snow_grnd(land_pts,nsurft)
+   rho_snow_grnd(land_pts,nsurft),                                             &
     ! Snowpack bulk density (kg/m3).
+   lid_snow_depth_ml(land_pts, nsurft),                                        &
+    ! Snow depth on virtual or permanent lid (m) 
+   lid_snow_temp_ml(land_pts, nsurft),                                         &
+    ! Temp of snow on virtual or permanent lid (K) 
+   cold_puddle_hrs_ml(land_pts,nsurft)
+    ! Number of accum hours with lake_depth < 0.1m a cold orphan puddle
+
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(out)
 !-----------------------------------------------------------------------------
@@ -192,6 +203,8 @@ REAL(KIND=real_jlslsm), INTENT(OUT) ::                                        &
     ! Stefan boundary movement lake bottom and snowpack top (ms-1 ice equiv) 
    dhdt_lid_lake_ml(land_pts,nsurft)
     ! Stefan boundary movement lid bottom and lake top (ms-1 ice equiv)
+   
+   
 !-----------------------------------------------------------------------------
 ! Local arrays
 !-----------------------------------------------------------------------------
@@ -213,9 +226,9 @@ REAL(KIND=real_jlslsm) ::                                                     &
   rho0(land_pts),                                                             & 
     ! Density of fresh snow (kg/m3).
     ! Where nsnow=0, rho0 is the density of the snowpack.
-  sice0_wtrac(land_pts,n_wtrac_jls),                                          &     ! Water tracer ice content of fresh snow (kg/m2).
+  sice0_wtrac(land_pts,n_wtrac_jls),                                          &     
     ! Where nsnow=0, sice0 is the mass of the snowpack.
-  sice_wtrac(land_pts,nsmax_ml,n_wtrac_jls),                                     &
+  sice_wtrac(land_pts,nsmax_ml,n_wtrac_jls),                                  &
     ! Water tracer ice content of snow layers (kg/m2).
   sliq_wtrac(land_pts,nsmax_ml,n_wtrac_jls)
     ! Water tracer liquid content of snow layers (kg/m2).
@@ -229,7 +242,8 @@ LOGICAL, INTENT(IN OUT) ::                                                    &
  has_lid(land_pts,nsurft), &
  has_vlid(land_pts,nsurft), &
  has_lake(land_pts,nsurft), &
- did_insert_lid(land_pts, nsurft)
+ did_insert_lid(land_pts,nsurft), &
+ snow_on_lid(land_pts,nsurft)
 
 !TYPE(wtrac_sn_type) :: wtrac_sn         ! Water tracer working arrays
 
@@ -286,6 +300,7 @@ DO n = 1,nsurft
            lid_depth_ml(:,n),             & !IN
            vlid_depth_ml(:,n),            & !IN
            snow_surft(:,n),               & !IN/OUT
+           snowdepth(:,n),                & !IN/OUT
            ls_snow,                       & !IN/OUT
            con_snow,                      & !IN/OUT
            ls_rain,                       & !IN/OUT
@@ -300,10 +315,117 @@ DO n = 1,nsurft
            sice_ml(:,n,:),                & !IN/OUT
            sliq_ml(:,n,:),                & !IN/OUT
            ds_ml(:,n,:),                  & !IN/OUT
+           cold_puddle_hrs_ml(:,n),       & !IN/OUT
            kdtdz_ml(:,n),                 & !OUT
            dhdt_lake_snow_ml(:,n))          !OUT
-           
-          
+
+
+      ! Tracer stuff not active 
+         sice0_wtrac(:,:)  = 0.0
+         sice_wtrac(:,n,:) = 0.0
+         sliq_wtrac(:,n,:) = 0.0
+         
+      !IF (ANY(dhdt_lake_snow_ml(surft_index(1:surft_pts(n),n),n) > 0.0)) THEN
+
+       !  snowfall(:) = 0.0
+       !  sice0(:)    = 0.0
+        
+        
+       !  WRITE(*,'(A,F12.6)') 'dhdt_lake_snow_ml      = ', dhdt_lake_snow_ml(1,n)
+       !  WRITE(*,'(A,F12.6)') 'lake_depth_ml          = ', lake_depth_ml(1,n)
+       !  WRITE(*,'(A,F12.6)') 'ls_snow                = ', ls_snow(1)
+       !  WRITE(*,'(A,F12.6)') 'con_snow               = ', con_snow(1)
+       !  WRITE(*,'(A,F12.6)') 'ls_rain                = ', ls_rain(1)
+       !  WRITE(*,'(A,F12.6)') 'con_rain               = ', con_rain(1)
+
+       !  WRITE(*,*) 'has_lid(i)                      = ', has_lid(1,n)
+       !  WRITE(*,*) 'has_lake(i)                     = ', has_lake(1,n)
+       !  WRITE(*,*) 'expsosed_water(i)               = ', exposed_water(1,n)
+         
+       !  WRITE(*,'(A,I8)')    'tile point i          = ', 1
+       !  WRITE(*,'(A,I8)')    'land index            = ', surft_index(1,n)
+       !  WRITE(*,'(A,I8)')    'nsnow(i,n)            = ', nsnow(1,n)
+
+        ! WRITE(*,'(A,F12.6)') 'rgrain0(i)            = ', rgrain0(1)
+        ! WRITE(*,'(A,F12.6)') 'rho0(i)               = ', rho0(1)
+        ! WRITE(*,'(A,F12.6)') 'sice0(i)              = ', sice0(1)
+        ! WRITE(*,'(A,F12.6)') 'snowfall(i)           = ', snowfall(1)
+        ! WRITE(*,'(A,F12.6)') 'snow_surft(i,n)       = ', snow_surft(1,n)
+        ! WRITE(*,'(A,F12.6)') 'tsnow0(i)             = ', tsnow0(1)
+        ! WRITE(*,'(A,F12.6)') 'rho_snow_grnd(i,n)    = ', rho_snow_grnd(1,n)
+        ! WRITE(*,'(A,F12.6)') 'snowdepth(i,n)        = ', snowdepth(1,n)
+
+      
+         !WRITE(*,'(A,I8)')    'nsnow(1,1)           = ', nsnow(1,n)
+         !WRITE(*,'(A,F12.6)') 'snow_surft(1,1)      = ', snow_surft(1,n)
+         !WRITE(*,'(A,F12.6)') 'snowdepth(1,1)       = ', snowdepth(1,n)
+         !WRITE(*,'(A,F12.6)') 'rho_snow_grnd(1,1)   = ', rho_snow_grnd(1,n)
+
+       
+         !WRITE(*,'(A,F12.6)') 'ds_ml(1,1,1)        = ', ds_ml(1,n,1)
+         !WRITE(*,'(A,F12.6)') 'rgrainl_ml(1,1,1)   = ', rgrainl_ml(1,n,1)
+         !WRITE(*,'(A,F12.6)') 'sice_ml(1,1,1)      = ', sice_ml(1,n,1)
+         !WRITE(*,'(A,F12.6)') 'sliq_ml(1,1,1)      = ', sliq_ml(1,n,1)
+         !WRITE(*,'(A,F12.6)') 'tsnow_ml(1,1,1)     = ', tsnow_ml(1,n,1)
+         !WRITE(*,'(A,F12.6)') 'rho_snow_ml(1,1,1)  = ', rho_snow_ml(1,n,1)
+
+         
+
+         !CALL relayersnow ( land_pts,       &
+         !     surft_pts(n),                 &
+         !     n_wtrac_jls,                  &
+         !     surft_index(:,n),             &
+         !     nsmax_ml,                     &
+         !     dzsnow_ml,                    &
+         !     rgrain0,                      & ! 2000 microns for ice
+         !     rho0,                         & ! lid denisty (rho_ice)
+         !     sice0,                        & ! lid ice mass
+         !     snowfall,                     & ! 0 snowfalls into lake or onto lid
+         !     snow_surft(:,n),              & ! snowmass including permanent lid ice
+         !     tsnow0,                       & ! lid temp
+         !     sice0_wtrac,                  &
+         !     nsnow(:,n),                   &
+         !     ds_ml(:,n,:),                 &
+         !     rgrain(:,n),                  &
+         !     rgrainl_ml(:,n,:),            &
+         !     sice_ml(:,n,:),               &
+         !     rho_snow_grnd(:,n),           &
+         !     sliq_ml(:,n,:),               &
+         !     tsnow_ml(:,n,:),              &
+         !     sice_wtrac(:,n,:),            &
+         !     sliq_wtrac(:,n,:),            &
+         !     rho_snow_ml(:,n,:),           &
+         !     snowdepth(:,n) )
+
+        ! WRITE(*,*) '--- RELAYERSNOW OUTPUT ---'
+        ! WRITE(*,'(A,I8)')    'timestep_number        = ', timestep_number
+        ! WRITE(*,'(A,I8)')    'nsnow(i,n)            = ', nsnow(1,n)
+
+         !WRITE(*,'(A,F12.6)') 'rgrain0(i)            = ', rgrain0(1)
+         !WRITE(*,'(A,F12.6)') 'rho0(i)               = ', rho0(1)
+         !WRITE(*,'(A,F12.6)') 'sice0(i)              = ', sice0(1)
+         !WRITE(*,'(A,F12.6)') 'snowfall(i)           = ', snowfall(1)
+         !WRITE(*,'(A,F12.6)') 'snow_surft(i,n)       = ', snow_surft(1,n)
+         !WRITE(*,'(A,F12.6)') 'tsnow0(i)             = ', tsnow0(1)
+         !WRITE(*,'(A,F12.6)') 'rho_snow_grnd(i,n)    = ', rho_snow_grnd(1,n)
+         !WRITE(*,'(A,F12.6)') 'snowdepth(i,n)        = ', snowdepth(1,n)
+
+      
+        ! WRITE(*,'(A,I8)')    'nsnow(1,1)           = ', nsnow(1,n)
+        ! WRITE(*,'(A,F12.6)') 'snow_surft(1,1)      = ', snow_surft(1,n)
+        ! WRITE(*,'(A,F12.6)') 'snowdepth(1,1)       = ', snowdepth(1,n)
+        ! WRITE(*,'(A,F12.6)') 'rho_snow_grnd(1,1)   = ', rho_snow_grnd(1,n)
+
+       
+         !WRITE(*,'(A,F12.6)') 'ds_ml(1,1,1)        = ', ds_ml(1,n,1)
+         !WRITE(*,'(A,F12.6)') 'rgrainl_ml(1,1,1)   = ', rgrainl_ml(1,n,1)
+         !WRITE(*,'(A,F12.6)') 'sice_ml(1,1,1)      = ', sice_ml(1,n,1)
+         !WRITE(*,'(A,F12.6)') 'sliq_ml(1,1,1)      = ', sliq_ml(1,n,1)
+         !WRITE(*,'(A,F12.6)') 'tsnow_ml(1,1,1)     = ', tsnow_ml(1,n,1)
+         !WRITE(*,'(A,F12.6)') 'rho_snow_ml(1,1,1)  = ', rho_snow_ml(1,n,1)
+         
+      !END IF !dhdt_lake_snow_ml > 0
+      
       CALL lid_evolve(land_pts,           & !IN
            timestep,                      & !IN
            surft_pts(n),                  & !IN
@@ -323,6 +445,7 @@ DO n = 1,nsurft
            has_lid(:,n),                  & !IN/OUT
            has_vlid(:,n),                 & !IN/OUT
            did_insert_lid(:,n),           & !IN/OUT
+           snow_on_lid(:,n),              & !IN/OUT
            nsnow(:,n),                    & !IN/OUT
            ds_ml(:,n,:),                  & !IN/OUT
            sice_ml(:,n,:),                & !IN/OUT
@@ -330,52 +453,22 @@ DO n = 1,nsurft
            tsnow_ml(:,n,:),               & !IN/OUT
            snow_surft(:,n),               & !OUT
            lake_state_ml(:,n),            & !OUT
-           dhdt_lid_lake_ml(:,n))           !OUT
-
+           dhdt_lid_lake_ml(:,n),         & !OUT
+           lid_snow_depth_ml(:,n),        & !IN/OUT
+           lid_snow_temp_ml(:,n),         & !IN/OUT 
+           snowfall,                      & !OUT
+           tsnow0,                        & !OUT
+           rho0,                          & !OUT
+           rgrain0,                       & !OUT
+           sice0)                          !OUT
 
       
-      ! This is runtime wasteful - it runs though all land_pts ever though I know
+      ! This is runtime wasteful - it runs though all land_pts even though I know
       ! which ones have did_insert_lid=true. Come back to this.  
       IF (ANY(did_insert_lid(surft_index(1:surft_pts(n),n),n))) THEN
 
-
-         WRITE(*,*) '--- BEFORE RELAYERSNOW INSERT LID ---'
-         WRITE(*,*) 'timestep_number   = ', timestep_number
-         WRITE(*,*) 'has_lake               = ', has_lake(1,9)
-         WRITE(*,*) 'has_lid                = ', has_lid(1,9)
-         WRITE(*,*) 'has_vlid               = ', has_vlid(1,9)
-         WRITE(*,*) 'exposed_water          = ', exposed_water(1,9)
-         WRITE(*,*) 'did_insert_lid         = ', did_insert_lid(1,9)
          
-         
-         WRITE(*,*) 'nsnow(1,9)        = ', nsnow(1,9)
-
-         
-         
-         WRITE(*,'(A,F16.8)') 'snowdepth(1,9) = ', snowdepth(1,9)
-         WRITE(*,'(A,F16.8)') 'snow_surft(1,9)= ', snow_surft(1,9)
-         WRITE(*,'(A,F16.8)') 'ds top         = ', ds_ml(1,9,1)
-         WRITE(*,'(A,F16.8)') 'sice top       = ', sice_ml(1,9,1)
-         WRITE(*,'(A,F16.8)') 'sliq top       = ', sliq_ml(1,9,1)
-         WRITE(*,'(A,F16.8)') 'tsnow top oC   = ', tsnow_ml(1,9,1) - 273.15
-         WRITE(*,'(A,F16.8)') 'ds(1,9,2)        = ', ds_ml(1,9,2)
-         WRITE(*,'(A,F16.8)') 'sice(1,9,2)      = ', sice_ml(1,9,2)
-         WRITE(*,'(A,F16.8)') 'sliq(1,9,2)      = ', sliq_ml(1,9,2)
-         WRITE(*,'(A,F16.8)') 'tsnow(1,9,2) oC  = ', tsnow_ml(1,9,2) - 273.15
-         WRITE(*,'(A,F16.8)') 'ds(1,9,3)        = ', ds_ml(1,9,3)
-         WRITE(*,'(A,F16.8)') 'sice(1,9,3)      = ', sice_ml(1,9,3)
-         WRITE(*,'(A,F16.8)') 'sliq(1,9,3)      = ', sliq_ml(1,9,3)
-         WRITE(*,'(A,F16.8)') 'tsnow(1,9,3) oC  = ', tsnow_ml(1,9,3) - 273.15
-
-
-         
-         snowfall(:)         = 0.0
-         sice0(:)            = 0.0
-         tsnow0(:)           = tm
-         !snowmass(:)         = snow_surft(:,n)
-         sice0_wtrac(:,:)    = 0.0
-         sice_wtrac(:,n,:)   = 0.0
-         sliq_wtrac(:,n,:)   = 0.0
+        
 
       CALL relayersnow ( land_pts,       &
            surft_pts(n),                 &
@@ -383,12 +476,12 @@ DO n = 1,nsurft
            surft_index(:,n),             &
            nsmax_ml,                     &
            dzsnow_ml,                    &
-           rgrain0,                      &
-           rho0,                         &
-           sice0,                        &
-           snowfall,                     &
-           snow_surft(:,n),              &
-           tsnow0,                       &
+           rgrain0,                      & ! 2000 microns for ice
+           rho0,                         & ! lid denisty (rho_ice)
+           sice0,                        & ! lid ice mass
+           snowfall,                     & ! 0 snowfalls into lake or onto lid
+           snow_surft(:,n),              & ! snowmass including permanent lid ice
+           tsnow0,                       & ! lid temp
            sice0_wtrac,                  &
            nsnow(:,n),                   &
            ds_ml(:,n,:),                 &
@@ -404,45 +497,83 @@ DO n = 1,nsurft
            snowdepth(:,n) )
 
       
-      WRITE(*,*) '--- AFTER RELAYERSNOW INSERT LID---'
-      
-      WRITE(*,*) 'timestep_number            = ', timestep_number
-      WRITE(*,*) 'nsnow(1,9)                 = ', nsnow(1,9)
-      WRITE(*,'(A,F16.8)') 'snowdepth(1,9) = ', snowdepth(1,9)
-      WRITE(*,'(A,F16.8)') 'snow_surft(1,9)= ', snow_surft(1,9)
-     
-      WRITE(*,'(A,F16.8)') 'ds(1,9,2)        = ', ds_ml(1,9,2)
-      WRITE(*,'(A,F16.8)') 'sice(1,9,2)      = ', sice_ml(1,9,2)
-      WRITE(*,'(A,F16.8)') 'sliq(1,9,2)      = ', sliq_ml(1,9,2)
-      WRITE(*,'(A,F16.8)') 'tsnow(1,9,2) oC  = ', tsnow_ml(1,9,2) - 273.15
-      WRITE(*,'(A,F16.8)') 'ds(1,9,3)        = ', ds_ml(1,9,3)
-      WRITE(*,'(A,F16.8)') 'sice(1,9,3)      = ', sice_ml(1,9,3)
-      WRITE(*,'(A,F16.8)') 'sliq(1,9,3)      = ', sliq_ml(1,9,3)
-      WRITE(*,'(A,F16.8)') 'tsnow(1,9,3) oC  = ', tsnow_ml(1,9,3) - 273.15
-      WRITE(*,*) 'did_insert_lid             = ', did_insert_lid(1,9)
-      
-      
    END IF ! did_insert_lid
-         
+
+!---------------------------------------------------------------
+! Final state cleanup, after any relayering
+!---------------------------------------------------------------
+   
+   !DO j = 1, surft_pts(n)
+   !   i = surft_index(j,n)
+
+   !   CALL finalise_meltlake_state(i,n)
+
+   !END DO
+
+
+   
    END IF ! elev land ice tile
       
 END DO !nsurft
-
-!WRITE(*,'(A,F18.8)') 'ds_ml        = ', ds_ml(1,9,1)
-      !WRITE(*,'(A,F18.8)') 'tsnow_ml     = ', tsnow_ml(1,9,1)-273.15
-      !WRITE(*,'(A,F18.8)') 'kdtdz_ml     = ', kdtdz_ml(1,9)
-      !WRITE(*,'(A,F18.8)') 'tstar        = ', tstar_surft(1,9)-273.15
-      !WRITE(*,'(A,F18.8)') 'ksnow0_ml    = ', ksnow0_ml(1,9)
-      !WRITE(*,'(A,F18.8)') 'lake_temp_ml = ', lake_temp_ml(1,9)-273.15
-      !WRITE(*,'(A,F18.8)') 'lid_temp_ml  = ', lid_temp_ml(1,9)-273.15
-      !WRITE(*,'(A,F18.8)') 'lake_depth_ml= ', lake_depth_ml(1,9)
-      !WRITE(*,'(A,F18.8)') 'lid_depth_ml = ', lid_depth_ml(1,9)
 
 
     
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 RETURN
+
+!CONTAINS
+
+!SUBROUTINE update_lake_states_tile(i,n)
+
+ !  INTEGER, INTENT(IN) :: i, n
+
+ !  has_lid(i,n)  = (lid_depth_ml(i,n)  > lid_min_depth)
+
+ !  has_vlid(i,n) = (vlid_depth_ml(i,n) >= lid_seed_depth) .AND.              &
+  !                 (vlid_depth_ml(i,n) <  lid_min_depth) .AND.               &
+  !                 (.NOT. has_lid(i,n))
+
+  ! has_lake(i,n) = (lake_depth_ml(i,n) > lake_min_depth) .OR.                &
+  !                 ((lake_depth_ml(i,n) > 0.0) .AND.                         &
+  !                  (has_lid(i,n) .OR. has_vlid(i,n)))
+
+  ! exposed_water(i,n) = (lake_depth_ml(i,n) > lake_min_depth) .AND.          &
+  !                      (.NOT. has_lid(i,n)) .AND. (.NOT. has_vlid(i,n))
+
+!END SUBROUTINE update_lake_states_tile
+
+
+!SUBROUTINE finalise_meltlake_state(i,n)
+
+!   INTEGER, INTENT(IN) :: i, n
+
+!   CALL update_lake_states_tile(i,n)
+
+!   IF (.NOT. has_lake(i,n)) THEN
+!      lake_temp_ml(i,n) = tm
+!   END IF
+
+  ! IF (.NOT. has_lid(i,n)) THEN
+  !    lid_temp_ml(i,n)  = tm
+  !    lid_depth_ml(i,n) = 0.0
+  ! END IF
+
+  ! IF (.NOT. has_vlid(i,n)) THEN
+  !    vlid_depth_ml(i,n) = 0.0
+  ! END IF
+
+  ! IF ((.NOT. has_lid(i,n)) .AND. (.NOT. has_vlid(i,n))) THEN
+  !    lid_snow_depth_ml(i,n) = 0.0
+  ! END IF
+
+  ! lake_state_ml(i,n) = 0.0
+  ! IF (exposed_water(i,n)) lake_state_ml(i,n) = 1.0
+  ! IF (has_vlid(i,n))      lake_state_ml(i,n) = 2.0
+  ! IF (has_lid(i,n))       lake_state_ml(i,n) = 3.0
+
+!END SUBROUTINE finalise_meltlake_state
+
 
 END SUBROUTINE meltlake
 END MODULE meltlake_mod

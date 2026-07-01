@@ -273,7 +273,7 @@ real(kind=real_jlslsm), intent(out), optional ::                               &
 LOGICAL, intent(IN), optional ::                                               &
    has_lake(land_pts)
     ! lake depth > 10 cm
-
+  
 !real(kind=real_jlslsm), intent(in), optional ::                               & 
 !  kdtdz_ml(land_pts)
   
@@ -717,9 +717,7 @@ DO k = 1,surft_pts
 
     DO n = 1,nsnow(i)
        melt_mass(i,n) = 0.0 ! sarah hack for diag out to nc
-       !if (n.eq.1) then
-       !   print *, 'tsnow before melt reset', tsnow(i,n)-273.15
-       !end if
+       
        
     ! energy per unit area needed to warm the layer to 0 °C.
       coldsnow = csnow(i,n) * (tm - tsnow(i,n))
@@ -751,10 +749,7 @@ DO k = 1,surft_pts
         !-------------------------------------------------------------------------
         melt_mass(i,n) = dsice   
 
-        !if (n.eq.1) then
-        !   write(*,'(A,I0,A,F16.8,A,F16.8,A,F16.12,A,F16.8,A,F16.8,A,F16.8,A,I0)') ' after melt jj=', n, ' sliq=', sliq(i,n), ' sice=', sice(i,n), ' melt_mass=', melt_mass(i,n),' tsnow=', tsnow(i,n)-273.15,'ds=', ds(i,n),'lens=', ice_lens_index(i), 't=', timestep_number  
-        !end if
-     
+        
         IF (sf_diag%l_snice) THEN
           sf_diag%snice_m_surft(i,surft_n) = sf_diag%snice_m_surft(i,surft_n)  &
                                              + dsice / timestep
@@ -763,9 +758,7 @@ DO k = 1,surft_pts
      
   END DO
   
-    ! Melt still > 0? - no snow left
-
-    !print *, 'after melt', sice(i,44)
+    
     
     !-------------------------------------------------------------------------
     ! Remove snow by sublimation unless snow is beneath canopy

@@ -668,8 +668,9 @@ CASE ( jules )
     ! meltlake (IN)
     meltlake_vars%has_lake, meltlake_vars%exposed_water,                       &
     meltlake_vars%has_lid, meltlake_vars%has_vlid,                             &
-    meltlake_vars%lake_temp_ml, meltlake_vars%lid_temp_ml,                     &
-    meltlake_vars%lid_depth_ml, meltlake_vars%vlid_depth_ml)
+    meltlake_vars%snow_on_lid, meltlake_vars%lake_temp_ml,                     & 
+    meltlake_vars%lid_temp_ml, meltlake_vars%lid_depth_ml,                     &
+    meltlake_vars%vlid_depth_ml, meltlake_vars%lid_snow_depth_ml)
 
   CALL jules_ssi_sf_explicit (                                                 &
     !IN values defining field dimensions and subset to be processed :

@@ -9610,7 +9610,7 @@ DATA metadata(742) / var_metadata(                                             &
 ! Variable type
     var_type_surft,                                                            &
 ! Long name
-    "Lake state 0=nolake 1=exposed water 2=vlid 3=lid",                               &
+    "Lake state 0=nolake 1=exposed water 2=vlid 3=lid",                        &
 ! Units
     " "                                                                        &
  ) /
@@ -9623,7 +9623,7 @@ DATA metadata(743) / var_metadata(                                             &
 ! Variable type
     var_type_surft,                                                            &
 ! Long name
-    "Stefan boundary movement lake bottom snowpack top",                       &
+    "dhdt lake snow",                                                          &
 ! Units
     "m hr-1 ice equiv"                                                                    &
  ) /
@@ -9636,8 +9636,34 @@ DATA metadata(744) / var_metadata(                                             &
 ! Variable type
     var_type_surft,                                                            &
 ! Long name
-    "Stefan boundary movement lid bottom lake top",                            &
+    "dhdt lid lake",                                                           &
 ! Units
     "m hr-1 ice equiv"                                                         &
  ) /
+!-----------------------------------------------------------------------------
+!! Metadata for snow depth on top of melt lake frozen lid
+!!-----------------------------------------------------------------------------
+DATA metadata(745) / var_metadata(                                             &
+! String identifier 
+    'lid_snow_depth_ml',                                                       &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    "Depth of fresh snow on top of lid",                                       &
+! Units
+    "m"                                                                        &
+ ) /
+!-----------------------------------------------------------------------------
+!! Metadata for temperature of snow on top of melt lake frozen lid
+!!-----------------------------------------------------------------------------
+DATA metadata(746) / var_metadata(                                             &
+! String identifier 
+    'lid_snow_temp_ml',                                                        &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    "Temperature of fresh snow on top of lid",                                 &
+! Units
+    "K"                                                                        &
+ ) / 
 #endif

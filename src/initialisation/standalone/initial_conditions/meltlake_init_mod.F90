@@ -134,6 +134,7 @@ DO n = 1,nsurft
               ! monarchs init desnity profile   
                     progs%rho_snow_surft_ml(i,n,k) = rho_ice - &
                          (rho_ice - rho_sfc) * EXP( - (1.9 / rho_firn_efold) * dzsnow_cumulative(i,n,k) )
+                   
                print *, 'k, rho, temp', k, progs%rho_snow_surft_ml(i,n,k),progs%tsnow_surft_ml(i,n,k)-273.15    
            END DO
         END IF

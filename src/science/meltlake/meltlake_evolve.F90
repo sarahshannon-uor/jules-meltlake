@@ -43,6 +43,7 @@ CONTAINS
                       lid_depth_ml,             & !IN
                       vlid_depth_ml,            & !IN
                       snow_surft,               & !IN/OUT
+                      snowdepth,                & !IN/OUT
                       ls_snow,                  & !IN/OUT
                       con_snow,                 & !IN/OUT
                       ls_rain,                  & !IN/OUT
@@ -56,7 +57,8 @@ CONTAINS
                       has_vlid,                 & !IN/OUT
                       sice_ml,                  & !IN/OUT
                       sliq_ml,                  & !IN/OUT
-                      ds_ml,                    & !IN/OUT 
+                      ds_ml,                    & !IN/OUT
+                      cold_puddle_hrs_ml,       & !IN/OUT 
                       kdtdz_ml,                 & !OUT
                       dhdt_lake_snow_ml)          !OUT
                       
@@ -160,9 +162,13 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Ice content of snow layers (kg/m2)
    sliq_ml(land_pts,nsmax_ml),                                                 &
     ! Liquid content of snow layers (kg/m2)
-   ds_ml(land_pts, nsmax_ml)
-      ! snowpack top level depth (m)
-      
+   ds_ml(land_pts, nsmax_ml),                                                  &
+    ! snowpack top level depth (m)
+   cold_puddle_hrs_ml(land_pts),                                               & 
+    ! Number of accum hours with lake_depth < 0.1m a cold orphan puddle
+   snowdepth(land_pts)
+    ! Snowdepth (m)
+   
 REAL(KIND=real_jlslsm), INTENT(OUT) ::                                         &
    kdtdz_ml(land_pts),                                                         &
      ! Conductive heat flux from lake into snowpack. pass this to snow module
@@ -192,8 +198,6 @@ INTEGER ::                                                                     &
 !-----------------------------------------------------------------------------
 ! Local arrays
 !-----------------------------------------------------------------------------
-
-  
 REAL(KIND=real_jlslsm) ::                                                      &
   expon_term,                                                                  &
     ! exponential term in albedo eqn (m)
@@ -223,13 +227,20 @@ REAL(KIND=real_jlslsm) ::                                                      &
   dsliq, &
   ds_old, &
   rain_add, &
-  snow_add
+  snow_add, &
+  dsice_tot, &
+  dsliq_tot
+  
+
+LOGICAL :: cold_lingering_shallow_puddle
+REAL(KIND=real_jlslsm) ::                                                 &
+  cold_shallow_puddle_hours(land_pts)
 
 ! --- diagnostic to check how much lake depth is from inflow versus stefan
 REAL, SAVE       :: cum_inflow_m = 0.0
 REAL, SAVE       :: cum_stefan_m = 0.0
 
-REAL(KIND=real_jlslsm), PARAMETER :: lid_seed_depth = 0.01!1.0e-3
+REAL(KIND=real_jlslsm), PARAMETER :: vlid_seed_depth = 0.001!1.0e-3
 
 
 REAL(KIND=real_jlslsm), PARAMETER :: tau_water   = 0.36
@@ -280,6 +291,8 @@ DO k = 1,surft_pts
 !-----------------------------------------------------------------------------
    CALL update_lake_states(i)
 
+   
+
 !-----------------------------------------------------------------------------
 ! No lake yet grow one using meltwater 
 !-----------------------------------------------------------------------------
@@ -299,7 +312,71 @@ DO k = 1,surft_pts
 !-----------------------------------------------------------------------------
    CALL update_lake_states(i)
 
+!---------------------------------------------------------------------
+! Mass-conserving fate for shallow uncovered puddle after inflow stops
+! Edge case: small puddle lingers if inflow stops 
+! Also no rain/snow is added to lake depth if < 0.1m leaving the linerging
+! puddle. 
+! Refreeze back into the snowpack if the puddle lingers for 48 hours 
+! Note: I should add latent heat and change tsnow(i,1) - come back to this 
+!---------------------------------------------------------------------
 
+   cold_lingering_shallow_puddle = (lake_depth_ml(i) > 0.0) .AND.        &
+        (lake_depth_ml(i) < lake_min_depth) .AND.                        &
+        (.NOT. has_lid(i)) .AND. (.NOT. has_vlid(i))                     &
+        .AND. (lake_inflow(i) <= 1.0e-12)                                &
+        .AND. (tstar_surft(i) < tm)
+
+   
+
+   IF (cold_lingering_shallow_puddle) THEN
+      
+      cold_puddle_hrs_ml(i) = cold_puddle_hrs_ml(i) + timestep/3600.0
+
+      IF (cold_puddle_hrs_ml(i) >= 48.0) THEN
+         
+         WRITE(*,*) '--- REFREEZE LINGERING SHALLOW PUDDLE ---'
+         WRITE(*,'(A,I8)')    'timestep                = ', timestep_number
+         WRITE(*,'(A,I8)')    'i                       = ', i
+         WRITE(*,'(A,F12.6)') 'cold_puddle_hours       = ', cold_puddle_hrs_ml(i)
+         WRITE(*,'(A,F12.6)') 'tstar_surft (C)         = ', tstar_surft(i) - 273.15
+         WRITE(*,'(A,F12.6)') 'lake_inflow (kg m-2)    = ', lake_inflow(i)
+         WRITE(*,'(A,F12.6)') 'lake_depth before (m)   = ', lake_depth_ml(i)
+         WRITE(*,'(A,F12.6)') 'snow_surft before       = ', snow_surft(i)
+         WRITE(*,'(A,F12.6)') 'ds_ml(1) before         = ', ds_ml(i,1)
+         WRITE(*,'(A,F12.6)') 'sice_ml(1) before       = ', sice_ml(i,1)
+         WRITE(*,'(A,F12.6)') 'sliq_ml(1) before       = ', sliq_ml(i,1)
+         WRITE(*,'(A,F12.6)') 'snowdepth before        = ', snowdepth(i)
+         
+         sice_ml(i,1)  = sice_ml(i,1)  + rho_water * lake_depth_ml(i)
+         ds_ml(i,1)    = ds_ml(i,1)    + lake_depth_ml(i) * rho_water / rho_ice
+         snow_surft(i) = snow_surft(i) + rho_water * lake_depth_ml(i)
+
+         snowdepth(i) = 0.0
+         DO n = 1, nsnow(i)
+            snowdepth(i) = snowdepth(i) + ds_ml(i,n)
+         END DO
+
+         lake_depth_ml(i) = 0.0
+         lake_temp_ml(i)  = tm
+         cold_puddle_hrs_ml(i) = 0.0
+
+       WRITE(*,'(A,F12.6)') 'lake_depth after (m)    = ', lake_depth_ml(i)
+       WRITE(*,'(A,F12.6)') 'snow_surft after        = ', snow_surft(i)
+       WRITE(*,'(A,F12.6)') 'ds_ml(1) after          = ', ds_ml(i,1)
+       WRITE(*,'(A,F12.6)') 'sice_ml(1) after        = ', sice_ml(i,1)
+       WRITE(*,'(A,F12.6)') 'sliq_ml(1) after        = ', sliq_ml(i,1)
+       WRITE(*,'(A,F12.6)') 'snowdepth after         = ', snowdepth(i)
+       WRITE(*,*) '------------------------------------------'
+      ! stop
+    END IF
+    
+
+   ELSE ! reset counter
+      cold_shallow_puddle_hours(i) = 0.0
+   END IF
+
+      
 !-----------------------------------------------------------------------------
 ! Add all precip to lake and reset fields - maybe only do if precip > 0
 !-----------------------------------------------------------------------------
@@ -346,6 +423,7 @@ DO k = 1,surft_pts
    dhdt_lake_snow_ml(i) = 0.0
    
    IF (exposed_water(i)) THEN
+     ! IF (lake_depth_ml(i)>=0.01) THEN
                      
       expon_term = 3.6 * lake_depth_ml(i)
 
@@ -409,10 +487,10 @@ DO k = 1,surft_pts
 !-----------------------------------------------------------------------------
 
       IF (has_vlid(i)) THEN
-         sw_absorb = sw_surft(i) * EXP(-tau_ice * vlid_depth_ml(i)) *              &
+         sw_absorb = sw_surft(i) * EXP(-tau_ice * vlid_depth_ml(i)) *   &
               (1.0 - EXP(-tau_water * lake_depth_ml(i)))
       ELSE IF (has_lid(i)) THEN
-         sw_absorb = sw_surft(i) * EXP(-tau_ice * lid_depth_ml(i)) *               &
+         sw_absorb = sw_surft(i) * EXP(-tau_ice * lid_depth_ml(i)) *    &
               (1.0 - EXP(-tau_water * lake_depth_ml(i)))
       ELSE IF (exposed_water(i)) THEN
          sw_absorb = sw_surft(i) * (1.0 - EXP(-tau_water * lake_depth_ml(i)))
@@ -423,7 +501,7 @@ DO k = 1,surft_pts
 ! Change in lake temperature. eqn 15
 !-----------------------------------------------------------------------------
          
-      dTdt = (- flux_upper - flux_lower + sw_absorb) /                 &
+      dTdt = (- flux_upper - flux_lower + sw_absorb) /                  &
            (rho_water * hcapw * lake_depth_ml(i))
             
       lake_temp_ml(i) = lake_temp_ml(i) + timestep * dTdt
@@ -460,7 +538,8 @@ DO k = 1,surft_pts
 ! present or there is exposed water
 !-----------------------------------------------------------------------------         
    IF (has_lake(i)) THEN
-
+      
+      !IF (has_lake(i) .AND. (.NOT. has_lid(i)) .AND. (.NOT. has_vlid(i))) THEN ! stop if lid
 !-----------------------------------------------------------------------------
 ! Re-calculate flux_upper before lake temp update for cross checking against 
 ! surf_ht_flux in sf_flux. flux_upper=surf_ht_flux in magnitude but have 
@@ -504,23 +583,11 @@ DO k = 1,surft_pts
          dhdt = (flux_lower - kdtdz_ml(i)) / (rho_ice * lf)
       END IF
 
-     !IF (has_lid(i) .OR. has_vlid(i)) THEN
-      !   WRITE(*,*) '--- BOTTOM STEFAN UNDER LID ---'
-      !   WRITE(*,*) 'has_lake                 = ', has_lake(i)
-      !   WRITE(*,*) 'has_lid                  = ', has_lid(i)
-      !   WRITE(*,*) 'has_vlid                 = ', has_vlid(i)
-      !   WRITE(*,'(A,F16.8)') 'lake_depth_ml      = ', lake_depth_ml(i)
-      !   WRITE(*,'(A,F16.8)') 'lake_temp_ml       = ', lake_temp_ml(i) - 273.15
-      !   WRITE(*,'(A,F16.8)') 'flux_lower         = ', flux_lower
-      !   WRITE(*,'(A,F16.8)') 'kdtdz_ml           = ', kdtdz_ml(i)
-      !   WRITE(*,'(A,F16.8)') 'flux_lower-kdtdz   = ', flux_lower - kdtdz_ml(i)
-      !   WRITE(*,'(A,F16.8)') 'dhdt               = ', dhdt
-      !   stop
-      !END IF
+    
 !-----------------------------------------------------------------------------
 ! dhdt (m of ice per sec) --> dh_water (m of water per timestep)
 !-----------------------------------------------------------------------------
-
+      
       dh_ice   = timestep * dhdt
       dh_water = dh_ice * rho_ice / rho_water
             
@@ -538,8 +605,10 @@ DO k = 1,surft_pts
 
       ! freeze over test, switch off stefan condition of there is any type of lid
       !IF (dh_ice > 0.0 .AND. .NOT. has_vlid(i) .AND. .NOT. has_lid(i)) THEN
-               
-            dh_remain = dh_ice
+
+         dsice_tot = 0.0
+         dsliq_tot = 0.0
+         dh_remain = dh_ice
 
 !-----------------------------------------------------------------------------
 ! looping over snowpack levels and removing sice.  This might be overkill since 
@@ -547,18 +616,22 @@ DO k = 1,surft_pts
 ! a setup with smaller top layer depth . Removal is based on fraction of top 
 ! snow layer depth that is retreating i.e. stefan retreat/ds top snow layer
 ! remove ice mass fraction, and liq mass fraction
-!-----------------------------------------------------------------------------                
+!-----------------------------------------------------------------------------
+         
          DO n = 1, nsnow(i)
 
             IF (dh_remain <= 0.0) EXIT
                 
             ds_old = ds_ml(i,n)
-
+            
             frac_melt = MIN(1.0, dh_remain / ds_old)
                       
             dsice = frac_melt * sice_ml(i,n)
             dsliq = frac_melt * sliq_ml(i,n)
 
+            dsice_tot = dsice_tot + dsice
+            dsliq_tot = dsliq_tot + dsliq
+            
 !-----------------------------------------------------------------------------
 ! water from ice retreat + draining all sliq from layer
 !-----------------------------------------------------------------------------
@@ -573,47 +646,54 @@ DO k = 1,surft_pts
                  
             dh_remain = dh_remain - frac_melt * ds_old
 
-                                  
-            ! WRITE(*,*) 'n                                  = ', n
-            ! WRITE(*,'(A,F16.8)') 'frac_melt                = ', frac_melt
-            ! WRITE(*,'(A,F16.8)') 'dsice                    = ', dsice
-            ! WRITE(*,'(A,F16.8)') 'dsliq                    = ', dsliq
-            ! WRITE(*,'(A,F16.8)') 'sice                     = ', sice_ml(i,n)
-            ! WRITE(*,'(A,F16.8)') 'sliq                     = ', sliq_ml(i,n)
-            ! WRITE(*,'(A,F16.8)') 'ds_old                   = ', ds_old
-            ! WRITE(*,'(A,F16.8)') 'ds_ml(i,n)               = ', ds_ml(i,n) 
-            ! WRITE(*,'(A,F16.8)') 'lake_add                 = ', (dsice + dsliq) / rho_water
-                 
+            
          END DO !nsnow
-
+         
+!-----------------------------------------------------------------------------
+! subtract the snowmass melted
+!-----------------------------------------------------------------------------    
+         
+         snow_surft(i) = snow_surft(i) - (dsice_tot + dsliq_tot)
          
       END IF ! Stefan dh_ice > 0
 
+      IF (timestep_number >= 338 .AND. timestep_number <= 340) THEN
 
-      !WRITE(*,*) '--- LAKE ENERGY DIAGNOSTICS ---'
-      !WRITE(*,*) '--------------------------------', timestep_number
-      !WRITE(*,*) 'nsnow(i)                           = ', nsnow(i) 
-      !WRITE(*,'(A,F16.8)') 'sw_absorb                = ', sw_absorb
-       !WRITE(*,'(A,F16.8)') 'flux_upper_diag          = ', flux_upper_diag
-      !WRITE(*,'(A,F16.8)') 'flux_lower               = ', flux_lower
-      !WRITE(*,'(A,F16.8)') 'lake_temp after          = ', lake_temp_ml(i) -273.15 
-      !WRITE(*,'(A,F16.8)') 'tstar_surft              = ', tstar_surft(i) - 273.15
-      !WRITE(*,'(A,F16.8)') 'lake_inflow              = ', lake_inflow(i)
-      !WRITE(*,'(A,F16.8)') 'lake_temp - tstar_surft  = ', lake_temp_ml(i)-tstar_surft(i)
-      !WRITE(*,'(A,F16.8)') 'dTdt                     = ', dTdt
-         
-                         
-      !WRITE(*,'(A,F16.8)') 'ksnow0_ml(i)             =',  ksnow0_ml(i)
-      !WRITE(*,'(A,F16.8)') 'tsnow(i,1)              = ', tsnow_ml(i)
-      !WRITE(*,'(A,F16.8)') 'kdtdz(i)_ml              = ', kdtdz_ml(i)
-      !WRITE(*,'(A,F16.8)') 'flux_lower               = ', flux_lower
-      !WRITE(*,'(A,F16.8)') 'flux_lower - kdTdz       = ', flux_lower - kdtdz_ml(i)
-      !WRITE(*,'(A,F16.8)')  'ds_ml(i),               = ', ds_ml(i,1)
-      !WRITE(*,'(A,F16.8)') 'dh_water (m)             = ', dh_water
-      !WRITE(*,'(A,F16.8)') 'snow_surft(i)            = ', snow_surft(i)
-           
-      !WRITE(*,*) '------------------------------------------------'
-      
+            WRITE(*,*) '--- MELTLAKE_EVOLVE DEBUG ---'
+            WRITE(*,'(A,I8)')    'timestep_number        = ', timestep_number
+            WRITE(*,'(A,I8)')    'i                      = ', i
+            WRITE(*,'(A,L2)')    'has_lake               = ', has_lake(i)
+            WRITE(*,'(A,L2)')    'exposed_water          = ', exposed_water(i)
+            WRITE(*,'(A,L2)')    'has_vlid               = ', has_vlid(i)
+            WRITE(*,'(A,L2)')    'has_lid                = ', has_lid(i)
+            
+            WRITE(*,'(A,F12.6)') 'lake_depth_ml          = ', lake_depth_ml(i)
+            WRITE(*,'(A,F12.6)') 'dhdt_lake_snow_ml      = ', dhdt_lake_snow_ml(i)
+            WRITE(*,'(A,F12.6)') 'snowdepth              = ', snowdepth(i)
+            WRITE(*,'(A,F12.6)') 'snow_surft             = ', snow_surft(i)
+            WRITE(*,'(A,F12.6)') 'lake_temp_ml (C)       = ', lake_temp_ml(i) - 273.15
+
+   
+            WRITE(*,'(A,I8)')    'nsnow                 = ', nsnow(i)
+            WRITE(*,'(A,F12.6)') 'ds_ml(1)              = ', ds_ml(i,1)
+            WRITE(*,'(A,F12.6)') 'sice_ml(1)            = ', sice_ml(i,1)
+            WRITE(*,'(A,F12.6)') 'sliq_ml(1)            = ', sliq_ml(i,1)
+            WRITE(*,'(A,F12.6)') 'tsnow_ml(1) (C)       = ', tsnow_ml(i) - 273.15
+            WRITE(*,'(A,F12.6)') 'ksnow0_ml             = ', ksnow0_ml(i)
+            WRITE(*,'(A,F12.6)') 'kdtdz_ml              = ', kdtdz_ml(i)
+   
+
+            WRITE(*,'(A,F12.6)') 'flux_lower             = ', flux_lower
+            WRITE(*,'(A,F12.6)') 'flux_upper             = ', flux_upper
+            WRITE(*,'(A,F12.6)') 'sw_absorb              = ', sw_absorb
+            WRITE(*,'(A,F12.6)') 'dTdt                   = ', dTdt
+            WRITE(*,'(A,F12.6)') 'dhdt                   = ', dhdt
+            WRITE(*,'(A,F12.6)') 'dh_ice                 = ', dh_ice
+            WRITE(*,'(A,F12.6)') 'dh_water               = ', dh_water
+
+           ! IF (timestep_number == 340) STOP 'debug stop after timestep 340'
+
+         END IF
       
       cum_stefan_m = cum_stefan_m + dh_water
            
@@ -625,8 +705,8 @@ DO k = 1,surft_pts
    CALL update_lake_states(i)
 
      
-    WRITE(*,'(A,F16.8)') 'cum_inflow_m', cum_inflow_m
-    WRITE(*,'(A,F16.8)') 'cum_stefan_m', cum_stefan_m
+    !WRITE(*,'(A,F16.8)') 'cum_inflow_m', cum_inflow_m
+    !WRITE(*,'(A,F16.8)') 'cum_stefan_m', cum_stefan_m
 
 END DO ! land_pts
 
@@ -643,13 +723,13 @@ SUBROUTINE update_lake_states(i)
 
    INTEGER, INTENT(IN) :: i
 
+     
    has_lid(i)  = (lid_depth_ml(i)  > lid_min_depth)
 
-   has_vlid(i) = (vlid_depth_ml(i) >= lid_seed_depth) .AND.                 &
+   has_vlid(i) = (vlid_depth_ml(i) >= vlid_seed_depth) .AND.                 &
               (vlid_depth_ml(i) <  lid_min_depth) .AND.                     &
               .NOT. has_lid(i)
    
-   !has_vlid(i) = (vlid_depth_ml(i) >= lid_seed_depth) .AND. .NOT. has_lid(i)
 
    has_lake(i) = (lake_depth_ml(i) > lake_min_depth) .OR.                    &
                  ((lake_depth_ml(i) > 0.0) .AND.                             &

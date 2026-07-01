@@ -268,7 +268,7 @@ CASE ( jules )
     progs%sice_surft, progs%sliq_surft, progs%ds_surft,                        &
     progs%sice_surft_ml, progs%sliq_surft_ml, progs%ds_surft_ml,               &
     meltlake_vars%lake_depth_ml,meltlake_vars%exposed_water,                   &
-    meltlake_vars%has_lid,meltlake_vars%has_vlid)
+    meltlake_vars%has_lid,meltlake_vars%has_vlid,meltlake_vars%snow_on_lid)
 
 CASE ( cable )
 

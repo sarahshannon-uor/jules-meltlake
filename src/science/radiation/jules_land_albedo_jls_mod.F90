@@ -43,7 +43,7 @@ SUBROUTINE jules_land_albedo(                                                  &
         snowdepth_surft, rho_snow_grnd_surft, nsnow_surft, sice_surft,         &
         sliq_surft, ds_surft,                                                  &
         sice_surft_ml, sliq_surft_ml, ds_surft_ml, lake_depth_ml,              &
-        exposed_water, has_lid, has_vlid)
+        exposed_water, has_lid, has_vlid, snow_on_lid)
 
 !Use in subroutines
 USE albpft_mod,               ONLY: albpft
@@ -204,6 +204,7 @@ REAL(KIND=real_jlslsm), INTENT(IN) :: lake_depth_ml(land_pts,nsurft)
 LOGICAL, INTENT(IN) :: has_lid(land_pts,nsurft)
 LOGICAL, INTENT(IN) :: has_vlid(land_pts,nsurft)
 LOGICAL, INTENT(IN) :: exposed_water(land_pts,nsurft)
+LOGICAL, INTENT(IN) :: snow_on_lid(land_pts,nsurft)
 
 
 !Local variables:
@@ -1126,29 +1127,39 @@ IF (l_elev_land_ice) THEN
           ! The meltlake surface can have 3 surfaces snow, exposed water 
           ! and frozen lid. 
           !------------------------------------------------------------
-          snow_surface = .false.
+           snow_surface = .false.
 
           !------------------------------------------------------------
           ! Case 1: meltlake scheme active
           !------------------------------------------------------------
-          IF (l_meltlake) THEN
+           IF (l_meltlake) THEN
 
-             !IF (has_lid(l,n)) THEN
-                IF (has_vlid(l,n) .OR. has_lid(l,n)) THEN
+
+              IF (snow_on_lid(l,n)) THEN
+
+              !--------------------------------------------------------
+              ! Snow on top of lid or vlid, treat surface as snow
+              !--------------------------------------------------------
+                 snow_surface = .true.
+
+              ! use snow-on-lid properties, not underlying snowpack
+                 rho_snow_surf = rho_snow_const
+
+            
+              ELSE IF (has_vlid(l,n) .OR. has_lid(l,n)) THEN
 
               !--------------------------------------------------------
               ! Lid present, fixed lid albedo
               !--------------------------------------------------------
-              alb_snow(l,n,:) = 0.6
-              !print *, 'lid_present', has_lid(l,n)
+                 alb_snow(l,n,:) = 0.6
+            
 
-            ELSE IF (exposed_water(l,n)) THEN
-
+             ! ELSE IF (exposed_water(l,n)) THEN
+                ELSE IF (lake_depth_ml(l,n) >= 0.01) THEN
               !--------------------------------------------------------
               ! Exposed water present, lake-depth albedo
               !--------------------------------------------------------
-              print *, 'exposed_water_present', exposed_water(l,n)
-
+              
               expon_term = 3.6 * lake_depth_ml(l,n)
 
               IF (expon_term < 50.0) THEN
@@ -1164,7 +1175,7 @@ IF (l_elev_land_ice) THEN
               !--------------------------------------------------------
               ! Meltlake scheme on, but surface is snow
               !--------------------------------------------------------
-              print *, 'meltlake model on, surface is snow'
+              !print *, 'meltlake model on, surface is snow'
               snow_surface = .true.
 
               ssum = 0.0

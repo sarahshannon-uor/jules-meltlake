@@ -125,8 +125,8 @@ SUBROUTINE jules_land_sf_explicit (                                            &
  ! Water tracers (OUT)
  fqw_1_wtrac, fqw_surft_wtrac, fqw_evapsrce_wtrac, smc_soilt_wtrac,            &
  !meltlake_mod (IN)
- has_lake, exposed_water, has_lid, has_vlid, lake_temp_ml, lid_temp_ml,        &
- lid_depth_ml, vlid_depth_ml)
+ has_lake, exposed_water, has_lid, has_vlid, snow_on_lid, lake_temp_ml,        &
+ lid_temp_ml, lid_depth_ml, vlid_depth_ml, lid_snow_depth_ml)
 
 USE ancil_info,              ONLY: dim_cslayer, nsoilt, rad_nband
 USE atm_fields_bounds_mod,      ONLY: pdims_s, pdims, tdims
@@ -415,9 +415,10 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
                              ! IN lid temp (K) 
 ,lid_depth_ml(land_pts,nsurft)                                                 & 
                              ! IN lid depth (m)
-,vlid_depth_ml(land_pts, nsurft)
+,vlid_depth_ml(land_pts, nsurft)                                               & 
                              ! IN virtual lid depth (m)
-
+,lid_snow_depth_ml(land_pts, nsurft)
+                             ! IN Snow depth on virtual or permantent lid (m)
 LOGICAL, INTENT(IN) ::                                                         &
  l_aero_classic                                                                &
                              ! IN switch for using CLASSIC aerosol
@@ -435,7 +436,8 @@ LOGICAL, INTENT(IN) ::                                                         &
                              ! IN if exposed melt lake water is present   
 ,has_lid(land_pts,nsurft)                                                      & 
 ,has_vlid(land_pts,nsurft)                                                     &
-,has_lake(land_pts,nsurft)
+,has_lake(land_pts,nsurft)                                                     &
+,snow_on_lid(land_pts,nsurft)
 
 !-----------------------------------------------------------------------
 !  In/outs :-
@@ -855,6 +857,9 @@ REAL(KIND=real_jlslsm) ::                                                      &
  lh0                         ! Latent heat for snow free surface
                              !   =LS for sea-ice, =LC otherwise
 
+REAL(KIND=real_jlslsm), PARAMETER :: ice_hcon = 2.2
+REAL(KIND=real_jlslsm) :: r_snow, r_ice, ice_depth_eff
+REAL(KIND=real_jlslsm), PARAMETER :: vlid_seed_depth = 0.001
 
 !  Workspace for sea-ice and marginal ice zone
 REAL(KIND=real_jlslsm) ::                                                      &
@@ -2031,25 +2036,26 @@ DO n = 1,nsurft
     i = land_index(l) - (j-1) * t_i_length
     IF (l_elev_land_ice .AND. l_lice_point(l)) THEN
 
-      ! Land ice
-      tsurf(l,n)        = tsurf_elev_surft(l,n)
-      dzsurf(l,n)       = dzsoil_elev
-      canhc_surf(l,n)   = 0.0
-      IF (l_lice_surft(n)) THEN
-        hcons_surf(l,n) = snow_hcon
-      ELSE
-        hcons_surf(l,n) = hcondeep
-      END IF
+       ! Land ice
+       tsurf(l,n)        = tsurf_elev_surft(l,n)
+       dzsurf(l,n)       = dzsoil_elev
+       canhc_surf(l,n)   = 0.0
+       IF (l_lice_surft(n)) THEN
+          hcons_surf(l,n) = snow_hcon
+       ELSE
+          hcons_surf(l,n) = hcondeep
+       END IF
 
      	  
     ELSE
 
       ! Soil
-      tsurf(l,n)      = t_soil_soilt(l,m,1) + t_elev(l,n) - tl_1(i,j)
-      dzsurf(l,n)     = dzsoil(1)
-      hcons_surf(l,n) = hcons_soilt(l,m)
-      canhc_surf(l,n) = canhc_surft(l,n)
+       tsurf(l,n)      = t_soil_soilt(l,m,1) + t_elev(l,n) - tl_1(i,j)
+       dzsurf(l,n)     = dzsoil(1)
+       hcons_surf(l,n) = hcons_soilt(l,m)
+       canhc_surf(l,n) = canhc_surft(l,n)
     END IF
+   
     IF (     (l_flake_model   )                                                &
         .AND. ( .NOT. l_aggregate)                                             &
         .AND. (n == lake  )) THEN
@@ -2110,6 +2116,64 @@ DO n = 1,nsurft
       END IF
     END IF
 
+    
+    !IF ( l_meltlake .AND. l_elev_land_ice .AND. l_lice_point(l) ) THEN
+
+    !IF (l_meltlake .AND. l_elev_land_ice .AND. l_lice_point(l) .AND.           &
+     !    l_lice_surft(n)) THEN
+
+    !-----------------------------------------------------------------------   
+    ! For snow on frozen meltlake lid assume resistance in series
+    ! Thermal resistances in series:
+    ! r_snow = lid_snow_depth_ml / snow_hcon
+    ! r_lid  = lid_depth_eff     / ice_hcon
+    ! r_tot  = r_snow + r_lid
+    ! Surface exchange coefficient:
+    !    ashtf_surft = 2.0 / (r_snow + r_lid)
+    ! 
+    ! r_snow is larger than r_ice i.e. snow is insulating the lid from the atmosphere
+    !-----------------------------------------------------------------------
+    
+    IF (snow_on_lid(l,n)) THEN
+
+       dzsurf(l,n)     = lid_snow_depth_ml(l,n)
+       hcons_surf(l,n) = snow_hcon
+       canhc_surf(l,n) = 0.0
+
+       r_snow = lid_snow_depth_ml(l,n) / snow_hcon
+
+       IF (has_lid(l,n)) THEN
+          tsurf(l,n)    = lid_temp_ml(l,n)
+          ice_depth_eff = MAX(lid_depth_ml(l,n), vlid_seed_depth)
+          
+       ELSE IF (has_vlid(l,n)) THEN
+          tsurf(l,n)    = tm
+          ice_depth_eff = MAX(vlid_depth_ml(l,n), vlid_seed_depth)
+       END IF
+
+       r_ice = ice_depth_eff / ice_hcon
+       ashtf_surft(l,n) = 2.0 / (r_snow + r_ice)
+
+       IF (snow_on_lid(l,n) .AND. lid_snow_depth_ml(l,n) > 0.3) THEN
+
+
+          WRITE(*,*) 'snow_on_lid:'
+          WRITE(*,'(A,I8)')    'l                 = ', l
+          WRITE(*,'(A,I8)')    'n                 = ', n
+          WRITE(*,'(A,L2)')    'has_lid           = ', has_lid(l,n)
+          WRITE(*,'(A,L2)')    'has_vlid          = ', has_vlid(l,n)
+          WRITE(*,'(A,F12.6)') 'lid_snow_depth_ml = ', lid_snow_depth_ml(l,n)
+          WRITE(*,'(A,F12.6)') 'dzsurf            = ', dzsurf(l,n)
+          WRITE(*,'(A,F12.6)') 'r_snow            = ', r_snow
+          WRITE(*,'(A,F12.6)') 'tsurf             = ', tsurf(l,n)
+          WRITE(*,'(A,F12.6)') 'ice_depth_eff     = ', ice_depth_eff
+          WRITE(*,'(A,F12.6)') 'r_ice             = ', r_ice
+          WRITE(*,'(A,F12.6)') 'ashtf_surft       = ', ashtf_surft(l,n)
+          
+         
+        
+       END IF
+   
     !-----------------------------------------------------------------------
     ! Exposed-water lower boundary for sf_flux
     ! Pass the melt-lake temperature as the lower-boundary temperature and
@@ -2120,38 +2184,36 @@ DO n = 1,nsurft
     ! to enhance the conductivity to represent convective mixing
     ! because it is linear in temp there is no need to scale the ashtf when using flake
     !-----------------------------------------------------------------------
-    !IF ( l_meltlake .AND. l_elev_land_ice .AND. l_lice_point(l) ) THEN
-
-       IF (exposed_water(l,n)) THEN
+    ELSE IF (exposed_water(l,n)) THEN
 
     !-----------------------------------------------------------------------   
     ! The lake temperature is already in the elevated-tile temperature
     ! frame, so no further elevation correction is applied here
     !-----------------------------------------------------------------------
         
-          tsurf(l,n) = lake_temp_ml(l,n) 
+       tsurf(l,n) = lake_temp_ml(l,n) 
    
                
-          ashtf_surft(l,n) = rho_water * hcapw * 1.907e-5 *                   &
-               ABS(tsurf(l,n) - tstar_surft(l,n))**(1.0/3.0)
+       ashtf_surft(l,n) = rho_water * hcapw * 1.907e-5 *                   &
+            ABS(tsurf(l,n) - tstar_surft(l,n))**(1.0/3.0)
 
-
-          ELSE IF (has_lid(l,n)) THEN
-
-             tsurf(l,n)  = lid_temp_ml(l,n)
-             dzsurf(l,n) = lid_depth_ml(l,n)
-             ashtf_surft(l,n) = 2.0 * 2.2 / dzsurf(l,n)
-
-          ELSE IF (has_vlid(l,n)) THEN
+  !zero layer method
+    ELSE IF (has_lid(l,n)) THEN
+       
+       tsurf(l,n)  = lid_temp_ml(l,n)
+       dzsurf(l,n) = lid_depth_ml(l,n)
+       ashtf_surft(l,n) = 2.0 * ice_hcon / dzsurf(l,n)
+       
+    ELSE IF (has_vlid(l,n)) THEN
+      
+       tsurf(l,n)  = tm
+       dzsurf(l,n) = MAX(vlid_depth_ml(l,n), 0.001)
+       ashtf_surft(l,n) = 2.0 * ice_hcon / dzsurf(l,n)
+      
              
-             tsurf(l,n)  = tm
-             dzsurf(l,n) = MAX(vlid_depth_ml(l,n), 0.001)
-             ashtf_surft(l,n) = 2.0 * 2.2 / dzsurf(l,n)
-
-             
-    END IF ! exposed_water/has_lid/has_vlid
+    END IF ! snow_on_lid/exposed_water/has_lid/has_vlid
     
- !END IF
+ !END IF !meltlake
 
 
   END DO

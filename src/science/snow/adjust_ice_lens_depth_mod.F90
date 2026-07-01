@@ -92,25 +92,39 @@ DO k = 1,surft_pts
    i = surft_index(k)
   
    IF (ice_lens_depth(i) >= 0.0) THEN
-
       ice_lens_depth(i) = ice_lens_depth(i) + dz_snowdepth(i)
-
    END IF
-   
+
    ! If surface lowered past the lens, lens is exposed/removed
    IF (ice_lens_depth(i) < 0.0) THEN
-     ! print *, 'lens is exposed'
-      !ice_lens_depth(i) = -1.0
-      ice_lens_index(i) = 0.0
-   END IF
-      
-   !If lens lies deeper than the snowpack, clear it
-   IF (ice_lens_depth(i) > snowdepth(i)) THEN
-      print *, 'lens depth is deeper than the snowpack depth'
-      stop
+      print *, 'surface lowered past the lens, lens is exposed/removed'
       ice_lens_depth(i) = -1.0
       ice_lens_index(i) = -1.0
    END IF
+
+   ! If lens lies deeper than the snowpack, clear it
+   IF (ice_lens_depth(i) > snowdepth(i)) THEN
+      print *, 'lens depth is deeper than the snowpack depth, resetting lens'
+      ice_lens_depth(i) = -1.0
+      ice_lens_index(i) = -1.0
+   END IF
+
+
+
+   ! If surface lowered past the lens, lens is exposed/removed
+   !IF (ice_lens_depth(i) < 0.0) THEN
+     ! print *, 'lens is exposed'
+      !ice_lens_depth(i) = -1.0
+    !  ice_lens_index(i) = 0.0
+   !END IF
+      
+   !If lens lies deeper than the snowpack, clear it
+   !IF (ice_lens_depth(i) > snowdepth(i)) THEN
+   !   print *, 'lens depth is deeper than the snowpack depth'
+   !   stop
+   !   ice_lens_depth(i) = -1.0
+   !   ice_lens_index(i) = -1.0
+   !END IF
       
 END DO
 !$OMP END DO

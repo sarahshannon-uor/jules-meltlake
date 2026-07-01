@@ -128,6 +128,7 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
 LOGICAL, INTENT(IN) ::                                                        &
    has_lake(land_pts)
     ! lake depth > 10cm
+   
 !-----------------------------------------------------------------------------
 ! Scalar arguments with intent(inout)
 !-----------------------------------------------------------------------------
@@ -365,8 +366,12 @@ DO n = 1, nsnow
 
   pfrac = 1.0 - sice(i,n) / (rho_ice * ds(i,n))
   pfrac = MAX(0.0, MIN(1.0, pfrac))
-  cap_full = pfrac * rho_water * ds(i,n) ! FULL pore capacity (kg m-2)
 
+  ! monarchs method to get full pore capacity (kg m-2) but gives bulk density > 917
+  !cap_full = pfrac * rho_water * ds(i,n) ! FULL pore capacity (kg m-2)
+
+  ! this prevents bulk densities > 917
+  cap_full = MAX(0.0, rho_ice * ds(i,n) - sice(i,n))
   
   !---------------------------------------------------------------------------
   ! Instantaneous lens formation test (pore-closure density)
@@ -393,25 +398,27 @@ DO n = 1, nsnow
      ice_lens = (ice_lens_depth(i) >= z_top .AND. ice_lens_depth(i) < z_bot)
   END IF
 
- 
-  
-! output snow layer of ice lens
-  IF (ice_lens) THEN
-     ice_lens_index(i) = REAL(n)
-     
+
+! bug fix  
+! Stored lens depth falls in this layer, but this layer no longer meets
+! the pore-closure criterion, so remove the persistent lens.
+  IF (ice_lens .AND. .NOT. new_lens) THEN
+     ice_lens_depth(i) = -1.0
+     ice_lens_index(i) = -1.0
+     ice_lens = .FALSE.
   END IF
 
- !OPEN(NEWUNIT=iw, FILE='new_lens_2.txt', STATUS='UNKNOWN', POSITION='APPEND', ACTION='WRITE')
- !WRITE(iw,'(I4,",",L1,",",ES16.8,",",I8)') &
- !    n, new_lens, ice_lens_depth(i), timestep_number
- !CLOSE(iw)
-
+  ! bug fix
+  
   !---------------------------------------------------------------------------
   ! 4) If lens exists here, then upward percoalte water into layer above 
   ! up to pore space capacity
   !-------------------------------------------------------------------------
     IF (ice_lens) THEN
 
+       ! output snow layer of ice lens
+       ice_lens_index(i) = REAL(n)
+       
        blocked = .TRUE.
 
        ! option 1: allow the lens to keep pore capacity liquid
@@ -427,7 +434,8 @@ DO n = 1, nsnow
        ! option 2: make lens completely dry
        w_up      = sliq(i,n)
        sliq(i,n) = 0.0!1.0e-6
-       
+
+
        !print *, 'sfrac in lens', timestep_number, n, sice(i,n) / (rho_ice   * ds(i,n)), sliq(i,n)
        
      ! upward fill 
@@ -439,14 +447,17 @@ DO n = 1, nsnow
           pfrac_m = 1.0 - sice(i,m) / (rho_ice * ds(i,m))
           pfrac_m = MAX(0.0, MIN(1.0, pfrac_m))
 
-          ! --- max mass a layer can hold 
-          cap_full_m = pfrac_m * rho_water * ds(i,m)
+          ! --- max mass a layer can hold following monarchs method but gives
+          !--- bulk densities > 917. This means just fill all the empty space with water 
+          !cap_full_m = pfrac_m * rho_water * ds(i,m)
 
+          !  max mass a layer can hold preventing bulk densities > 917.
+          ! This means fill all empty space with water but dont allow bulk density > 917
+          cap_full_m = MAX(0.0, rho_ice * ds(i,m) - sice(i,m))
+          
           ! --- water to upfill
           sliq(i,m) = sliq(i,m) + w_up
-          !if (m==n-1) then
-          !   print *, 'sliq to move', sliq(i,m) 
-          !end if
+          
           
           ! --- only allow layers to contain water up to pore capacity 
           IF (sliq(i,m) > cap_full_m) THEN

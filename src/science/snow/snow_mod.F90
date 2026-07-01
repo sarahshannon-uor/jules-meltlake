@@ -60,7 +60,7 @@ SUBROUTINE snow (a_step, land_pts, timestep, stf_hf_snow_melt, nsurft, n_wtrac_j
                   has_lake,      &     !(land_pts,nsurft)
                   has_lid,       &     !(land_pts,nsurft)
                   has_vlid,      &     !(land_pts,nsurft)
-                  exposed_water, &     !(land_pts,nsurft) 
+                  exposed_water, &     !(land_pts,nsurft)
                   ice_lens_depth,&     !(land_pts,nsurft)
                   ice_lens_index,&     !(land_pts,nsurft)
                   lake_inflow,   &     !(land_pts,nsurft)
@@ -77,8 +77,7 @@ USE snowpack_mod,    ONLY: snowpack
 USE snowtherm_mod,   ONLY: snowtherm
 
 USE adjust_ice_lens_depth_mod,   ONLY: adjust_ice_lens_depth
-USE insert_lid_mod,   ONLY: insert_lid
-     
+
 USE water_constants_mod, ONLY:                                                 &
   ! imported scalar parameters
    lf,                                                                         &
@@ -221,6 +220,7 @@ LOGICAL, INTENT(IN) ::                                                         &
     ! permanent lid present
   has_vlid(land_pts, nsurft),                                                  &
   exposed_water(land_pts, nsurft)
+ 
 
 REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
   con_rain(land_pts),                                                          &
@@ -911,12 +911,12 @@ END IF
     
 
 !---------------------------------------------------------------------------
-! Water sitting on top of snowpack
+! An active lake sitting on top of snowpack
 !---------------------------------------------------------------------------
      DO k=1,surft_pts(n)
         i = surft_index(k,n)
 
-        
+        !IF (exposed_water(i,n) .OR. has_vlid(i,n) .OR. has_lid(i,n)) THEN
         IF (has_lake(i,n)) THEN
 
            !--- No melting
