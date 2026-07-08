@@ -54,13 +54,13 @@ SUBROUTINE snow (a_step, land_pts, timestep, stf_hf_snow_melt, nsurft, n_wtrac_j
                   lfrac_ml,      &     !(land_pts,nsurft,nsmax_ml)
                   refreeze_ml,   &     !(land_pts,nsurft,nsmax_ml)
                   melt_ml,       &     !(land_pts,nsurft,nsmax_ml)
-                  lake_depth_ml, &     !(land_pts,nsurft)
-                  lid_depth_ml,  &     !(land_pts,nsurft)
-                  lid_temp_ml,   &     !(land_pts,nsurft)   
+                  !lake_depth_ml, &     !(land_pts,nsurft)
+                  !lid_depth_ml,  &     !(land_pts,nsurft)
+                  !lid_temp_ml,   &     !(land_pts,nsurft)   
                   has_lake,      &     !(land_pts,nsurft)
-                  has_lid,       &     !(land_pts,nsurft)
-                  has_vlid,      &     !(land_pts,nsurft)
-                  exposed_water, &     !(land_pts,nsurft)
+                  !has_lid,       &     !(land_pts,nsurft)
+                  !has_vlid,      &     !(land_pts,nsurft)
+                  !exposed_water, &     !(land_pts,nsurft)
                   ice_lens_depth,&     !(land_pts,nsurft)
                   ice_lens_index,&     !(land_pts,nsurft)
                   lake_inflow,   &     !(land_pts,nsurft)
@@ -80,13 +80,9 @@ USE adjust_ice_lens_depth_mod,   ONLY: adjust_ice_lens_depth
 
 USE water_constants_mod, ONLY:                                                 &
   ! imported scalar parameters
-   lf,                                                                         &
+   lf
      ! Latent heat of fusion of water at 0degc (J kg-1).
-   !rho_water,                                                                  &
-    ! Density of pure water (kg/m3).
-   rho_ice                                                               
-    ! Density of pure ice (kg/m3).
-
+   
 USE jules_snow_mod, ONLY:                                                      &
   nsmax,                                                                       &
     ! Maximum possible number of snow layers.
@@ -214,12 +210,12 @@ INTEGER, INTENT(IN OUT) ::                                                     &
     ! Number of snow layers.
       
 LOGICAL, INTENT(IN) ::                                                         &
-  has_lake(land_pts,nsurft),                                                   &
+  has_lake(land_pts,nsurft)!,                                                   &
     ! meltlake water present 
-  has_lid(land_pts, nsurft),                                                   & 
+  !has_lid(land_pts, nsurft),                                                   & 
     ! permanent lid present
-  has_vlid(land_pts, nsurft),                                                  &
-  exposed_water(land_pts, nsurft)
+  !has_vlid(land_pts, nsurft),                                                  &
+  !exposed_water(land_pts, nsurft)
  
 
 REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
@@ -301,11 +297,11 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Refrozen mass in snow layers (kg/m2).
   melt_ml(land_pts,nsurft,nsmax_ml),                                           &                                          
     ! Melt mass in snow layers (kg/m2).   
-  lake_depth_ml(land_pts,nsurft),                                              &    
+  !lake_depth_ml(land_pts,nsurft),                                              &    
     ! Melt lake depth (m)
-  lid_depth_ml(land_pts,nsurft),                                               &    
+  !lid_depth_ml(land_pts,nsurft),                                               &    
     ! Frozen lid depth (m)
-  lid_temp_ml(land_pts,nsurft),                                                &    
+  !lid_temp_ml(land_pts,nsurft),                                                &    
     ! Frozen lid temp (K)
   ice_lens_depth(land_pts,nsurft),                                             &
     ! Ice lens depth (m)
@@ -480,12 +476,9 @@ REAL(KIND=real_jlslsm) ::                                                      &
     ! Melt mass in snow layers  (kgm-2)   
   snowdepth_before(land_pts,nsurft),                                           &                                                  
        ! Snow depth previous timestep (m).
-  dz_snowdepth(land_pts,nsurft),                                               &        
+  dz_snowdepth(land_pts,nsurft)
        ! Change is snow depth between timesteps (m).
-  snowdepth_before_compact(land_pts,nsurft),                                   &
-    ! Snow depth (m)
-  snowdepth_after_compact(land_pts,nsurft)
-   ! Snow depth (m)
+ 
    
 REAL(KIND=real_jlslsm), ALLOCATABLE ::                                         &
   snow_surft_old(:,:),                                                         &
@@ -499,15 +492,6 @@ REAL(KIND=real_jlslsm) :: snow_ratio    ! Ratio of water tracer to water
 
 TYPE(wtrac_sn_type) :: wtrac_sn         ! Water tracer working arrays
 
-INTEGER(KIND=jpim) :: ii, nn, jj
-REAL(KIND=jprb) :: rho_check, mlay, mabove, rhoj, z
-REAL :: band_top, band_bot, overlap, sice_band, ztop, zbot, rho_true
-
-!LOGICAL :: any_exposed_water(nsurft)
-
-INTEGER :: iu
-!CHARACTER(LEN=*), PARAMETER :: dbgfile = 'depth.marker.warm.cold.wet.adjust.on.ds.10cm.txt'
-CHARACTER(LEN=*), PARAMETER :: dbgfile = 'before_after_relayer.txt'
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -791,7 +775,8 @@ DO n = 1,nsurft
 !$OMP        l_wtrac_jls,n_wtrac_jls,wtrac_sn,sice_wtrac,sliq_wtrac,           &
 !$OMP        l_meltlake,nsmax_ml,sice_ml,sice_sl_ml,sliq_ml,sliq_sl_ml,        &
 !$OMP        tsnow_ml,tsnow_sl_ml,rgrainl_ml,rgrainl_sl_ml,sfrac_ml,           &
-!$OMP        sfrac_sl_ml,lfrac_ml,lfrac_sl_ml,refreeze_sl_ml,melt_sl_ml)
+!$OMP        sfrac_sl_ml,lfrac_ml,lfrac_sl_ml,refreeze_ml,refreeze_sl_ml,      &
+!$OMP        melt_ml,melt_sl_ml)
 IF (l_meltlake) THEN
   DO ns = 1, nsmax_ml
 !$OMP DO SCHEDULE(STATIC)
@@ -1245,7 +1230,9 @@ END IF
 !$OMP        wtrac_sn,melt_surft_wtrac,n_wtrac_jls,l_meltlake,nsmax_ml,        &
 !$OMP        ds_ml,ds_sl_ml,sice_ml,sice_sl_ml,sliq_ml,sliq_sl_ml,tsnow_ml,    &
 !$OMP        tsnow_sl_ml,rho_snow_ml,rho_snow_sl_ml,rgrainl_ml,rgrainl_sl_ml,  &
-!$OMP        sfrac_ml,sfrac_sl_ml,lfrac_ml,lfrac_sl_ml,refreeze_sl_ml, melt_sl_ml)
+!$OMP        sfrac_ml,sfrac_sl_ml,lfrac_ml,lfrac_sl_ml,refreeze_ml,            &
+!$OMP        refreeze_sl_ml,melt_ml,melt_sl_ml)
+  
   IF ( cansnowtile(n) ) THEN
 !$OMP DO SCHEDULE(STATIC)
     DO k = 1,surft_pts(n)

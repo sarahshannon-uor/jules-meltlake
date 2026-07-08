@@ -816,25 +816,9 @@ ELSE
       radnet_surft(l,n) = sw_surft(l,n) +   emis_surft(l,n) *                  &
                  ( lw_down(i,j) + lw_down_elevcorr_surft(l,n)                  &
                                 - sbcon * tstar_surft(l,n)**4 )
-    
-!IF (n == 9) THEN
-!   PRINT *, '--- radiative balance terms at l=', l, ' n=', n, ' ---'
-!   PRINT *, 'sw_surft              = ', sw_surft(l,n)
-!   PRINT *, 'emis_surft            = ', emis_surft(l,n)
-!   PRINT *, 'lw_down(i,j)          = ', lw_down(i,j)
-!   PRINT *, 'lw_down_elevcorr_surft= ', lw_down_elevcorr_surft(l,n)
-!   PRINT *, 'sbcon                 = ', sbcon
-!   PRINT *, 'tstar_surft           = ', tstar_surft(l,n)
-!   PRINT *, 'emis*lw_down          = ', emis_surft(l,n) * lw_down(i,j)
-!   PRINT *, 'emis*lw_down_elevcorr = ', emis_surft(l,n) * lw_down_elevcorr_surft(l,n)
-!   PRINT *, 'emis*sbcon*T^4        = ', emis_surft(l,n) * sbcon * tstar_surft(l,n)**4
-!   PRINT *, 'radnet_surft          = ', radnet_surft(l,n)
-!   PRINT *, '-----------------------------------------------------'	 
-!END IF	
- 
-	END DO
+   END DO
 !$OMP END DO
-  END DO
+END DO
   IF (sf_diag%l_lw_surft) THEN
     DO n = 1,nsurft
 !$OMP DO SCHEDULE(STATIC)

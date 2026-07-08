@@ -1200,7 +1200,7 @@ IF (l_elev_land_ice) THEN
             !----------------------------------------------------------
             ! Case 2: meltlake scheme off, surface is snow
             !----------------------------------------------------------
-            print *, 'meltlake model is off'
+            !print *, 'meltlake model is off'
             snow_surface = .true.
 
             ssum = 0.0

@@ -82,11 +82,7 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='ADJUST_ICE_LENS_DEPTH'
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
-!$OMP PARALLEL                                                                 &
-!$OMP DEFAULT(SHARED)                                                          &
-!$OMP PRIVATE(i,k,surft_pts,surft_index,ice_lens_depth,ice_lens_index,         &
-!$OMP dz_snowdepth)                   
-
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i,k)
 !$OMP DO SCHEDULE(STATIC)
 DO k = 1,surft_pts
    i = surft_index(k)

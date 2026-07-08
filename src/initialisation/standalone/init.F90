@@ -95,7 +95,7 @@ USE fire_vars_mod,                ONLY: fire_vars_data_type,                   &
                                         fire_vars_assoc
 USE meltlake_vars_mod,            ONLY: meltlake_vars_data_type,               &
                                         meltlake_vars_type,                    &
-                                        meltlake_vars_assoc																			
+                                        meltlake_vars_assoc
 USE ancil_info,                   ONLY: ainfo_data_type,                       &
                                         ainfo_type,                            &
                                         ancil_info_assoc

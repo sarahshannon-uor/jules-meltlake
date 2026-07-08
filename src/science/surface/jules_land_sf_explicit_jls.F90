@@ -100,8 +100,7 @@ SUBROUTINE jules_land_sf_explicit (                                            &
  !Fluxes (IN OUT)
  anthrop_heat_surft,                                                           &
  !prognostics (IN)
- nsnow_surft, sice_surft, sliq_surft, snowdepth_surft,                         &
-                        tsnow_surft, ds_surft,                                 &
+ nsnow_surft, sice_surft, sliq_surft, snowdepth_surft, tsnow_surft, ds_surft,  &
  sice_surft_ml, sliq_surft_ml, tsnow_surft_ml, ds_surft_ml,                    &
  !c_elevate (OUT)
  surf_hgt_surft, lw_down_elevcorr_surft,                                       &
@@ -125,7 +124,7 @@ SUBROUTINE jules_land_sf_explicit (                                            &
  ! Water tracers (OUT)
  fqw_1_wtrac, fqw_surft_wtrac, fqw_evapsrce_wtrac, smc_soilt_wtrac,            &
  !meltlake_mod (IN)
- has_lake, exposed_water, has_lid, has_vlid, snow_on_lid, lake_temp_ml,        &
+ exposed_water, has_lid, has_vlid, snow_on_lid, lake_temp_ml,                  &
  lid_temp_ml, lid_depth_ml, vlid_depth_ml, lid_snow_depth_ml)
 
 USE ancil_info,              ONLY: dim_cslayer, nsoilt, rad_nband
@@ -436,7 +435,7 @@ LOGICAL, INTENT(IN) ::                                                         &
                              ! IN if exposed melt lake water is present   
 ,has_lid(land_pts,nsurft)                                                      & 
 ,has_vlid(land_pts,nsurft)                                                     &
-,has_lake(land_pts,nsurft)                                                     &
+!,has_lake(land_pts,nsurft)                                                     &
 ,snow_on_lid(land_pts,nsurft)
 
 !-----------------------------------------------------------------------
@@ -858,7 +857,7 @@ REAL(KIND=real_jlslsm) ::                                                      &
                              !   =LS for sea-ice, =LC otherwise
 
 REAL(KIND=real_jlslsm), PARAMETER :: ice_hcon = 2.2
-REAL(KIND=real_jlslsm) :: r_snow, r_ice, ice_depth_eff
+!REAL(KIND=real_jlslsm) :: r_snow, r_ice, ice_depth_eff
 REAL(KIND=real_jlslsm), PARAMETER :: vlid_seed_depth = 0.001
 
 !  Workspace for sea-ice and marginal ice zone
@@ -1479,10 +1478,10 @@ IF (land_pts >  0) THEN    ! Omit if no land points
   !-----------------------------------------------------------------------
   ! Calculate the thermal conductivity of the top soil layer.
   !-----------------------------------------------------------------------
-  DO m = 1, nsoilt
-    CALL heat_con (land_pts,hcon_soilt,sthu_soilt(:,m,1),                      &
-                   sthf_soilt(:,m,1),smvcst_soilt(:,m,1),hcons_soilt(:,m))
-  END DO
+   DO m = 1, nsoilt
+      CALL heat_con (land_pts,hcon_soilt,sthu_soilt(:,m,1),                    &
+           sthf_soilt(:,m,1),smvcst_soilt(:,m,1),hcons_soilt(:,m))
+   END DO
 
 !-----------------------------------------------------------------------
 ! Thermal conductvity of top snow layer if nsmax > 0
@@ -1491,37 +1490,37 @@ IF (land_pts >  0) THEN    ! Omit if no land points
 !-----------------------------------------------------------------------
 IF (nsmax > 0) THEN
   DO n = 1, nsurft
-    IF (l_meltlake .AND. l_lice_surft(n)) THEN
-		
-	 ds_surft_tmp_ml(:,:)  = ds_surft_ml(:,n,:)
-	 sice_surft_tmp_ml(:,:) = sice_surft_ml(:,n,:)
-	 sliq_surft_tmp_ml(:,:) = sliq_surft_ml(:,n,:)
+     IF (l_meltlake .AND. l_lice_surft(n)) THEN
+        
+        ds_surft_tmp_ml(:,:)  = ds_surft_ml(:,n,:)
+        sice_surft_tmp_ml(:,:) = sice_surft_ml(:,n,:)
+        sliq_surft_tmp_ml(:,:) = sliq_surft_ml(:,n,:)
 
-	 CALL snowtherm(land_pts,surft_pts(n),nsnow_surft(:,n),            &
-                     surft_index(:,n),nsmax_ml,ds_surft_tmp_ml,            &
-                     sice_surft_tmp_ml,sliq_surft_tmp_ml,csnow_ml,ksnow_ml)
+        CALL snowtherm(land_pts,surft_pts(n),nsnow_surft(:,n),                 &
+             surft_index(:,n),nsmax_ml,ds_surft_tmp_ml,                        &
+             sice_surft_tmp_ml,sliq_surft_tmp_ml,csnow_ml,ksnow_ml)
   
-    DO l = 1, land_pts
-	 hcons_snow(l,n) = ksnow_ml(l,1)
-    END DO
+        DO l = 1, land_pts
+           hcons_snow(l,n) = ksnow_ml(l,1)
+        END DO
 
-    ELSE
+     ELSE
+
+        ds_surft_tmp(:,:)   = ds_surft(:,n,:)
+        sice_surft_tmp(:,:) = sice_surft(:,n,:)
+        sliq_surft_tmp(:,:) = sliq_surft(:,n,:)
+
+        CALL snowtherm(land_pts,surft_pts(n),nsnow_surft(:,n),                 &
+             surft_index(:,n),nsmax,ds_surft_tmp,sice_surft_tmp,               &
+             sliq_surft_tmp,csnow,ksnow)
 		
-	ds_surft_tmp(:,:)   = ds_surft(:,n,:)
-	sice_surft_tmp(:,:) = sice_surft(:,n,:)
-	sliq_surft_tmp(:,:) = sliq_surft(:,n,:)
-
-	CALL snowtherm(land_pts,surft_pts(n),nsnow_surft(:,n),              &
-                     surft_index(:,n),nsmax,ds_surft_tmp,sice_surft_tmp,    &
-                     sliq_surft_tmp,csnow,ksnow)
-		
-   DO l = 1, land_pts
-    hcons_snow(l,n) = ksnow(l,1)
-   END DO
-
-  END IF ! l_meltlake
-
- END DO
+        DO l = 1, land_pts
+           hcons_snow(l,n) = ksnow(l,1)
+        END DO
+ 
+     END IF ! l_meltlake
+     
+  END DO
 END IF ! nsmax > 0 
 
 
@@ -2029,8 +2028,10 @@ DO n = 1,nsurft
 !$OMP        n, m, ts1_lake_gb, hcon_lake, l_elev_land_ice, l_lice_point,      &
 !$OMP        tsurf_elev_surft, dzsoil_elev, l_lice_surft, hcondeep,            &
 !$OMP        l_moruses_storage, urban_roof, l_fix_moruses_roof_rad_coupling,   &
-!$OMP        vfrac_surft, ashtf_surft, scaling_urban, l_soil_point)            &
-!$OMP SCHEDULE(STATIC)
+!$OMP        vfrac_surft, ashtf_surft, scaling_urban, l_soil_point,has_lid,    &
+!$OMP        has_vlid,snow_on_lid,lid_depth_ml,vlid_depth_ml,lid_snow_depth_ml,&
+!$OMP        lid_temp_ml,exposed_water,lake_temp_ml,tstar_surft) SCHEDULE(STATIC)
+  
   DO l = 1,land_pts
     j = (land_index(l) - 1) / t_i_length + 1
     i = land_index(l) - (j-1) * t_i_length
@@ -2068,15 +2069,15 @@ DO n = 1,nsurft
 
 	!sarah this seems to overwrite l_elev_land_ice tsurf,dzsurf,hcons 
     !IF ( ( nsmax > 0 ) .AND. ( nsnow_surft(l,n) > 0 ) ) THEN
-	IF (.NOT. l_elev_land_ice .AND. nsmax > 0 .AND. nsnow_surft(l,n) > 0) THEN
-      ! Snow
-      tsurf(l,n) = tsnow_surft(l,n,1)
-      ! change the effective surface layer thickness for snow
-      dzsurf(l,n)     = ds_surft(l,n,1)
-      hcons_surf(l,n) = hcons_snow(l,n)
-      IF ( ( .NOT. cansnowtile(n) ) .AND. l_snow_nocan_hc ) THEN
-        canhc_surf(l,n) = 0.0
-      END IF
+    IF (.NOT. l_elev_land_ice .AND. nsmax > 0 .AND. nsnow_surft(l,n) > 0) THEN
+       ! Snow
+       tsurf(l,n) = tsnow_surft(l,n,1)
+       ! change the effective surface layer thickness for snow
+       dzsurf(l,n)     = ds_surft(l,n,1)
+       hcons_surf(l,n) = hcons_snow(l,n)
+       IF ( ( .NOT. cansnowtile(n) ) .AND. l_snow_nocan_hc ) THEN
+          canhc_surf(l,n) = 0.0
+       END IF
     END IF
 
     ! MORUSES: Uncouple the roof for perfect insulation. hcons should only be zero
@@ -2136,43 +2137,41 @@ DO n = 1,nsurft
     
     IF (snow_on_lid(l,n)) THEN
 
-       dzsurf(l,n)     = lid_snow_depth_ml(l,n)
-       hcons_surf(l,n) = snow_hcon
-       canhc_surf(l,n) = 0.0
+    !   dzsurf(l,n)     = lid_snow_depth_ml(l,n)
+    !   hcons_surf(l,n) = snow_hcon
+    !   canhc_surf(l,n) = 0.0
 
-       r_snow = lid_snow_depth_ml(l,n) / snow_hcon
+     !  r_snow = lid_snow_depth_ml(l,n) / snow_hcon
 
-       IF (has_lid(l,n)) THEN
-          tsurf(l,n)    = lid_temp_ml(l,n)
-          ice_depth_eff = MAX(lid_depth_ml(l,n), vlid_seed_depth)
+     !  IF (has_lid(l,n)) THEN
+     !     tsurf(l,n)    = lid_temp_ml(l,n)
+     !     ice_depth_eff = MAX(lid_depth_ml(l,n), vlid_seed_depth)
           
-       ELSE IF (has_vlid(l,n)) THEN
-          tsurf(l,n)    = tm
-          ice_depth_eff = MAX(vlid_depth_ml(l,n), vlid_seed_depth)
-       END IF
+     !  ELSE IF (has_vlid(l,n)) THEN
+     !     tsurf(l,n)    = tm
+     !     ice_depth_eff = MAX(vlid_depth_ml(l,n), vlid_seed_depth)
+     !  END IF
 
-       r_ice = ice_depth_eff / ice_hcon
-       ashtf_surft(l,n) = 2.0 / (r_snow + r_ice)
+     !  r_ice = ice_depth_eff / ice_hcon
+     !  ashtf_surft(l,n) = 2.0 / (r_snow + r_ice)
 
-       IF (snow_on_lid(l,n) .AND. lid_snow_depth_ml(l,n) > 0.3) THEN
+     !  IF (snow_on_lid(l,n) .AND. lid_snow_depth_ml(l,n) > 0.3) THEN
 
 
-          WRITE(*,*) 'snow_on_lid:'
-          WRITE(*,'(A,I8)')    'l                 = ', l
-          WRITE(*,'(A,I8)')    'n                 = ', n
-          WRITE(*,'(A,L2)')    'has_lid           = ', has_lid(l,n)
-          WRITE(*,'(A,L2)')    'has_vlid          = ', has_vlid(l,n)
-          WRITE(*,'(A,F12.6)') 'lid_snow_depth_ml = ', lid_snow_depth_ml(l,n)
-          WRITE(*,'(A,F12.6)') 'dzsurf            = ', dzsurf(l,n)
-          WRITE(*,'(A,F12.6)') 'r_snow            = ', r_snow
-          WRITE(*,'(A,F12.6)') 'tsurf             = ', tsurf(l,n)
-          WRITE(*,'(A,F12.6)') 'ice_depth_eff     = ', ice_depth_eff
-          WRITE(*,'(A,F12.6)') 'r_ice             = ', r_ice
-          WRITE(*,'(A,F12.6)') 'ashtf_surft       = ', ashtf_surft(l,n)
-          
-         
-        
-       END IF
+      !    WRITE(*,*) 'snow_on_lid:'
+      !    WRITE(*,'(A,I8)')    'l                 = ', l
+      !    WRITE(*,'(A,I8)')    'n                 = ', n
+      !    WRITE(*,'(A,L2)')    'has_lid           = ', has_lid(l,n)
+      !    WRITE(*,'(A,L2)')    'has_vlid          = ', has_vlid(l,n)
+      !    WRITE(*,'(A,F12.6)') 'lid_snow_depth_ml = ', lid_snow_depth_ml(l,n)
+      !    WRITE(*,'(A,F12.6)') 'dzsurf            = ', dzsurf(l,n)
+      !    WRITE(*,'(A,F12.6)') 'r_snow            = ', r_snow
+      !    WRITE(*,'(A,F12.6)') 'tsurf             = ', tsurf(l,n)
+      !    WRITE(*,'(A,F12.6)') 'ice_depth_eff     = ', ice_depth_eff
+      !    WRITE(*,'(A,F12.6)') 'r_ice             = ', r_ice
+      !    WRITE(*,'(A,F12.6)') 'ashtf_surft       = ', ashtf_surft(l,n)
+               
+      ! END IF
    
     !-----------------------------------------------------------------------
     ! Exposed-water lower boundary for sf_flux

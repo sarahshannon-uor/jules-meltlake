@@ -267,7 +267,7 @@ z_top   = 0.0
 
 IF (has_lake(i)) THEN
    win = 0
-   print *, 'lake present bypass percolate_monarchs'
+   !print *, 'lake present bypass percolate_monarchs'
    RETURN
 END IF
 

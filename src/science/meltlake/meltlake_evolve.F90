@@ -237,8 +237,8 @@ REAL(KIND=real_jlslsm) ::                                                 &
   cold_shallow_puddle_hours(land_pts)
 
 ! --- diagnostic to check how much lake depth is from inflow versus stefan
-REAL, SAVE       :: cum_inflow_m = 0.0
-REAL, SAVE       :: cum_stefan_m = 0.0
+!REAL, SAVE       :: cum_inflow_m = 0.0
+!REAL, SAVE       :: cum_stefan_m = 0.0
 
 REAL(KIND=real_jlslsm), PARAMETER :: vlid_seed_depth = 0.001!1.0e-3
 
@@ -279,9 +279,11 @@ CHARACTER(LEN=80)    :: ERRMSG             ! Error message
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
-!-----------------------------------------------------------------------------
-! 
-!-----------------------------------------------------------------------------
+!$OMP PARALLEL DO DEFAULT(SHARED)                                             &
+!$OMP PRIVATE(k,i,n,expon_term,ex,flux_lower,flux_upper,delta_t,dt,dTdt,      &
+!$OMP         sw_absorb,dhdt,dh_ice,dh_water,dm,flux_upper_diag,dh_remain,    &
+!$OMP         frac_melt,dsice,dsliq,ds_old,rain_add,snow_add,dsice_tot,       &
+!$OMP         dsliq_tot,cold_lingering_shallow_puddle)
 DO k = 1,surft_pts
    i = surft_index(k)
 
@@ -290,8 +292,6 @@ DO k = 1,surft_pts
 ! snowpack top. 
 !-----------------------------------------------------------------------------
    CALL update_lake_states(i)
-
-   
 
 !-----------------------------------------------------------------------------
 ! No lake yet grow one using meltwater 
@@ -305,7 +305,7 @@ DO k = 1,surft_pts
       END IF
    END IF
 
-   cum_inflow_m = cum_inflow_m + lake_inflow(i) / rho_water
+   !cum_inflow_m = cum_inflow_m + lake_inflow(i) / rho_water
 
 !-----------------------------------------------------------------------------
 ! Re-calculate lake state after lake growth
@@ -657,45 +657,45 @@ DO k = 1,surft_pts
          
       END IF ! Stefan dh_ice > 0
 
-      IF (timestep_number >= 338 .AND. timestep_number <= 340) THEN
+      !IF (timestep_number >= 338 .AND. timestep_number <= 340) THEN
 
-            WRITE(*,*) '--- MELTLAKE_EVOLVE DEBUG ---'
-            WRITE(*,'(A,I8)')    'timestep_number        = ', timestep_number
-            WRITE(*,'(A,I8)')    'i                      = ', i
-            WRITE(*,'(A,L2)')    'has_lake               = ', has_lake(i)
-            WRITE(*,'(A,L2)')    'exposed_water          = ', exposed_water(i)
-            WRITE(*,'(A,L2)')    'has_vlid               = ', has_vlid(i)
-            WRITE(*,'(A,L2)')    'has_lid                = ', has_lid(i)
+       !     WRITE(*,*) '--- MELTLAKE_EVOLVE DEBUG ---'
+       !     WRITE(*,'(A,I8)')    'timestep_number        = ', timestep_number
+       !     WRITE(*,'(A,I8)')    'i                      = ', i
+       !     WRITE(*,'(A,L2)')    'has_lake               = ', has_lake(i)
+       !     WRITE(*,'(A,L2)')    'exposed_water          = ', exposed_water(i)
+       !     WRITE(*,'(A,L2)')    'has_vlid               = ', has_vlid(i)
+       !     WRITE(*,'(A,L2)')    'has_lid                = ', has_lid(i)
             
-            WRITE(*,'(A,F12.6)') 'lake_depth_ml          = ', lake_depth_ml(i)
-            WRITE(*,'(A,F12.6)') 'dhdt_lake_snow_ml      = ', dhdt_lake_snow_ml(i)
-            WRITE(*,'(A,F12.6)') 'snowdepth              = ', snowdepth(i)
-            WRITE(*,'(A,F12.6)') 'snow_surft             = ', snow_surft(i)
-            WRITE(*,'(A,F12.6)') 'lake_temp_ml (C)       = ', lake_temp_ml(i) - 273.15
+       !     WRITE(*,'(A,F12.6)') 'lake_depth_ml          = ', lake_depth_ml(i)
+       !     WRITE(*,'(A,F12.6)') 'dhdt_lake_snow_ml      = ', dhdt_lake_snow_ml(i)
+       !     WRITE(*,'(A,F12.6)') 'snowdepth              = ', snowdepth(i)
+       !     WRITE(*,'(A,F12.6)') 'snow_surft             = ', snow_surft(i)
+       !     WRITE(*,'(A,F12.6)') 'lake_temp_ml (C)       = ', lake_temp_ml(i) - 273.15
 
    
-            WRITE(*,'(A,I8)')    'nsnow                 = ', nsnow(i)
-            WRITE(*,'(A,F12.6)') 'ds_ml(1)              = ', ds_ml(i,1)
-            WRITE(*,'(A,F12.6)') 'sice_ml(1)            = ', sice_ml(i,1)
-            WRITE(*,'(A,F12.6)') 'sliq_ml(1)            = ', sliq_ml(i,1)
-            WRITE(*,'(A,F12.6)') 'tsnow_ml(1) (C)       = ', tsnow_ml(i) - 273.15
-            WRITE(*,'(A,F12.6)') 'ksnow0_ml             = ', ksnow0_ml(i)
-            WRITE(*,'(A,F12.6)') 'kdtdz_ml              = ', kdtdz_ml(i)
+        !    WRITE(*,'(A,I8)')    'nsnow                 = ', nsnow(i)
+        !    WRITE(*,'(A,F12.6)') 'ds_ml(1)              = ', ds_ml(i,1)
+        !    WRITE(*,'(A,F12.6)') 'sice_ml(1)            = ', sice_ml(i,1)
+        !    WRITE(*,'(A,F12.6)') 'sliq_ml(1)            = ', sliq_ml(i,1)
+        !    WRITE(*,'(A,F12.6)') 'tsnow_ml(1) (C)       = ', tsnow_ml(i) - 273.15
+        !    WRITE(*,'(A,F12.6)') 'ksnow0_ml             = ', ksnow0_ml(i)
+        !    WRITE(*,'(A,F12.6)') 'kdtdz_ml              = ', kdtdz_ml(i)
    
 
-            WRITE(*,'(A,F12.6)') 'flux_lower             = ', flux_lower
-            WRITE(*,'(A,F12.6)') 'flux_upper             = ', flux_upper
-            WRITE(*,'(A,F12.6)') 'sw_absorb              = ', sw_absorb
-            WRITE(*,'(A,F12.6)') 'dTdt                   = ', dTdt
-            WRITE(*,'(A,F12.6)') 'dhdt                   = ', dhdt
-            WRITE(*,'(A,F12.6)') 'dh_ice                 = ', dh_ice
-            WRITE(*,'(A,F12.6)') 'dh_water               = ', dh_water
+         !   WRITE(*,'(A,F12.6)') 'flux_lower             = ', flux_lower
+         !   WRITE(*,'(A,F12.6)') 'flux_upper             = ', flux_upper
+         !   WRITE(*,'(A,F12.6)') 'sw_absorb              = ', sw_absorb
+         !   WRITE(*,'(A,F12.6)') 'dTdt                   = ', dTdt
+         !   WRITE(*,'(A,F12.6)') 'dhdt                   = ', dhdt
+         !   WRITE(*,'(A,F12.6)') 'dh_ice                 = ', dh_ice
+         !   WRITE(*,'(A,F12.6)') 'dh_water               = ', dh_water
 
            ! IF (timestep_number == 340) STOP 'debug stop after timestep 340'
 
-         END IF
+         !END IF
       
-      cum_stefan_m = cum_stefan_m + dh_water
+     ! cum_stefan_m = cum_stefan_m + dh_water
            
    END IF !has_lake
 
@@ -704,9 +704,6 @@ DO k = 1,surft_pts
 !-----------------------------------------------------------------------------
    CALL update_lake_states(i)
 
-     
-    !WRITE(*,'(A,F16.8)') 'cum_inflow_m', cum_inflow_m
-    !WRITE(*,'(A,F16.8)') 'cum_stefan_m', cum_stefan_m
 
 END DO ! land_pts
 
@@ -714,6 +711,7 @@ END DO ! land_pts
 !   stop
 !END IF
 
+!$OMP END PARALLEL DO
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN
 

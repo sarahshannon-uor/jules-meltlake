@@ -241,6 +241,9 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 !-----------------------------------------------------------------------------
 ! Lid growth by Stefan condition at the lake top / lid bottom interface
 !-----------------------------------------------------------------------------
+!$OMP PARALLEL DO DEFAULT(SHARED)                                            &
+!$OMP PRIVATE(k,i,n,kdtdz_ml,flux_lower,delta_t,t_lid_top,dhdt,dh_ice,       &
+!$OMP         dh_water,lid_depth_eff,rain_add,snow_add,seeded_vlid)
 DO k = 1,surft_pts
    i = surft_index(k)
 
@@ -579,6 +582,7 @@ END IF
    
    
 END DO ! land_pts
+!$OMP END PARALLEL DO
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN

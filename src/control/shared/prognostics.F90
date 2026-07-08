@@ -397,7 +397,7 @@ ALLOCATE(progs_data%rho_snow_surft(land_pts,nsurft,nsmax))
 progs_data%rho_snow_surft(:,:,:) = 0.0
 
 ! Snowpack variables for melt lake model 
-IF (l_meltlake) THEN
+!IF (l_meltlake) THEN
    ALLOCATE(progs_data%nsnow_surft_ml(land_pts,nsurft))
    ALLOCATE(progs_data%ds_surft_ml(land_pts,nsurft,nsmax_ml))
    ALLOCATE(progs_data%rho_snow_surft_ml(land_pts,nsurft,nsmax_ml))
@@ -416,7 +416,8 @@ IF (l_meltlake) THEN
    progs_data%tsnow_surft_ml(:,:,:)   = 0.0
    progs_data%snow_surft_ml(:,:)      = 0.0
    progs_data%snowdepth_surft_ml(:,:) = 0.0
-   progs_data%rgrainl_surft_ml(:,:,:) = 0.0	
+   progs_data%rgrainl_surft_ml(:,:,:) = 0.0
+
 !ELSE
 !   ALLOCATE(progs_data%nsnow_surft_ml(1,1))
 !   ALLOCATE(progs_data%ds_surft_ml(1,1,1))
@@ -426,7 +427,18 @@ IF (l_meltlake) THEN
 !   ALLOCATE(progs_data%tsnow_surft_ml(1,1,1))
 !   ALLOCATE(progs_data%snow_surft_ml(1,1))
 !   ALLOCATE(progs_data%snowdepth_surft_ml(1,1))
-END IF
+!   ALLOCATE(progs_data%rgrainl_surft_ml(1,1,1))
+
+!   progs_data%nsnow_surft_ml(:,:)      = 0
+!   progs_data%ds_surft_ml(:,:,:)       = 0.0
+!   progs_data%rho_snow_surft_ml(:,:,:) = 0.0
+!   progs_data%sice_surft_ml(:,:,:)     = 0.0
+!   progs_data%sliq_surft_ml(:,:,:)     = 0.0
+!   progs_data%tsnow_surft_ml(:,:,:)    = 0.0
+!   progs_data%snow_surft_ml(:,:)       = 0.0
+!   progs_data%snowdepth_surft_ml(:,:)  = 0.0
+!   progs_data%rgrainl_surft_ml(:,:,:)  = 0.0
+!END IF
 
 ! Allocate WP Pools
 IF ( l_triffid .OR. l_phenol ) THEN

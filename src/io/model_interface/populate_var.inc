@@ -156,7 +156,7 @@ CASE ( 'surf_hgt_surft' )
 CASE ( 'z_land_land' )
   IF ( PRESENT(cube) ) THEN
     cube_land = map_to_land(cube)
-	CALL cube_get_data(cube_land, jules_vars_data%z_land_land)
+    CALL cube_get_data(cube_land, jules_vars_data%z_land_land)
   ELSE
     jules_vars_data%z_land_land(:) = const_val
   END IF

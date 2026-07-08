@@ -41,7 +41,7 @@ INTEGER, PARAMETER ::                                                          &
   cs_layer_max     = 60,                                                       &
     ! Maximum allowed number of soil carbon layers.
 #endif
-  snow_layers_max   = 10,                                                      &
+  snow_layers_max   = 200,                                                      &
   ndep_species_max  = 200,                                                     &
     ! Maximum allowed number of trace gas and aerosol components for
     ! deposition.

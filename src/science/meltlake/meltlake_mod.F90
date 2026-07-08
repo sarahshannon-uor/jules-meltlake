@@ -280,7 +280,6 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='MELTLAKE'
 !-----------------------------------------------------------------------------
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
-
 DO n = 1,nsurft
 
    IF (l_elev_land_ice .AND. l_lice_surft(n)) THEN
@@ -467,9 +466,7 @@ DO n = 1,nsurft
       ! which ones have did_insert_lid=true. Come back to this.  
       IF (ANY(did_insert_lid(surft_index(1:surft_pts(n),n),n))) THEN
 
-         
-        
-
+   
       CALL relayersnow ( land_pts,       &
            surft_pts(n),                 &
            n_wtrac_jls,                  &
@@ -499,20 +496,7 @@ DO n = 1,nsurft
       
    END IF ! did_insert_lid
 
-!---------------------------------------------------------------
-! Final state cleanup, after any relayering
-!---------------------------------------------------------------
-   
-   !DO j = 1, surft_pts(n)
-   !   i = surft_index(j,n)
-
-   !   CALL finalise_meltlake_state(i,n)
-
-   !END DO
-
-
-   
-   END IF ! elev land ice tile
+END IF ! elev land ice tile
       
 END DO !nsurft
 

@@ -666,9 +666,8 @@ CASE ( jules )
     wtrac_jls%fqw_1, wtrac_jls%fqw_surft, wtrac_jls%fqw_evapsrce,              &
     wtrac_jls%smc_soilt,                                                       &
     ! meltlake (IN)
-    meltlake_vars%has_lake, meltlake_vars%exposed_water,                       &
-    meltlake_vars%has_lid, meltlake_vars%has_vlid,                             &
-    meltlake_vars%snow_on_lid, meltlake_vars%lake_temp_ml,                     & 
+    meltlake_vars%exposed_water, meltlake_vars%has_lid, meltlake_vars%has_vlid,&
+    meltlake_vars%snow_on_lid, meltlake_vars%lake_temp_ml,                     &
     meltlake_vars%lid_temp_ml, meltlake_vars%lid_depth_ml,                     &
     meltlake_vars%vlid_depth_ml, meltlake_vars%lid_snow_depth_ml)
 

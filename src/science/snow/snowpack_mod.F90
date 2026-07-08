@@ -715,9 +715,11 @@ DO k = 1,surft_pts
     ! Melt snow in layers with temperature exceeding melting point
     !-------------------------------------------------------------------------
 
-    DO n = 1,nsnow(i)
-       melt_mass(i,n) = 0.0 ! sarah hack for diag out to nc
-       
+  DO n = 1,nsnow(i)
+
+     IF (l_meltlake .AND. PRESENT(melt_mass)) THEN
+        melt_mass(i,n) = 0.0 ! sarah hack for diag out to nc
+     END IF
        
     ! energy per unit area needed to warm the layer to 0 °C.
       coldsnow = csnow(i,n) * (tm - tsnow(i,n))
@@ -744,11 +746,12 @@ DO k = 1,surft_pts
         sice(i,n) = sice(i,n) - dsice
         sliq(i,n) = sliq(i,n) + dsice
         
-        !-------------------------------------------------------------------------
-        ! melting at each snow level for output diagnostics
-        !-------------------------------------------------------------------------
-        melt_mass(i,n) = dsice   
-
+!-------------------------------------------------------------------------
+! melting at each snow level for output diagnostics
+!-------------------------------------------------------------------------           
+        IF (l_meltlake .AND. PRESENT(melt_mass)) THEN
+           melt_mass(i,n) = dsice   
+        END IF
         
         IF (sf_diag%l_snice) THEN
           sf_diag%snice_m_surft(i,surft_n) = sf_diag%snice_m_surft(i,surft_n)  &
@@ -912,8 +915,7 @@ DO k = 1,surft_pts
 
       coldsnow = csnow(i,n) * (tm - tsnow(i,n))
       
-      !print *, "refreeze layer", n, "dsice", 0, "tsnow before refreeze", tsnow(i,n)-273.15
-
+      
       IF (coldsnow > 0.0) THEN
         ! Liquid can freeze
         dsice      = MIN(sliq(i,n), coldsnow / lf)
@@ -940,8 +942,7 @@ DO k = 1,surft_pts
         sice(i,n)  = sice(i,n) + dsice
         tsnow(i,n) = tsnow(i,n) + lf * dsice / csnow(i,n)
 
-        !print *, "refreeze layer", n, "dsice", dsice, "tsnow after refreeze", tsnow(i,n)-273.15
-        
+               
         IF (sf_diag%l_snice) THEN
           sf_diag%snice_freez_surft(i,surft_n) =                               &
                        sf_diag%snice_freez_surft(i,surft_n) + dsice / timestep
