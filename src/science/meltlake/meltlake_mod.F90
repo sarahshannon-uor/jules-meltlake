@@ -257,9 +257,9 @@ INTEGER ::                                                                     &
     ! Tile pts loop counter.
   k,                                                                           &
     ! Tile number.
-  n                                                                           
+  n, &                                                                           
     ! Tile loop counter.
-
+  ns
 !-----------------------------------------------------------------------------
 ! Local arrays
 !-----------------------------------------------------------------------------
@@ -319,7 +319,42 @@ DO n = 1,nsurft
            dhdt_lake_snow_ml(:,n))          !OUT
 
 
-      ! Tracer stuff not active 
+      !WRITE(*,*) 'after meltlake_evolve: ', timestep_number, SUM(ds_ml(1,n,1:nsnow(1,n)))
+      
+      !IF (timestep_number == 335) THEN
+   
+       !  WRITE(*,*) '---after meltlake_evolve ---'
+       !  WRITE(*,'(A,I8)')    'timestep_number       = ', timestep_number
+       !  WRITE(*,'(A4,3A12)') 'ns', 'ds', 'sice', 'sliq'
+
+        ! DO ns = 1, nsnow(1,n)
+        !    WRITE(*,'(I4,4F12.6)') ns,                  &
+        !         ds_ml(1,n,ns),                         &
+        !         sice_ml(1,n,ns),                       &
+        !         sliq_ml(1,n,ns),                       &
+        !         tsnow_ml(1,n,ns) - 273.15
+        ! END DO
+       
+        ! WRITE(*,'(A,F12.6)') 'snowdepth(1,1)       = ', snowdepth(1,n)
+        ! WRITE(*,'(A,F12.6)') 'dhdt_lake_snow_ml     = ', dhdt_lake_snow_ml(1,n)
+      !      WRITE(*,'(A,F12.6)') 'snow_surft            = ', snow_surft(1,n)
+      !      WRITE(*,'(A,I8)')    'nsnow                 = ', nsnow(1,n)
+      !      WRITE(*,'(A,F12.6)') 'ds_ml(1)              = ', ds_ml(1,n,1)
+      !      WRITE(*,'(A,F12.6)') 'ds_ml(end)            = ', ds_ml(1,n,1:nsnow(1,n))
+      !      DO ns = 1, nsnow(1,n)
+      !         WRITE(*,'(A,I4,A,F12.6)') 'ns' , ns, ' ds_sl_ml = ', ds_ml(1,n,ns)
+      !      END DO
+
+       !     WRITE(*,'(A,F12.6)') 'snowdepth             = ', snowdepth(1,n)
+       !     WRITE(*,'(A,F12.6)') 'sum_ds                = ', SUM(ds_ml(1,n,1:nsnow(1,n)))
+       !     WRITE(*,'(A,F12.6)') 'difference            = ', snowdepth(1,n) - &
+       !          SUM(ds_ml(1,n,1:nsnow(1,n)))
+
+        !    WRITE(*,'(A,F12.6)') 'snow_surft            = ', snow_surft(1,n)
+        !    WRITE(*,'(A,F12.6)') 'sum(sice+sliq)        = ', SUM(sice_ml(1,n,1:nsnow(1,n))) + SUM(sliq_ml(1,n,1:nsnow(1,n)))
+         !END IF
+            
+            ! Tracer stuff not active 
          sice0_wtrac(:,:)  = 0.0
          sice_wtrac(:,n,:) = 0.0
          sliq_wtrac(:,n,:) = 0.0
@@ -328,7 +363,9 @@ DO n = 1,nsurft
 
        !  snowfall(:) = 0.0
        !  sice0(:)    = 0.0
-        
+       !  tsnow0(:)  = tm
+       !  rho0(:)    = rho_ice
+       !  rgrain0(:) = 2000.0
         
        !  WRITE(*,'(A,F12.6)') 'dhdt_lake_snow_ml      = ', dhdt_lake_snow_ml(1,n)
        !  WRITE(*,'(A,F12.6)') 'lake_depth_ml          = ', lake_depth_ml(1,n)
@@ -337,9 +374,9 @@ DO n = 1,nsurft
        !  WRITE(*,'(A,F12.6)') 'ls_rain                = ', ls_rain(1)
        !  WRITE(*,'(A,F12.6)') 'con_rain               = ', con_rain(1)
 
-       !  WRITE(*,*) 'has_lid(i)                      = ', has_lid(1,n)
-       !  WRITE(*,*) 'has_lake(i)                     = ', has_lake(1,n)
-       !  WRITE(*,*) 'expsosed_water(i)               = ', exposed_water(1,n)
+        ! WRITE(*,*) 'has_lid(i)                      = ', has_lid(1,n)
+        ! WRITE(*,*) 'has_lake(i)                     = ', has_lake(1,n)
+        ! WRITE(*,*) 'expsosed_water(i)               = ', exposed_water(1,n)
          
        !  WRITE(*,'(A,I8)')    'tile point i          = ', 1
        !  WRITE(*,'(A,I8)')    'land index            = ', surft_index(1,n)
@@ -370,32 +407,51 @@ DO n = 1,nsurft
 
          
 
-         !CALL relayersnow ( land_pts,       &
-         !     surft_pts(n),                 &
-         !     n_wtrac_jls,                  &
-         !     surft_index(:,n),             &
-         !     nsmax_ml,                     &
-         !     dzsnow_ml,                    &
-         !     rgrain0,                      & ! 2000 microns for ice
-         !     rho0,                         & ! lid denisty (rho_ice)
-         !     sice0,                        & ! lid ice mass
-         !     snowfall,                     & ! 0 snowfalls into lake or onto lid
-         !     snow_surft(:,n),              & ! snowmass including permanent lid ice
-         !     tsnow0,                       & ! lid temp
-         !     sice0_wtrac,                  &
-         !     nsnow(:,n),                   &
-         !     ds_ml(:,n,:),                 &
-         !     rgrain(:,n),                  &
-         !     rgrainl_ml(:,n,:),            &
-         !     sice_ml(:,n,:),               &
-         !     rho_snow_grnd(:,n),           &
-         !     sliq_ml(:,n,:),               &
-         !     tsnow_ml(:,n,:),              &
-         !     sice_wtrac(:,n,:),            &
-         !     sliq_wtrac(:,n,:),            &
-         !     rho_snow_ml(:,n,:),           &
-         !     snowdepth(:,n) )
+        ! CALL relayersnow ( land_pts,       &
+        !      surft_pts(n),                 &
+        !      n_wtrac_jls,                  &
+        !      surft_index(:,n),             &
+        !      nsmax_ml,                     &
+        !      dzsnow_ml,                    &
+        !      rgrain0,                      & ! 2000 microns for ice
+        !      rho0,                         & ! lid denisty (rho_ice)
+        !      sice0,                        & ! lid ice mass
+        !      snowfall,                     & ! 0 snowfalls into lake or onto lid
+        !      snow_surft(:,n),              & ! snowmass including permanent lid ice
+        !      tsnow0,                       & ! lid temp
+        !      sice0_wtrac,                  &
+        !      nsnow(:,n),                   &
+        !      ds_ml(:,n,:),                 &
+        !      rgrain(:,n),                  &
+        !      rgrainl_ml(:,n,:),            &
+        !      sice_ml(:,n,:),               &
+        !      rho_snow_grnd(:,n),           &
+        !      sliq_ml(:,n,:),               &
+        !      tsnow_ml(:,n,:),              &
+        !      sice_wtrac(:,n,:),            &
+        !      sliq_wtrac(:,n,:),            &
+        !      rho_snow_ml(:,n,:),           &
+        !      snowdepth(:,n) )
 
+         !IF (timestep_number == 335) THEN
+   
+          !  WRITE(*,*) '---after relayersnow after meltlake_evolve ---'
+          !  WRITE(*,'(A,I8)')    'timestep_number       = ', timestep_number
+          !  WRITE(*,'(A4,3A12)') 'ns', 'ds', 'sice', 'sliq'
+
+           ! DO ns = 1, nsnow(1,n)
+           !    WRITE(*,'(I4,4F12.6)') ns,                  &
+           !         ds_ml(1,n,ns),                         &
+           !         sice_ml(1,n,ns),                       &
+           !         sliq_ml(1,n,ns),                       &
+           !         tsnow_ml(1,n,ns) - 273.15
+           ! END DO
+         
+            
+            !WRITE(*,'(A,F12.6)') 'snowdepth(1,1)       = ', snowdepth(1,n)
+         !END IF
+
+         
         ! WRITE(*,*) '--- RELAYERSNOW OUTPUT ---'
         ! WRITE(*,'(A,I8)')    'timestep_number        = ', timestep_number
         ! WRITE(*,'(A,I8)')    'nsnow(i,n)            = ', nsnow(1,n)
@@ -461,6 +517,25 @@ DO n = 1,nsurft
            rgrain0,                       & !OUT
            sice0)                          !OUT
 
+      !WRITE(*,*) 'after lid_evolve: ', timestep_number, SUM(ds_ml(1,n,1:nsnow(1,n)))
+      
+      !IF (timestep_number == 335) THEN
+   
+       !  WRITE(*,*) '--- after lid_evolve ---'
+       !     WRITE(*,'(A,I8)')    'timestep_number       = ', timestep_number
+       !     WRITE(*,'(A,F12.6)') 'dhdt_lid_lake_ml      = ', dhdt_lid_lake_ml(1,n)
+       !     WRITE(*,'(A,F12.6)') 'snow_surft            = ', snow_surft(1,n)
+       !     WRITE(*,'(A,I8)')    'nsnow                 = ', nsnow(1,n)
+       !     WRITE(*,'(A,F12.6)') 'ds_ml(1)              = ', ds_ml(1,n,1)
+       !     WRITE(*,'(A,F12.6)') 'ds_ml(end)            = ', ds_ml(1,n,nsnow(1,n))
+       !     WRITE(*,'(A,F12.6)') 'snowdepth             = ', snowdepth(1,n)
+       !     WRITE(*,'(A,F12.6)') 'sum_ds                = ', SUM(ds_ml(1,n,1:nsnow(1,n)))
+       !     WRITE(*,'(A,F12.6)') 'difference            = ', snowdepth(1,n) - &
+       !          SUM(ds_ml(1,n,1:nsnow(1,n)))
+
+        !    WRITE(*,'(A,F12.6)') 'snow_surft            = ', snow_surft(1,n)
+        !    WRITE(*,'(A,F12.6)') 'sum(sice+sliq)        = ', SUM(sice_ml(1,n,1:nsnow(1,n))) + SUM(sliq_ml(1,n,1:nsnow(1,n)))
+        ! END IF
       
       ! This is runtime wasteful - it runs though all land_pts even though I know
       ! which ones have did_insert_lid=true. Come back to this.  
@@ -493,9 +568,34 @@ DO n = 1,nsurft
            rho_snow_ml(:,n,:),           &
            snowdepth(:,n) )
 
+      !WRITE(*,*) 'after meltlake_mod relayersnow: ', timestep_number, SUM(ds_ml(1,n,1:nsnow(1,n)))
       
+      !WRITE(*,*) '--- after relayer after insert lid ---'
+      !WRITE(*,'(A,I8)')    'timestep_number       = ', timestep_number
+           
+      !WRITE(*,'(A,F12.6)') 'snow_surft            = ', snow_surft(1,n)
+      !WRITE(*,'(A,I8)')    'nsnow                 = ', nsnow(1,n)
+      !WRITE(*,'(A,F12.6)') 'ds_ml(1)              = ', ds_ml(1,n,1)
+      !WRITE(*,'(A,F12.6)') 'ds_ml(end)            = ', ds_ml(1,n,nsnow(1,n))
+      !WRITE(*,'(A,F12.6)') 'snowdepth             = ', snowdepth(1,n)
+      !WRITE(*,'(A,F12.6)') 'sum_ds                = ', SUM(ds_ml(1,n,1:nsnow(1,n)))
+      !WRITE(*,'(A,F12.6)') 'difference            = ', snowdepth(1,n) - &
+      !     SUM(ds_ml(1,n,1:nsnow(1,n)))
+
+      !WRITE(*,'(A,F12.6)') 'snow_surft            = ', snow_surft(1,n)
+      !WRITE(*,'(A,F12.6)') 'sum(sice+sliq)        = ', SUM(sice_ml(1,n,1:nsnow(1,n))) + SUM(sliq_ml(1,n,1:nsnow(1,n)))
+
    END IF ! did_insert_lid
 
+   !IF (timestep_number >= 333 .AND. timestep_number <= 335) THEN
+   !   WRITE(*,*) 'after meltlake timestep=', timestep_number, &
+   !        'snowdepth=', snowdepth(:,n), &
+   !        'snowmass=', snow_surft(:,n),&
+   !        'dhdt_lake_snow_ml=', dhdt_lake_snow_ml(:,n)
+                    
+   ! END IF
+    !IF (timestep_number == 335) STOP
+   
 END IF ! elev land ice tile
       
 END DO !nsurft

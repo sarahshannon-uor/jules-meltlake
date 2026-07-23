@@ -854,7 +854,10 @@ CASE ( jules )
                       !Ancil info (IN)
                       ainfo%l_lice_point,              & !IN (land_pts)
                       ainfo%l_lice_surft)                !IN (land_pts)  
-    END IF
+
+        
+
+     END IF
 
     IF (l_wtrac_jls) THEN
 

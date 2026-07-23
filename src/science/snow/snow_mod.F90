@@ -877,8 +877,62 @@ END IF !l_meltlake
 !---------------------------------------------------------------------------
 IF (l_meltlake.AND.l_elev_land_ice .AND. l_lice_surft(n)) THEN
 
+  ! IF (timestep_number >= 333 .AND. timestep_number <= 335) THEN
+   !IF (timestep_number == 336) THEN
+  
+    !  WRITE(*,*) '--- before layersnow ---'
+    !  WRITE(*,'(A,I8)')    'timestep_number    = ', timestep_number
+    !  WRITE(*,'(A,I8)')    'nsnow              = ', nsnow(1,n)
+    !  WRITE(*,'(A,F12.6)') 'snowdepth          = ', snowdepth(1,n)
+    !  WRITE(*,'(A,F12.6)') 'ds_sl_ml(1)        = ', ds_sl_ml(1,1)
+    !  WRITE(*,'(A,F12.6)') 'ds_sl_ml(end)      = ', ds_sl_ml(1,nsnow(1,n))
+
+     ! DO ns = 1, nsnow(1,n)
+     !    WRITE(*,'(A,I4,A,F12.6)') 'ns' , ns, ' ds_sl_ml = ', ds_sl_ml(1,ns)
+     ! END DO
+
+     ! WRITE(*,'(A,F12.6)') 'sum_ds             = ', SUM(ds_sl_ml(1,1:nsnow(1,n)))
+     ! WRITE(*,'(A,F12.6)') 'difference         = ', snowdepth(1,n) - &
+     !      SUM(ds_sl_ml(1,1:nsnow(1,n)))
+    !  WRITE(*,'(A,F12.6)') 'snow_surft         = ', snow_surft(1,n)
+   !END IF
+  
+  
     CALL layersnow ( land_pts, surft_pts(n), surft_index(:,n),                 &
-                   nsmax_ml, dzsnow_ml, snowdepth(:,n), nsnow(:,n), ds_sl_ml )
+         nsmax_ml, dzsnow_ml, snowdepth(:,n), nsnow(:,n), ds_sl_ml )
+
+    !WRITE(*,*) 'after layersnow: ', timestep_number, SUM(ds_sl_ml(1,1:nsnow(1,n)))
+    
+    !IF (timestep_number >= 333 .AND. timestep_number <= 335) THEN
+    !IF (timestep_number == 336) THEN
+
+     !  WRITE(*,*) '---after layersnow ---'
+     !  WRITE(*,'(A,I8)')    'timestep_number       = ', timestep_number
+     !  WRITE(*,'(A4,3A12)') 'ns', 'ds', 'sice', 'sliq'
+
+      ! DO ns = 1, nsnow(1,n)
+      !    WRITE(*,'(I4,3F12.6)') ns,             &
+      !         ds_sl_ml(1,ns),                    &
+      !         sice_sl_ml(1,ns),                  &
+      !         sliq_sl_ml(1,ns)
+      ! END DO
+       
+     !  WRITE(*,'(A,I8)')    'timestep_number    = ', timestep_number
+     !  WRITE(*,'(A,I8)')    'nsnow              = ', nsnow(1,n)
+     !  WRITE(*,'(A,F12.6)') 'snowdepth          = ', snowdepth(1,n)
+     !  WRITE(*,'(A,F12.6)') 'ds_sl_ml(1)        = ', ds_sl_ml(1,1)
+     !  WRITE(*,'(A,F12.6)') 'ds_sl_ml(end)      = ', ds_sl_ml(1,nsnow(1,n))
+       !DO ns = 1, nsnow(1,n)
+       !   WRITE(*,'(A,I4,A,F12.6)') 'ns' , ns, ' ds_sl_ml = ', ds_sl_ml(1,ns)
+       !END DO
+     !  WRITE(*,'(A,F12.6)') 'sum_ds             = ', SUM(ds_sl_ml(1,1:nsnow(1,n)))
+     !  WRITE(*,'(A,F12.6)') 'difference         = ', snowdepth(1,n) - &
+     !       SUM(ds_sl_ml(1,1:nsnow(1,n)))
+     !   WRITE(*,'(A,F12.6)') 'snow_surft         = ', snow_surft(1,n)
+    !END IF
+    
+    !IF (timestep_number == 336) STOP 'debug stop after timestep 336'
+    
 ELSE 
     CALL layersnow ( land_pts, surft_pts(n), surft_index(:, n),                &
                    nsmax, dzsnow, snowdepth(:,n), nsnow(:,n), ds_sl )  
@@ -1075,7 +1129,7 @@ END IF
   ELSE IF (l_meltlake.AND.l_lice_surft(n)) THEN
                
     CALL snowpack(a_step, n, land_pts, surft_pts(n), n_wtrac_jls, timestep,    &
-                  cansnowtile(n), nsnow(:,n), surft_index(:,n), nsurft, nsmax_ml,        &
+                  cansnowtile(n), nsnow(:,n), surft_index(:,n), nsurft, nsmax_ml,  &
                   csnow_ml,ei_surft(:,n), hcaps1_soilt(:,m), hcons,            &
                   infiltration, ksnow_ml, rho_snow_grnd(:,n), smcl1_soilt(:,m),&
                   snowfall, sthf1_soilt(:,m), surf_htf_surft(:,n),             &
@@ -1097,7 +1151,24 @@ END IF
                   ice_lens_depth(:,n),ice_lens_index(:,n), lake_inflow(:,n),   &
                   has_lake(:,n))
 
-   
+    !WRITE(*,*) 'after snowpack: ', timestep_number, SUM(ds_sl_ml(1,1:nsnow(1,n)))
+    
+    !IF (timestep_number == 336) THEN
+    !   WRITE(*,*) '--- after snowpack ---'
+    !   WRITE(*,'(A,I8)')    'timestep_number    = ', timestep_number
+    !   WRITE(*,'(A,I8)')    'nsnow              = ', nsnow(1,n)
+    !   WRITE(*,'(A,F12.6)') 'snowdepth          = ', snowdepth(1,n)
+    !   WRITE(*,'(A,F12.6)') 'ds_sl_ml(1)        = ', ds_sl_ml(1,1)
+    !   WRITE(*,'(A,F12.6)') 'ds_sl_ml(end)      = ', ds_sl_ml(1,nsnow(1,n))
+    !   WRITE(*,'(A,F12.6)') 'sum_ds             = ', SUM(ds_sl_ml(1,1:nsnow(1,n)))
+    !   WRITE(*,'(A,F12.6)') 'difference         = ', snowdepth(1,n) - &
+    !        SUM(ds_sl_ml(1,1:nsnow(1,n)))
+    !    WRITE(*,'(A,F12.6)') 'snow_surft        = ', snow_surft(1,n)
+    ! END IF
+     
+    
+    !IF (timestep_number == 336) STOP
+          
   ELSE 
   
     CALL snowpack (a_step, n, land_pts, surft_pts(n), n_wtrac_jls, timestep,   &
@@ -1162,7 +1233,8 @@ END IF
                        surft_index(:,n), nsmax_ml, sice_sl_ml, sliq_sl_ml,     &
                        tsnow_sl_ml, rho_snow_sl_ml, ds_sl_ml)
 
-             
+    !WRITE(*,*) 'after compactsnow: ', timestep_number, SUM(ds_sl_ml(1,1:nsnow(1,n)))
+    
     CALL relayersnow ( land_pts, surft_pts(n), n_wtrac_jls, surft_index(:,n),  &
                        nsmax_ml, dzsnow_ml, rgrain0, rho0, sice0, snowfall,    &
                        snowmass, tsnow0, wtrac_sn%sice0, nsnow(:,n), ds_sl_ml, &
@@ -1171,7 +1243,7 @@ END IF
                        tsnow_sl_ml, wtrac_sn%sice_sl, wtrac_sn%sliq_sl,        &
                        rho_snow_sl_ml, snowdepth(:,n) )
 
-
+    !WRITE(*,*) 'after relayersnow: ', timestep_number, SUM(ds_sl_ml(1,1:nsnow(1,n)))
     
     !-------------------------------------------------------------------------
     ! Adjust the location of the ice lens 
@@ -1585,8 +1657,8 @@ IF (l_snow_infilt) THEN
 !$OMP END PARALLEL
 END IF
 
-!2277, 2477,2279, 2179
-!if (timestep_number==2455) then !2451
+
+!if (timestep_number==336) then 
 !   print *, 'force stop'
 !   stop
 !end if

@@ -185,7 +185,7 @@ ELSE
     forcing%ls_snow_ij(:,:)  = precip_rel_perturbation * forcing%ls_snow_ij(:,:)
   END IF
 
-  l_ideal_forcing=.FALSE.
+  l_ideal_forcing=.TRUE.
 
   
   IF (l_ideal_forcing) THEN

@@ -512,7 +512,7 @@ DO k = 1,surft_pts
          WRITE(*,*) '*** meltlake temp > 27C ***'
          WRITE(*,*) 'has_lid(i)                = ', has_lid(i)
          WRITE(*,*) 'has_lake(i)               = ', has_lake(i)
-         WRITE(*,*) 'expsoed_water(i)          = ', exposed_water(i)
+         WRITE(*,*) 'exposed_water(i)          = ', exposed_water(i)
          WRITE(*,'(A,F16.8)') 'sw_absorb       = ', sw_absorb
          WRITE(*,'(A,F16.8)') 'tstar_surft     = ', tstar_surft(i) - 273.15
          WRITE(*,'(A,F16.8)') 'lake_temp_ml    = ', lake_temp_ml(i) - 273.15
@@ -611,10 +611,15 @@ DO k = 1,surft_pts
          dh_remain = dh_ice
 
 !-----------------------------------------------------------------------------
-! looping over snowpack levels and removing sice.  This might be overkill since 
-! Stefan retreat will be small compared to ds(1) i.e. 0.1 m, but guarding against 
-! a setup with smaller top layer depth . Removal is based on fraction of top 
-! snow layer depth that is retreating i.e. stefan retreat/ds top snow layer
+! Stefan melt removes solid and liquid mass from the affected snow layers
+! and transfers that mass to the lake.
+! Snow layer geometry is not adjusted directly here.
+! The standard JULES compaction and relayering routines subsequently
+! diagnose a consistent snow depth and layer structure.
+! 
+! Stefan retreat will be small compared to ds(1) i.e. 0.1 m, but loop through 
+! levels in case dh_ice melts multiple snow layers. Removal is based on the fraction 
+! of top snow layer depth that is retreating i.e. stefan retreat/ds top snow layer
 ! remove ice mass fraction, and liq mass fraction
 !-----------------------------------------------------------------------------
          
@@ -625,7 +630,7 @@ DO k = 1,surft_pts
             ds_old = ds_ml(i,n)
             
             frac_melt = MIN(1.0, dh_remain / ds_old)
-                      
+                        
             dsice = frac_melt * sice_ml(i,n)
             dsliq = frac_melt * sliq_ml(i,n)
 
@@ -633,7 +638,7 @@ DO k = 1,surft_pts
             dsliq_tot = dsliq_tot + dsliq
             
 !-----------------------------------------------------------------------------
-! water from ice retreat + draining all sliq from layer
+! add melted ice to the lake depth
 !-----------------------------------------------------------------------------
             lake_depth_ml(i) = lake_depth_ml(i) + (dsice + dsliq) / rho_water
 
@@ -650,34 +655,64 @@ DO k = 1,surft_pts
          END DO !nsnow
          
 !-----------------------------------------------------------------------------
-! subtract the snowmass melted
+! subtract the snowmass melted by Stefan boundary retreat
 !-----------------------------------------------------------------------------    
          
          snow_surft(i) = snow_surft(i) - (dsice_tot + dsliq_tot)
+
+!-----------------------------------------------------------------------------
+! subtract the Stefan boundary retreat from total snow depth. Breaks mass
+! conservation 
+!-----------------------------------------------------------------------------  
+        
+         !snowdepth(i) = snowdepth(i) - dh_ice
+
+         !IF (timestep_number >= 333 .AND. timestep_number <= 335) THEN
+         ! End of meltlake_evolve
+         !WRITE(*,*) 'after meltlake:', timestep_number, &
+         !     'snowmass=', snow_surft(i), &
+         !     'layer_mass=', SUM(sice_ml(i,1:nsnow(i))) + &
+         !     SUM(sliq_ml(i,1:nsnow(i))), &
+         !     'snowdepth=', snowdepth(i), &
+         !     'sum_ds=', SUM(ds_ml(i,1:nsnow(i)))
+      !END IF
+      !IF (timestep_number == 335) STOP
+
+
          
       END IF ! Stefan dh_ice > 0
 
-      !IF (timestep_number >= 338 .AND. timestep_number <= 340) THEN
-
+      ! IF (timestep_number == 335) THEN
+     ! IF (timestep_number >= 333 .AND. timestep_number <= 335) THEN
+         
        !     WRITE(*,*) '--- MELTLAKE_EVOLVE DEBUG ---'
-       !     WRITE(*,'(A,I8)')    'timestep_number        = ', timestep_number
-       !     WRITE(*,'(A,I8)')    'i                      = ', i
-       !     WRITE(*,'(A,L2)')    'has_lake               = ', has_lake(i)
-       !     WRITE(*,'(A,L2)')    'exposed_water          = ', exposed_water(i)
-       !     WRITE(*,'(A,L2)')    'has_vlid               = ', has_vlid(i)
-       !     WRITE(*,'(A,L2)')    'has_lid                = ', has_lid(i)
+        !    WRITE(*,'(A,I8)')    'timestep_number        = ', timestep_number
+            !WRITE(*,'(A,I8)')    'i                      = ', i
+            !WRITE(*,'(A,L2)')    'has_lake               = ', has_lake(i)
+            !WRITE(*,'(A,L2)')    'exposed_water          = ', exposed_water(i)
+            !WRITE(*,'(A,L2)')    'has_vlid               = ', has_vlid(i)
+            !WRITE(*,'(A,L2)')    'has_lid                = ', has_lid(i)
             
-       !     WRITE(*,'(A,F12.6)') 'lake_depth_ml          = ', lake_depth_ml(i)
-       !     WRITE(*,'(A,F12.6)') 'dhdt_lake_snow_ml      = ', dhdt_lake_snow_ml(i)
-       !     WRITE(*,'(A,F12.6)') 'snowdepth              = ', snowdepth(i)
-       !     WRITE(*,'(A,F12.6)') 'snow_surft             = ', snow_surft(i)
+            !WRITE(*,'(A,F12.6)') 'lake_depth_ml          = ', lake_depth_ml(i)
+         !   WRITE(*,'(A,F12.6)') 'dhdt_lake_snow_ml      = ', dhdt_lake_snow_ml(i)
+            
+         !   WRITE(*,'(A,F12.6)') 'snow_surft             = ', snow_surft(i)
        !     WRITE(*,'(A,F12.6)') 'lake_temp_ml (C)       = ', lake_temp_ml(i) - 273.15
 
    
-        !    WRITE(*,'(A,I8)')    'nsnow                 = ', nsnow(i)
-        !    WRITE(*,'(A,F12.6)') 'ds_ml(1)              = ', ds_ml(i,1)
-        !    WRITE(*,'(A,F12.6)') 'sice_ml(1)            = ', sice_ml(i,1)
-        !    WRITE(*,'(A,F12.6)') 'sliq_ml(1)            = ', sliq_ml(i,1)
+          !  WRITE(*,'(A,I8)')    'nsnow                 = ', nsnow(i)
+          !  WRITE(*,'(A,F12.6)') 'ds_ml(1)              = ', ds_ml(i,1)
+          !  WRITE(*,'(A,F12.6)') 'ds_ml(end)            = ', ds_ml(i,nsnow(i))
+          !  WRITE(*,'(A,F12.6)') 'frac_melt             = ', frac_melt
+          !  WRITE(*,'(A,F12.6)') 'snowdepth             = ', snowdepth(i)
+          !  WRITE(*,'(A,F12.6)') 'sum_ds                = ', SUM(ds_ml(i,1:nsnow(i)))
+          !  WRITE(*,'(A,F12.6)') 'difference            = ', snowdepth(i) - &
+          !       SUM(ds_ml(i,1:nsnow(i)))
+
+           ! WRITE(*,'(A,F12.6)') 'snow_surft            = ', snow_surft(i)
+           ! WRITE(*,'(A,F12.6)') 'sum(sice+sliq)        = ', SUM(sice_ml(i,1:nsnow(i))) + SUM(sliq_ml(i,1:nsnow(i)))
+           ! WRITE(*,'(A,F12.6)') 'sice_ml(1)            = ', sice_ml(i,1)
+           ! WRITE(*,'(A,F12.6)') 'sliq_ml(1)            = ', sliq_ml(i,1)
         !    WRITE(*,'(A,F12.6)') 'tsnow_ml(1) (C)       = ', tsnow_ml(i) - 273.15
         !    WRITE(*,'(A,F12.6)') 'ksnow0_ml             = ', ksnow0_ml(i)
         !    WRITE(*,'(A,F12.6)') 'kdtdz_ml              = ', kdtdz_ml(i)
@@ -691,11 +726,11 @@ DO k = 1,surft_pts
          !   WRITE(*,'(A,F12.6)') 'dh_ice                 = ', dh_ice
          !   WRITE(*,'(A,F12.6)') 'dh_water               = ', dh_water
 
-           ! IF (timestep_number == 340) STOP 'debug stop after timestep 340'
+            !IF (timestep_number == 335) STOP 'debug stop after timestep 340'
 
          !END IF
       
-     ! cum_stefan_m = cum_stefan_m + dh_water
+     
            
    END IF !has_lake
 

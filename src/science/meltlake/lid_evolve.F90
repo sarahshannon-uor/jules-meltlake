@@ -151,8 +151,10 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! snowpack level temperatures (K)
   lid_snow_depth_ml(land_pts),                                                 & 
     ! Depth of snow on virtual or permanent lid (m)
-  lid_snow_temp_ml(land_pts)
+  lid_snow_temp_ml(land_pts),                                                  &
     ! Temp of zero layer snow on lid or vlid (K)
+  snow_surft(land_pts)
+! snow mass can change because lid is injected into snowpack
 
 LOGICAL, INTENT(IN OUT) ::                                                    &
   has_lid(land_pts),                                                          &
@@ -165,7 +167,7 @@ LOGICAL, INTENT(IN OUT) ::                                                    &
 REAL(KIND=real_jlslsm), INTENT(OUT) ::                                        &
   lake_state_ml(land_pts),                                                    &
     ! logicals for lake state
-  snow_surft(land_pts),                                                       & 
+  !snow_surft(land_pts),                                                       & 
     ! snow mass can change because lid is injected into snowpack 
   dhdt_lid_lake_ml(land_pts),                                                 & 
     ! Stefan boundary movement lid bottom and lake top (ms-1 ice equiv)

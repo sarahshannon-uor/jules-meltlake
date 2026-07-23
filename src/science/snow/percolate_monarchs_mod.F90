@@ -243,8 +243,11 @@ REAL(KIND=real_jlslsm) ::                                                      &
   retain, &
   cap_full_m, &
   wout, &
-  ice_capacity !maximum additional ice mass that can fit in the layer 
-
+   ! liquid water mass out of top after upward fill (kgm-2)
+  ice_capacity, &
+   !maximum additional ice mass that can fit in the layer 
+  win_in
+   ! water into snowpack 
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -261,6 +264,8 @@ lake_inflow(i) = 0.0
 
 blocked = .FALSE.
 wout    = 0.0
+
+win_in = win
 
 ! running depth to top of current layer (m)
 z_top   = 0.0
@@ -421,6 +426,12 @@ DO n = 1, nsnow
        
        blocked = .TRUE.
 
+      ! IF (timestep_number >= 329 .AND. timestep_number <= 331) THEN
+      !    WRITE(*,*) 'timestep=', timestep_number, &
+      !         'lens layer=', n, &
+      !         'sliq at lens=', sliq(i,n)
+      ! END IF
+       
        ! option 1: allow the lens to keep pore capacity liquid
        ! --- compute pore capacity in lens layer
        !pfrac = 1.0 - sice(i,n) / (rho_ice * ds(i,n))
@@ -467,6 +478,13 @@ DO n = 1, nsnow
              w_up = 0.0 ! no more water to upfill
           END IF
 
+          !IF (timestep_number >= 329 .AND. timestep_number <= 331) THEN
+          !   WRITE(*,*) 'timestep=', timestep_number, &
+          !        'fill layer=', m, &
+                 ! 'cap_full=', cap_full_m, &
+           !       'sliq=', sliq(i,m), &
+           !       'w_up left=', w_up
+          !END IF
          
           IF (w_up <= 0.0) EXIT
        END DO
@@ -505,16 +523,26 @@ DO n = 1, nsnow
 
   
 END DO ! nsnow
-!print *, 'in perc', n, sice(i,1), sliq(i,1)
+
 !-----------------------------------------------------------------------
 ! 5) water exiting the snowpack (water out bottom + out top)
 !-----------------------------------------------------------------------
+
+!IF (timestep_number >= 329 .AND. timestep_number <= 331) THEN
+
+ !  WRITE(*,*) 'timestep=', timestep_number, &
+ !       'win_in=', win_in, &
+ !       'win_bottom=', win, &
+ !       'wout=', wout, &
+ !       'lake_inflow=', win + wout
+   
+!END IF
+
+!IF (timestep_number == 331) STOP
+
 win = win + wout
 
 lake_inflow(i) = win
-
-
-!print *, 'win, wout, lake_inflow', win, wout, lake_inflow(i)
 
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
