@@ -1077,6 +1077,11 @@ LOGICAL ::                                                                     &
 
 REAL(KIND=real_jlslsm) :: sea_point
 
+REAL(KIND=real_jlslsm) ::                                                      &
+     ice_depth_eff,                                                            &
+     r_ice,                                                                    &
+     r_snow
+
 INTEGER :: n_diag
 
 INTEGER :: errcode
@@ -1522,25 +1527,6 @@ IF (nsmax > 0) THEN
      
   END DO
 END IF ! nsmax > 0 
-
-
-
-
-
-  ! Thermal conductvity of top snow layer if nsmax > 0
-  !IF (nsmax > 0) THEN
-  !  DO n = 1,nsurft
-  !    ds_surft_tmp(:,:) = ds_surft(:,n,:)
-  !    sice_surft_tmp(:,:) = sice_surft(:,n,:)
-  !    sliq_surft_tmp(:,:) = sliq_surft(:,n,:)
-  !    CALL snowtherm(land_pts,surft_pts(n),nsnow_surft(:,n),                   &
-  !                   surft_index(:,n),nsmax,ds_surft_tmp,sice_surft_tmp,       &
-  !                   sliq_surft_tmp,csnow,ksnow)
-  !    DO l = 1,land_pts
-  !      hcons_snow(l,n) = ksnow(l,1)
-  !    END DO
-  !  END DO
-  !END IF
 
 END IF                     ! End test on land points
 
@@ -2117,71 +2103,93 @@ DO n = 1,nsurft
       END IF
     END IF
 
-    
-    !IF ( l_meltlake .AND. l_elev_land_ice .AND. l_lice_point(l) ) THEN
 
-    !IF (l_meltlake .AND. l_elev_land_ice .AND. l_lice_point(l) .AND.           &
-     !    l_lice_surft(n)) THEN
+    !-----------------------------------------------------------------------
+    ! Setting subsurface temperature (tsurf), subsurface depth and heat 
+    ! transfer coefficient (ashtf_surft) for sf_flux.
+    ! Four possible melt lake surface states are represented:
+    !
+    !   1. snow on a permanent or virtual lid
+    !   2. exposed lake water
+    !   3. bare permanent or virtual lid
+    !   4. snow-covered elevated land ice with no surface lake or lid
+    !
+    ! For case 4, retain the standard elevated land-ice values calculated
+    ! above. 
+    !-----------------------------------------------------------------------
+  
+    IF (l_meltlake .AND. l_elev_land_ice .AND. l_lice_point(l) .AND.           &
+         l_lice_surft(n)) THEN
 
-    !-----------------------------------------------------------------------   
-    ! For snow on frozen meltlake lid assume resistance in series
+    !-----------------------------------------------------------------------
+    ! Case 1: Snow on permanent or virtual lid.
+    !
+    ! tsurf is treated as the lid midpoint temperature:
+    !
+    !   permanent lid: tsurf = lid_temp_ml
+    !   virtual lid:   tsurf = tm
+    !
+    ! The conductive path is:
+    !
+    !   1. the full snow thickness
+    !   2. half of the lid thickness
+    !
     ! Thermal resistances in series:
-    ! r_snow = lid_snow_depth_ml / snow_hcon
-    ! r_lid  = lid_depth_eff     / ice_hcon
-    ! r_tot  = r_snow + r_lid
-    ! Surface exchange coefficient:
-    !    ashtf_surft = 2.0 / (r_snow + r_lid)
-    ! 
-    ! r_snow is larger than r_ice i.e. snow is insulating the lid from the atmosphere
+    !
+    !   r_snow = lid_snow_depth_ml / snow_hcon
+    !   r_ice  = 0.5 * ice_depth_eff / ice_hcon
+    !
+    ! The effective heat transfer coefficient is:
+    !
+    !   ashtf_surft = 1.0 / (r_snow + r_ice)
+    !
     !-----------------------------------------------------------------------
     
     IF (snow_on_lid(l,n)) THEN
 
-    !   dzsurf(l,n)     = lid_snow_depth_ml(l,n)
-    !   hcons_surf(l,n) = snow_hcon
-    !   canhc_surf(l,n) = 0.0
+       dzsurf(l,n)     = lid_snow_depth_ml(l,n)
+       hcons_surf(l,n) = snow_hcon
+       canhc_surf(l,n) = 0.0
 
-     !  r_snow = lid_snow_depth_ml(l,n) / snow_hcon
+       r_snow = lid_snow_depth_ml(l,n) / snow_hcon
 
-     !  IF (has_lid(l,n)) THEN
-     !     tsurf(l,n)    = lid_temp_ml(l,n)
-     !     ice_depth_eff = MAX(lid_depth_ml(l,n), vlid_seed_depth)
+       IF (has_lid(l,n)) THEN
+          tsurf(l,n)    = lid_temp_ml(l,n)
+          ice_depth_eff = MAX(lid_depth_ml(l,n), vlid_seed_depth)
           
-     !  ELSE IF (has_vlid(l,n)) THEN
-     !     tsurf(l,n)    = tm
-     !     ice_depth_eff = MAX(vlid_depth_ml(l,n), vlid_seed_depth)
-     !  END IF
+       ELSE IF (has_vlid(l,n)) THEN
+          tsurf(l,n)    = tm
+          ice_depth_eff = MAX(vlid_depth_ml(l,n), vlid_seed_depth)
+       END IF
 
-     !  r_ice = ice_depth_eff / ice_hcon
-     !  ashtf_surft(l,n) = 2.0 / (r_snow + r_ice)
+       r_ice = 0.5 * ice_depth_eff / ice_hcon
+       
+       ashtf_surft(l,n) = 1.0 / (r_snow + r_ice)
+   
+       IF (snow_on_lid(l,n) .AND. lid_snow_depth_ml(l,n) > 0.3) THEN
 
-     !  IF (snow_on_lid(l,n) .AND. lid_snow_depth_ml(l,n) > 0.3) THEN
 
-
-      !    WRITE(*,*) 'snow_on_lid:'
-      !    WRITE(*,'(A,I8)')    'l                 = ', l
-      !    WRITE(*,'(A,I8)')    'n                 = ', n
-      !    WRITE(*,'(A,L2)')    'has_lid           = ', has_lid(l,n)
-      !    WRITE(*,'(A,L2)')    'has_vlid          = ', has_vlid(l,n)
-      !    WRITE(*,'(A,F12.6)') 'lid_snow_depth_ml = ', lid_snow_depth_ml(l,n)
-      !    WRITE(*,'(A,F12.6)') 'dzsurf            = ', dzsurf(l,n)
-      !    WRITE(*,'(A,F12.6)') 'r_snow            = ', r_snow
-      !    WRITE(*,'(A,F12.6)') 'tsurf             = ', tsurf(l,n)
-      !    WRITE(*,'(A,F12.6)') 'ice_depth_eff     = ', ice_depth_eff
-      !    WRITE(*,'(A,F12.6)') 'r_ice             = ', r_ice
-      !    WRITE(*,'(A,F12.6)') 'ashtf_surft       = ', ashtf_surft(l,n)
+          WRITE(*,*) 'snow_on_lid:'
+          WRITE(*,'(A,I8)')    'l                 = ', l
+          WRITE(*,'(A,I8)')    'n                 = ', n
+          WRITE(*,'(A,L2)')    'has_lid           = ', has_lid(l,n)
+          WRITE(*,'(A,L2)')    'has_vlid          = ', has_vlid(l,n)
+          WRITE(*,'(A,F12.6)') 'lid_snow_depth_ml = ', lid_snow_depth_ml(l,n)
+          WRITE(*,'(A,F12.6)') 'dzsurf            = ', dzsurf(l,n)
+          WRITE(*,'(A,F12.6)') 'r_snow            = ', r_snow
+          WRITE(*,'(A,F12.6)') 'tsurf             = ', tsurf(l,n)
+          WRITE(*,'(A,F12.6)') 'ice_depth_eff     = ', ice_depth_eff
+          WRITE(*,'(A,F12.6)') 'r_ice             = ', r_ice
+          WRITE(*,'(A,F12.6)') 'ashtf_surft       = ', ashtf_surft(l,n)
                
-      ! END IF
+       END IF
    
     !-----------------------------------------------------------------------
-    ! Exposed-water lower boundary for sf_flux
-    ! Pass the melt-lake temperature as the lower-boundary temperature and
-    ! use an effective heat-transfer coefficient derived from the
-    ! rearranged 4/3-law turbulent heat flux of Buzzard et al. (2018).
-    ! note flake is using a linear conductive lower-boundary flux,
-    ! flake hcon_lake = (conductivity ice + conductive water ) * Nusselt number
-    ! to enhance the conductivity to represent convective mixing
-    ! because it is linear in temp there is no need to scale the ashtf when using flake
+    ! Case 2: Exposed water.  
+    ! The heat transfer coeff is found by rearranging 4/3-law
+    ! turbulent heat flux from Buzzard et al. (2018), eqn 16
+    ! Note: I have not found anything in the litrature that shows that the 
+    ! 4/3 law is better than a linear parameterisation. Ask Danny
     !-----------------------------------------------------------------------
     ELSE IF (exposed_water(l,n)) THEN
 
@@ -2191,12 +2199,31 @@ DO n = 1,nsurft
     !-----------------------------------------------------------------------
         
        tsurf(l,n) = lake_temp_ml(l,n) 
-   
-               
+                  
        ashtf_surft(l,n) = rho_water * hcapw * 1.907e-5 *                   &
             ABS(tsurf(l,n) - tstar_surft(l,n))**(1.0/3.0)
 
-  !zero layer method
+     !-----------------------------------------------------------------------
+     ! Case 3: Bare permanent lid or bare virtual lid.
+     ! For this zero layer lid treatment, tsurf is the lid
+     ! midpoint temperature:
+     !
+     !   permanent lid: tsurf = lid_temp_ml
+     !   virtual lid:   tsurf = tm
+     !
+     ! The conductive heat flux passes from the lid midpoint to the 
+     ! top of the lid i.e. half the lid thickness.
+     !
+     !   resistance = 0.5 * lid_depth / ice_hcon
+     !
+     ! Therefore:
+     !
+     !   ashtf_surft = 1.0 / resistance
+     !               = 2.0 * ice_hcon / lid_depth
+     ! 
+     ! Looks like this is the same approach that is used above
+     ! when soil is the subsurface (see Line xxx above) 
+     !-----------------------------------------------------------------------  
     ELSE IF (has_lid(l,n)) THEN
        
        tsurf(l,n)  = lid_temp_ml(l,n)
@@ -2208,11 +2235,10 @@ DO n = 1,nsurft
        tsurf(l,n)  = tm
        dzsurf(l,n) = MAX(vlid_depth_ml(l,n), 0.001)
        ashtf_surft(l,n) = 2.0 * ice_hcon / dzsurf(l,n)
-      
-             
+                  
     END IF ! snow_on_lid/exposed_water/has_lid/has_vlid
     
- !END IF !meltlake
+ END IF !meltlake
 
 
   END DO

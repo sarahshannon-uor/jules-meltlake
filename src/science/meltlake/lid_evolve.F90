@@ -95,14 +95,15 @@ IMPLICIT NONE
 ! Scalar arguments with intent(in)
 !-----------------------------------------------------------------------------
 INTEGER, INTENT(IN) ::                                                         &
-   land_pts,                                                                   &
+  land_pts,                                                                    &
      ! Total number of land points.
-   surft_pts
+  surft_pts
     ! Number of tile points.
   
     
 REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
-  timestep              ! Timestep length (s).
+  timestep
+    ! Timestep length (s).
 
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(in)
@@ -123,13 +124,13 @@ INTEGER, INTENT(IN OUT) ::                                                     &
     ! Number of snow layers.
 
 REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
-  con_rain(land_pts),                                                         &
+  con_rain(land_pts),                                                          &
     ! Convective rainfall rate (kg/m2/s).
-  ls_rain(land_pts),                                                          &
+  ls_rain(land_pts),                                                           &
     ! Large-scale rainfall fall rate (kg/m2/s).
-  con_snow(land_pts),                                                         &
+  con_snow(land_pts),                                                          &
     ! Convective frozen rainfall rate (kg/m2/s).
-  ls_snow(land_pts),                                                          &
+  ls_snow(land_pts),                                                           &
     ! Large-scale frozen precip fall rate (kg/m2/s).
   lake_temp_ml(land_pts),                                                      &
    ! Temperature of melt lake (K)
@@ -147,14 +148,14 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Liquid content of snow layers (kg/m2)
   ds_ml(land_pts, nsmax_ml),                                                   &
     ! snowpack top level depth (m)
-  tsnow_ml(land_pts, nsmax_ml),                                                & 
+  tsnow_ml(land_pts, nsmax_ml),                                                &
     ! snowpack level temperatures (K)
-  lid_snow_depth_ml(land_pts),                                                 & 
+  lid_snow_depth_ml(land_pts),                                                & 
     ! Depth of snow on virtual or permanent lid (m)
   lid_snow_temp_ml(land_pts),                                                  &
     ! Temp of zero layer snow on lid or vlid (K)
   snow_surft(land_pts)
-! snow mass can change because lid is injected into snowpack
+    ! snow mass can change because lid is injected into snowpack
 
 LOGICAL, INTENT(IN OUT) ::                                                    &
   has_lid(land_pts),                                                          &
@@ -210,22 +211,25 @@ REAL(KIND=real_jlslsm) ::                                                      &
   !flux_upper_diag, &
   lid_depth_eff, &
   rain_add, &
-  snow_add
+  snow_add,&
+  r_snow, &
+  r_ice
   
-
-REAL, PARAMETER :: Jturb  = 1.907e-5
-                 ! Turbulent heat flux factor (ms⁻¹ K⁻¹/3) Eqn 16 Buzzard 
-
 LOGICAL :: seeded_vlid
 
-REAL(KIND=real_jlslsm), PARAMETER :: ice_hcon = 2.2
+! Move some of these constants to jules_meltlake.nml
+REAL(KIND=real_jlslsm), PARAMETER ::                                          &
+  Jturb  = 1.907e-5,                                                          &
+    ! Turbulent heat-transfer coefficient (m s-1 K-1/3), Eq. 16 Buzzard 
+  ice_hcon = 2.2,                                                             &
+    ! Thermal conductivity of ice (W m-1 K-1).
+  vlid_seed_depth = 0.0001,                                                   &
+    ! Minimum initial physical thickness assigned to a virtual lid (m).
+  lid_min_depth = 0.1,                                                        &
+    !  Virtual lid thickness threshold for formation of a permanent lid (m).
+  lake_min_depth = 0.1
+    ! Minimum liquid lake depth used to define an exposed melt lake (m).
 
-REAL(KIND=real_jlslsm), PARAMETER :: vlid_seed_depth = 0.001!1.0e-3 ! use a seed for now 
-
-REAL(KIND=real_jlslsm), PARAMETER :: lid_min_depth = 0.1
-REAL(KIND=real_jlslsm), PARAMETER :: lake_min_depth = 0.1
-
-REAL(KIND=real_jlslsm) :: r_snow, r_lid
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -258,9 +262,10 @@ DO k = 1,surft_pts
    dh_ice     = 0.0
    dh_water   = 0.0
    did_insert_lid(i) = .false.
-   snow_on_lid(i)    = .false.
+   !snow_on_lid(i)    = .false.
    seeded_vlid       = .false.
-
+   snow_on_lid(i) = lid_snow_depth_ml(i) > 0.0
+   
 !-----------------------------------------------------------------------------
 ! If lake exists and is freezing, seed a thin lid. Taking the seed depth 
 ! from no where and not adjusting the lake depth. It's small though
@@ -302,37 +307,39 @@ DO k = 1,surft_pts
 !-----------------------------------------------------------------------------
 ! Get temp at top of lid. If no snow then top of lid is tstar_surft
 !-----------------------------------------------------------------------------
-      t_lid_top = MIN(tstar_surft(i), tm)
+      !t_lid_top = MIN(tstar_surft(i), tm)
 
-      IF (has_lid(i)) THEN  
-         lid_temp_ml(i) = 0.5 * (t_lid_top + tm)
-      ELSE IF (has_vlid(i)) THEN
-         lid_temp_ml(i) = tm
-      END IF
-
-     ! IF (has_lid(i)) THEN
-
-      !   CALL get_lid_thermo_zero_layer(                                        &
-       !       tstar_surft(i),                                                   &
-       !       lid_depth_ml(i),                                                  &
-       !       has_lid(i),                                                       &
-       !       has_vlid(i),                                                      &
-       !       lid_snow_depth_ml(i),                                             &
-       !       kdtdz_ml,                                                         &
-       !       lid_temp_ml(i))
-
+      !IF (has_lid(i)) THEN  
+      !   lid_temp_ml(i) = 0.5 * (t_lid_top + tm)
       !ELSE IF (has_vlid(i)) THEN
-
-      !   CALL get_lid_thermo_zero_layer(                                        &
-      !        tstar_surft(i),                                                   &
-      !        vlid_depth_ml(i),                                                 &
-      !        has_lid(i),                                                       &
-      !        has_vlid(i),                                                      &
-      !        lid_snow_depth_ml(i),                                             &
-      !        kdtdz_ml,                                                         &
-      !        lid_temp_ml(i))
-         
+      !   lid_temp_ml(i) = tm
       !END IF
+
+         
+      IF (has_lid(i)) THEN
+
+         CALL get_lid_thermo_zero_layer(                                        &
+              tstar_surft(i),                                                   &
+              lid_depth_ml(i),                                                  &
+              has_lid(i),                                                       &
+              has_vlid(i),                                                      &
+              lid_snow_depth_ml(i),                                             &
+              kdtdz_ml,                                                         &
+              lid_temp_ml(i),                                                   &
+              lid_snow_temp_ml(i))
+
+      ELSE IF (has_vlid(i)) THEN
+
+         CALL get_lid_thermo_zero_layer(                                        &
+              tstar_surft(i),                                                   &
+              vlid_depth_ml(i),                                                 &
+              has_lid(i),                                                       &
+              has_vlid(i),                                                      &
+              lid_snow_depth_ml(i),                                             &
+              kdtdz_ml,                                                         &
+              lid_temp_ml(i),                                                   &
+              lid_snow_temp_ml(i))
+      END IF
    
       
 !-----------------------------------------------------------------------------
@@ -364,13 +371,13 @@ DO k = 1,surft_pts
 !
 ! lid bottom (tm)
 !-----------------------------------------------------------------------------
-      IF (has_lid(i)) THEN
-         lid_depth_eff = lid_depth_ml(i)
-      ELSE IF (has_vlid(i)) THEN
-         lid_depth_eff = MAX(vlid_depth_ml(i), 0.001)
-      END IF
+      !IF (has_lid(i)) THEN
+      !   lid_depth_eff = lid_depth_ml(i)
+      !ELSE IF (has_vlid(i)) THEN
+      !   lid_depth_eff = MAX(vlid_depth_ml(i), 0.001)
+      !END IF
 
-      kdtdz_ml = ice_hcon * (tm - t_lid_top) / lid_depth_eff
+      !kdtdz_ml = ice_hcon * (tm - t_lid_top) / lid_depth_eff
 
 !-----------------------------------------------------------------------------
 !  Stefan boundary movement Eqn 14
@@ -440,10 +447,8 @@ DO k = 1,surft_pts
 ! Snow and rain on lid
 !-----------------------------------------------------------------------------
    IF (has_lid(i) .OR. has_vlid(i)) THEN
-      IF (ls_rain(i) > 0.0 .OR. con_rain(i) > 0.0 .OR.                      &
-           ls_snow(i) > 0.0 .OR. con_snow(i) > 0.0) THEN
-
-         rain_add = ls_rain(i) + con_rain(i)
+      IF (ls_snow(i) > 0.0 .OR. con_snow(i) > 0.0) THEN
+        
          snow_add = ls_snow(i) + con_snow(i)
 
 
@@ -458,35 +463,21 @@ DO k = 1,surft_pts
          WRITE(*,'(A,F12.6)') 'snow_add                = ', snow_add
          WRITE(*,'(A,F12.6)') 'lid_snow_depth before   = ', lid_snow_depth_ml(i)
 
-         IF (has_lid(i)) THEN
           
-            lid_snow_depth_ml(i) = lid_snow_depth_ml(i) +                      &
-                 snow_add * timestep /rho_snow_fresh 
+         lid_snow_depth_ml(i) = lid_snow_depth_ml(i) +                      &
+              snow_add * timestep /rho_snow_fresh 
             
-         ELSE IF (has_vlid(i)) THEN
-          
-            lid_snow_depth_ml(i) = lid_snow_depth_ml(i) +                      &
-                 snow_add * timestep /rho_snow_fresh 
-          
-         END IF
-
-         !snow_on_lid(i) = (lid_snow_depth_ml(i) > 0.0)
+        
+         snow_on_lid(i) = (lid_snow_depth_ml(i) > 0.0)
          
          WRITE(*,'(A,F12.6)') 'lid_snow_depth after    = ', lid_snow_depth_ml(i)
          WRITE(*,'(A,L2)')    'snow_on_lid after      = ', snow_on_lid(i)
 
          
-         
-         lake_depth_ml(i) = lake_depth_ml(i)                                &
-              + rain_add * timestep / rho_water
-
-         ls_rain(i)  = 0.0
-         con_rain(i) = 0.0
          ls_snow(i)  = 0.0
          con_snow(i) = 0.0
-
-         
-
+       
+        
       END IF
 
 
@@ -539,6 +530,7 @@ DO k = 1,surft_pts
       WRITE(*,'(A,L2)')    'exposed_water = ', exposed_water(i)
       
    END IF
+
 !-----------------------------------------------------------------------------
 ! Reset inactive temperatures and depths 
 !-----------------------------------------------------------------------------
@@ -558,6 +550,7 @@ END IF
 
 IF ((.NOT. has_lid(i)) .AND. (.NOT. has_vlid(i))) THEN
    lid_snow_depth_ml(i) = 0.0
+   snow_on_lid(i)       = .false.
 END IF
 
 !-----------------------------------------------------------------------------
@@ -621,15 +614,19 @@ SUBROUTINE get_lid_thermo_zero_layer(                                        &
     has_vlid,                                                                &
     lid_snow_depth_ml,                                                       &
     kdtdz_ml,                                                                &
-    lid_temp_ml)
-
+    lid_temp_ml,                                                             &
+    lid_snow_temp_ml)
 !--------------------------------------------------------------------
 ! Get lid conductive flux (kdtdz_ml) and lid temperature with/without snow on top 
 ! Bare lid: lid-top temperature = tile surface temperature, capped at tm.
 ! Snow-covered lid: lid-top temperature = snow-lid interface temperature,
 ! found by splitting the temperature drop between snow surface and lid
 ! bottom (tm) according to snow and lid resistances in series.
-! 
+! tstar_surft
+!    ↑ conduction through snow
+!t_lid_top
+!    ↑ conduction through lid
+!tm
 !--------------------------------------------------------------------
   
   REAL(KIND=real_jlslsm), INTENT(IN) ::                                      &
@@ -649,9 +646,11 @@ SUBROUTINE get_lid_thermo_zero_layer(                                        &
   REAL(KIND=real_jlslsm), INTENT(OUT) ::                                     &
     kdtdz_ml,                                                                &
       ! Conductive heat flux through lid or virtual lid (W m-2).
-    lid_temp_ml
+    lid_temp_ml,                                                             &
       ! Mean lid temperature (K). For virtual lid this is returned as tm.
-
+    lid_snow_temp_ml
+      ! Mean temperature of snow on lid (K)
+  
   REAL(KIND=real_jlslsm) ::                                                  &
     t_lid_top,                                                               &
       ! Temperature at top of lid, or snow-lid interface if snow is present.
@@ -672,12 +671,16 @@ SUBROUTINE get_lid_thermo_zero_layer(                                        &
      ! Snow-lid interface temperature from resistances in series
      t_lid_top = tm - (tm - MIN(tstar_surft, tm)) * r_lid / (r_snow + r_lid)
 
+     lid_snow_temp_ml = 0.5 * (MIN(tstar_surft, tm) +                       &
+                               t_lid_top)
+
   !--------------------------------------------------------------------
   ! Bare lid or bare virtual lid
   !--------------------------------------------------------------------
   ELSE
 
      t_lid_top = MIN(tstar_surft, tm)
+     lid_snow_temp_ml = tm
 
   END IF
 
@@ -691,62 +694,6 @@ SUBROUTINE get_lid_thermo_zero_layer(                                        &
 
 END SUBROUTINE get_lid_thermo_zero_layer
 
-
-
-
-
-!SUBROUTINE get_lid_top_temp(i, lid_thickness, t_lid_top)
-  !--------------------------------------------------------------------
-  ! Get lid top temperature with or without snow on top of lid
-  ! If no snow on lid then lid top temp is tile surface temp
-  ! If snow on lid then get lid top temp by partitionaing the total temp drop
-  ! between tile surface temp and lid bottom (tm) using the
-  ! resistances in series.  
-  !--------------------------------------------------------------------
-  
- !  INTEGER, INTENT(IN) :: i
- !  REAL(KIND=real_jlslsm), INTENT(IN)  :: lid_thickness
- !  REAL(KIND=real_jlslsm), INTENT(OUT) :: t_lid_top
-
-   ! thermal resistance of lid and snow on top of lid
- !  REAL(KIND=real_jlslsm) :: r_snow, r_lid 
-
- !  WRITE(*,*) '--- GET_LID_TOP_TEMP ---'
- !  WRITE(*,'(A,I8)')    'timestep                = ', timestep_number
- !  WRITE(*,'(A,I8)')    'i                       = ', i
- !  WRITE(*,'(A,F12.6)') 'lid_thickness           = ', lid_thickness
- !  WRITE(*,'(A,F12.6)') 'lid_snow_depth_ml       = ', lid_snow_depth_ml(i)
- !  WRITE(*,'(A,F12.6)') 'tstar_surft (C)         = ', tstar_surft(i) - 273.15
- !  WRITE(*,'(A,F12.6)') 'tm (C)                  = ', tm - 273.15
-
-   ! if snow on lid then lid temp then 
- !  IF (lid_snow_depth_ml(i) > 0.0) THEN
-
-      ! thicker snow larger resistance 
-  !    r_snow = lid_snow_depth_ml(i) / snow_hcon
-      
-   !   r_lid  = lid_thickness / ice_hcon
-
-   !   t_lid_top = tm - (tm - MIN(tstar_surft(i), tm)) *                      &
-   !        r_lid / (r_snow + r_lid)
-      
-   !   WRITE(*,'(A)')       'branch                  = snow on lid'
-   !   WRITE(*,'(A,F12.6)') 'snow_hcon               = ', snow_hcon
-   !   WRITE(*,'(A,F12.6)') 'ice_hcon                = ', ice_hcon
-   !   WRITE(*,'(A,F12.6)') 'r_snow                  = ', r_snow
-   !   WRITE(*,'(A,F12.6)') 'r_lid                   = ', r_lid
-   !   WRITE(*,'(A,F12.6)') 't_lid_top (C)           = ', t_lid_top - 273.15
-  
-   !ELSE
-
-   !   t_lid_top = MIN(tstar_surft(i), tm)
-   !   WRITE(*,'(A)')       'branch                  = bare lid'
-   !   WRITE(*,'(A,F12.6)') 't_lid_top (C)           = ', t_lid_top - 273.15
-
-   !END IF
-
-!END SUBROUTINE get_lid_top_temp
-
 SUBROUTINE prepare_lid_insertion_for_relayer(i)
   !--------------------------------------------------------------------
   ! Get inputs to pass to relayersnow to insert the permanent lid 
@@ -755,37 +702,32 @@ SUBROUTINE prepare_lid_insertion_for_relayer(i)
 
   INTEGER, INTENT(IN) :: i
 
-  
-  !did_insert_lid(i) = .false.
-  
   IF (lake_depth_ml(i) <= 1.0e-5 .AND. lid_depth_ml(i) > 0.0) THEN
 
      
      !--------------------------------------------------------------------
      ! Modified arguments to pass to relayersnow 
      !--------------------------------------------------------------------
-     snowfall(i)   = 0.0
-     snow_surft(i) = snow_surft(i) + rho_ice * lid_depth_ml(i)
-     sice0(i)      = lid_depth_ml(i) * rho_ice
-     tsnow0(i)     = lid_temp_ml(i)
-     rho0(i)       = rho_ice
-     rgrain0(i)    = 2000.0                                               
+     !snowfall(i)   = 0.0
+     !snow_surft(i) = snow_surft(i) + rho_ice * lid_depth_ml(i)
+     !sice0(i)      = lid_depth_ml(i) * rho_ice
+     !tsnow0(i)     = lid_temp_ml(i)
+     !rho0(i)       = rho_ice
+     !rgrain0(i)    = 2000.0                                               
      
          
      !--------------------------------------------------------------------
      ! Lid has now been transferred into the snowpack
      !--------------------------------------------------------------------
-     lid_depth_ml(i)   = 0.0
-     lid_temp_ml(i)    = tm
+     !lid_depth_ml(i)   = 0.0
+     !lid_temp_ml(i)    = tm
      lake_depth_ml(i)  = 0.0
      did_insert_lid(i) = .true.
-     snow_on_lid(i)    = .false.
+     !snow_on_lid(i)    = .false.
      
   END IF
 
 END SUBROUTINE prepare_lid_insertion_for_relayer
-
-  
 
 END SUBROUTINE lid_evolve
 END MODULE lid_evolve_mod

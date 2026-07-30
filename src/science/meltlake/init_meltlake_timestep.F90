@@ -58,7 +58,7 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 !-------------------------------------------------
 ! Initialisation
 !-------------------------------------------------
-meltlake_vars%lake_inflow(:,:)  = 0.0
+!meltlake_vars%lake_inflow(:,:)  = 0.0
 
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)

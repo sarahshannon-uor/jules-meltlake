@@ -857,7 +857,7 @@ DO k = 1,surft_pts
             win, win_wtrac,                                       &
             sf_diag, surft_n, refreeze, ice_lens_depth,           &
             ice_lens_index, lake_inflow, has_lake )
-       
+      
    ELSE
 
        

@@ -54,7 +54,7 @@ SUBROUTINE snow (a_step, land_pts, timestep, stf_hf_snow_melt, nsurft, n_wtrac_j
                   lfrac_ml,      &     !(land_pts,nsurft,nsmax_ml)
                   refreeze_ml,   &     !(land_pts,nsurft,nsmax_ml)
                   melt_ml,       &     !(land_pts,nsurft,nsmax_ml)
-                  !lake_depth_ml, &     !(land_pts,nsurft)
+                  lake_depth_ml, &     !(land_pts,nsurft)
                   !lid_depth_ml,  &     !(land_pts,nsurft)
                   !lid_temp_ml,   &     !(land_pts,nsurft)   
                   has_lake,      &     !(land_pts,nsurft)
@@ -65,7 +65,8 @@ SUBROUTINE snow (a_step, land_pts, timestep, stf_hf_snow_melt, nsurft, n_wtrac_j
                   ice_lens_index,&     !(land_pts,nsurft)
                   lake_inflow,   &     !(land_pts,nsurft)
                   ksnow0_ml,     &       !(land_pts,nsurft)
-                  kdtdz_ml) 
+                  kdtdz_ml,&
+                  dhdt_lake_snow_ml)
                   
 USE canopysnow_mod,  ONLY: canopysnow
 USE compactsnow_mod, ONLY: compactsnow
@@ -77,6 +78,7 @@ USE snowpack_mod,    ONLY: snowpack
 USE snowtherm_mod,   ONLY: snowtherm
 
 USE adjust_ice_lens_depth_mod,   ONLY: adjust_ice_lens_depth
+USE apply_lake_bottom_melt_mod, ONLY:  apply_lake_bottom_melt
 
 USE water_constants_mod, ONLY:                                                 &
   ! imported scalar parameters
@@ -197,8 +199,10 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
     ! Water tracer convective snowfall rate (kg/m2/s).
   ei_surft_wtrac(land_pts,nsurft,n_wtrac_jls),                                 &
     ! Water tracer sublimation of snow (kg/m2/s).
-  kdtdz_ml(land_pts,nsurft)
-    ! heat flux into snowpack when exposed_water is above W/m2 (from meltlake_evolve.F90)
+  kdtdz_ml(land_pts,nsurft),                                                   & 
+   ! heat flux into snowpack when exposed_water is above W/m2 (from meltlake_evolve.F90)
+  dhdt_lake_snow_ml(land_pts,nsurft)
+   ! Stefan lake bottom melt boundary movement (m)
 
   !-----------------------------------------------------------------------------
 ! Array arguments with intent(inout)
@@ -297,7 +301,7 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Refrozen mass in snow layers (kg/m2).
   melt_ml(land_pts,nsurft,nsmax_ml),                                           &                                          
     ! Melt mass in snow layers (kg/m2).   
-  !lake_depth_ml(land_pts,nsurft),                                              &    
+  lake_depth_ml(land_pts,nsurft),                                              &    
     ! Melt lake depth (m)
   !lid_depth_ml(land_pts,nsurft),                                               &    
     ! Frozen lid depth (m)
@@ -558,8 +562,8 @@ IF (sf_diag%l_snice) THEN
       DO k = 1,surft_pts(n)
         i = surft_index(k,n)
         IF (nsnow(i,n) > 0) THEN
-
-            IF (l_meltlake.AND.l_lice_surft(n)) THEN 
+           IF (l_meltlake .AND. l_elev_land_ice .AND. l_lice_surft(n)) THEN
+           ! IF (l_meltlake.AND.l_lice_surft(n)) THEN 
                 sice_old(i,n) = SUM(sice_ml(i,n,1:nsnow(i,n)))
                 sliq_old(i,n) = SUM(sliq_ml(i,n,1:nsnow(i,n)))
              ELSE
@@ -872,66 +876,26 @@ END IF !l_meltlake
                     snowfall, graupfall, wtrac_sn%snowfall,                    &
                     wtrac_sn%graupfall)
 
+
+  IF (l_meltlake.AND.l_elev_land_ice .AND. l_lice_surft(n)) THEN
+     
 !---------------------------------------------------------------------------
 ! Divide snow pack into layers
 !---------------------------------------------------------------------------
-IF (l_meltlake.AND.l_elev_land_ice .AND. l_lice_surft(n)) THEN
-
-  ! IF (timestep_number >= 333 .AND. timestep_number <= 335) THEN
-   !IF (timestep_number == 336) THEN
-  
-    !  WRITE(*,*) '--- before layersnow ---'
-    !  WRITE(*,'(A,I8)')    'timestep_number    = ', timestep_number
-    !  WRITE(*,'(A,I8)')    'nsnow              = ', nsnow(1,n)
-    !  WRITE(*,'(A,F12.6)') 'snowdepth          = ', snowdepth(1,n)
-    !  WRITE(*,'(A,F12.6)') 'ds_sl_ml(1)        = ', ds_sl_ml(1,1)
-    !  WRITE(*,'(A,F12.6)') 'ds_sl_ml(end)      = ', ds_sl_ml(1,nsnow(1,n))
-
-     ! DO ns = 1, nsnow(1,n)
-     !    WRITE(*,'(A,I4,A,F12.6)') 'ns' , ns, ' ds_sl_ml = ', ds_sl_ml(1,ns)
-     ! END DO
-
-     ! WRITE(*,'(A,F12.6)') 'sum_ds             = ', SUM(ds_sl_ml(1,1:nsnow(1,n)))
-     ! WRITE(*,'(A,F12.6)') 'difference         = ', snowdepth(1,n) - &
-     !      SUM(ds_sl_ml(1,1:nsnow(1,n)))
-    !  WRITE(*,'(A,F12.6)') 'snow_surft         = ', snow_surft(1,n)
-   !END IF
-  
-  
+   
     CALL layersnow ( land_pts, surft_pts(n), surft_index(:,n),                 &
          nsmax_ml, dzsnow_ml, snowdepth(:,n), nsnow(:,n), ds_sl_ml )
 
-    !WRITE(*,*) 'after layersnow: ', timestep_number, SUM(ds_sl_ml(1,1:nsnow(1,n)))
-    
-    !IF (timestep_number >= 333 .AND. timestep_number <= 335) THEN
-    !IF (timestep_number == 336) THEN
+!---------------------------------------------------------------------------
+! Remove depth and mass from top of snowpack using Stefan boundary melt
+!---------------------------------------------------------------------------
 
-     !  WRITE(*,*) '---after layersnow ---'
-     !  WRITE(*,'(A,I8)')    'timestep_number       = ', timestep_number
-     !  WRITE(*,'(A4,3A12)') 'ns', 'ds', 'sice', 'sliq'
+    IF (ANY(dhdt_lake_snow_ml(surft_index(1:surft_pts(n),n),n) > 0.0)) THEN
 
-      ! DO ns = 1, nsnow(1,n)
-      !    WRITE(*,'(I4,3F12.6)') ns,             &
-      !         ds_sl_ml(1,ns),                    &
-      !         sice_sl_ml(1,ns),                  &
-      !         sliq_sl_ml(1,ns)
-      ! END DO
-       
-     !  WRITE(*,'(A,I8)')    'timestep_number    = ', timestep_number
-     !  WRITE(*,'(A,I8)')    'nsnow              = ', nsnow(1,n)
-     !  WRITE(*,'(A,F12.6)') 'snowdepth          = ', snowdepth(1,n)
-     !  WRITE(*,'(A,F12.6)') 'ds_sl_ml(1)        = ', ds_sl_ml(1,1)
-     !  WRITE(*,'(A,F12.6)') 'ds_sl_ml(end)      = ', ds_sl_ml(1,nsnow(1,n))
-       !DO ns = 1, nsnow(1,n)
-       !   WRITE(*,'(A,I4,A,F12.6)') 'ns' , ns, ' ds_sl_ml = ', ds_sl_ml(1,ns)
-       !END DO
-     !  WRITE(*,'(A,F12.6)') 'sum_ds             = ', SUM(ds_sl_ml(1,1:nsnow(1,n)))
-     !  WRITE(*,'(A,F12.6)') 'difference         = ', snowdepth(1,n) - &
-     !       SUM(ds_sl_ml(1,1:nsnow(1,n)))
-     !   WRITE(*,'(A,F12.6)') 'snow_surft         = ', snow_surft(1,n)
-    !END IF
-    
-    !IF (timestep_number == 336) STOP 'debug stop after timestep 336'
+       CALL apply_lake_bottom_melt( land_pts, surft_pts(n), surft_index(:,n),  &
+            nsnow(:,n), dhdt_lake_snow_ml(:,n), ds_sl_ml, sice_sl_ml,          &
+            sliq_sl_ml, snowmass, snowdepth(:,n), lake_depth_ml(:,n))
+    END IF
     
 ELSE 
     CALL layersnow ( land_pts, surft_pts(n), surft_index(:, n),                &
@@ -943,35 +907,35 @@ END IF
   !---------------------------------------------------------------------------
   IF ( nsmax > 0 ) THEN
   
-  IF (l_meltlake.AND.l_elev_land_ice .AND. l_lice_surft(n)) THEN
-    CALL snowtherm ( land_pts, surft_pts(n), nsnow(:,n),                      &
-                     surft_index(:,n), nsmax_ml, ds_sl_ml, sice_sl_ml,        &
-                     sliq_sl_ml, csnow_ml, ksnow_ml )
-    
+     IF (l_meltlake.AND.l_elev_land_ice .AND. l_lice_surft(n)) THEN
+        
+        CALL snowtherm ( land_pts, surft_pts(n), nsnow(:,n),                      &
+             surft_index(:,n), nsmax_ml, ds_sl_ml, sice_sl_ml,                    &
+             sliq_sl_ml, csnow_ml, ksnow_ml )
+        
 
 !---------------------------------------------------------------------------
 ! An active lake sitting on top of snowpack
 !---------------------------------------------------------------------------
-     DO k=1,surft_pts(n)
-        i = surft_index(k,n)
+        DO k=1,surft_pts(n)
+           i = surft_index(k,n)
 
-        !IF (exposed_water(i,n) .OR. has_vlid(i,n) .OR. has_lid(i,n)) THEN
-        IF (has_lake(i,n)) THEN
+           IF (has_lake(i,n)) THEN
 
-           !--- No melting
-           melt_surft(i,n)      = 0.0
+              !--- No melting
+              melt_surft(i,n)     = 0.0
+              
+              ! No increment in snowmass from sublim/melt 
+              snowinc_surft(i,n)  = 0.0
            
-           ! No increment in snowmass from sublim/melt 
-           snowinc_surft(i,n)   = 0.0
+              !--- Heat flux into snow pack is conductive from lake 
+              surf_htf_surft(i,n) = kdtdz_ml(i,n)
            
-           !--- Heat flux into snow pack is conductive from lake 
-           surf_htf_surft(i,n)  = kdtdz_ml(i,n)
-           
-           !--- Stefan condition needs thermal conductitivy of top snow layer
-           ksnow0_ml(i,n)       = ksnow_ml(i,1)
+              !--- Stefan condition needs thermal conductitivy of top snow layer
+              ksnow0_ml(i,n)       = ksnow_ml(i,1)
 
-           !--- No snowfall (either falls on lid or into lake 
-           snowfall(i)          = 0.0
+              !--- No snowfall (this is intercepeted by lid or added to lake depth) 
+              snowfall(i)          = 0.0
           
         END IF
      END DO
@@ -981,8 +945,8 @@ END IF
     CALL snowtherm ( land_pts, surft_pts(n), nsnow(:,n),                      &
                      surft_index(:,n), nsmax, ds_sl, sice_sl,                 &
                      sliq_sl, csnow, ksnow )
-  END IF !l_meltlake
-  END IF !nsmax
+ END IF !l_meltlake
+END IF !nsmax
 
   !---------------------------------------------------------------------------
   ! Snow thermodynamics and hydrology
@@ -1125,9 +1089,9 @@ END IF
                   l_lice_point, l_lice_surft,                                  &
                   ! Types Variables
                   lake_h_ice_gb, lake_h_mxl_gb, lake_depth_gb)
- 
-  ELSE IF (l_meltlake.AND.l_lice_surft(n)) THEN
-               
+    
+ ELSE IF (l_meltlake .AND. l_elev_land_ice .AND. l_lice_surft(n)) THEN
+                
     CALL snowpack(a_step, n, land_pts, surft_pts(n), n_wtrac_jls, timestep,    &
                   cansnowtile(n), nsnow(:,n), surft_index(:,n), nsurft, nsmax_ml,  &
                   csnow_ml,ei_surft(:,n), hcaps1_soilt(:,m), hcons,            &
@@ -1151,24 +1115,7 @@ END IF
                   ice_lens_depth(:,n),ice_lens_index(:,n), lake_inflow(:,n),   &
                   has_lake(:,n))
 
-    !WRITE(*,*) 'after snowpack: ', timestep_number, SUM(ds_sl_ml(1,1:nsnow(1,n)))
-    
-    !IF (timestep_number == 336) THEN
-    !   WRITE(*,*) '--- after snowpack ---'
-    !   WRITE(*,'(A,I8)')    'timestep_number    = ', timestep_number
-    !   WRITE(*,'(A,I8)')    'nsnow              = ', nsnow(1,n)
-    !   WRITE(*,'(A,F12.6)') 'snowdepth          = ', snowdepth(1,n)
-    !   WRITE(*,'(A,F12.6)') 'ds_sl_ml(1)        = ', ds_sl_ml(1,1)
-    !   WRITE(*,'(A,F12.6)') 'ds_sl_ml(end)      = ', ds_sl_ml(1,nsnow(1,n))
-    !   WRITE(*,'(A,F12.6)') 'sum_ds             = ', SUM(ds_sl_ml(1,1:nsnow(1,n)))
-    !   WRITE(*,'(A,F12.6)') 'difference         = ', snowdepth(1,n) - &
-    !        SUM(ds_sl_ml(1,1:nsnow(1,n)))
-    !    WRITE(*,'(A,F12.6)') 'snow_surft        = ', snow_surft(1,n)
-    ! END IF
-     
-    
-    !IF (timestep_number == 336) STOP
-          
+              
   ELSE 
   
     CALL snowpack (a_step, n, land_pts, surft_pts(n), n_wtrac_jls, timestep,   &
@@ -1201,8 +1148,10 @@ END IF
   ! Growth of snow grains
   !---------------------------------------------------------------------------
   IF ( l_snow_albedo .OR. l_embedded_snow ) THEN
+
   
-  IF (l_meltlake.AND.l_lice_surft(n)) THEN
+     IF (l_meltlake .AND. l_elev_land_ice .AND. l_lice_surft(n)) THEN   
+  !IF (l_meltlake.AND.l_lice_surft(n)) THEN
   
   CALL snowgrain ( land_pts, surft_pts(n), timestep, nsnow(:,n),              &
                      surft_index(:,n), nsmax_ml, sice_sl_ml, snowfall,        &
@@ -1222,8 +1171,9 @@ END IF
   END IF
 
   IF ( nsmax > 0 ) THEN
-   
-   IF (l_meltlake.AND.l_lice_surft(n)) THEN
+
+     IF (l_meltlake .AND. l_elev_land_ice .AND. l_lice_surft(n)) THEN
+   !IF (l_meltlake.AND.l_lice_surft(n)) THEN
    
     !-------------------------------------------------------------------------
     ! Mechanical compaction of snow
@@ -1587,7 +1537,8 @@ IF (sf_diag%l_snice) THEN
            snow_surft_old(i,n) > EPSILON(snow_surft) ) THEN
         IF (nsnow(i,n) > 0) THEN
 
-         IF (l_meltlake.AND.l_lice_surft(n)) THEN   
+           IF (l_meltlake .AND. l_elev_land_ice .AND. l_lice_surft(n)) THEN
+         !IF (l_meltlake.AND.l_lice_surft(n)) THEN   
  
           sf_diag%snice_sicerate_surft(i,n) = ( SUM(sice_ml(i,n,1:nsnow(i,n))) -  &
                                               sice_old(i,n) ) / timestep

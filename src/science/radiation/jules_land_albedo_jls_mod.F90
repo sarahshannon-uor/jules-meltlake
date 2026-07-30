@@ -941,50 +941,148 @@ IF (l_spec_albedo) THEN
       ! For land ice surfaces where deep, dense snow may be emulating firn/bare
       ! ice, scattering physics as in albedo_ts less valid. As in MAR, scale
       ! albedo above threshold with surface density (Gruell and Konzellmann '94)
-      ! using ~ top 10cm
+      ! using ~ top 10cm. Copy l_meltlake stuff here. 
       !------------------------------------------------------------------------
+      
       IF (l_elev_land_ice .AND. l_lice_surft(n)) THEN
-        DO j = 1,snow_pts(n)
-          l = snow_index(j,n)
-          IF (l_lice_point(l) .AND. nsnow_surft(l,n) > 0) THEN
+         DO j = 1,snow_pts(n)
+            l = snow_index(j,n)
 
-            ssum = 0.0
-            DO k = 1,nsnow_surft(l,n)
-              ssum = ssum + ds_surft(l,n,k)
-              IF (ssum > 0.1) EXIT
-            END DO
-            k = MIN(k,nsnow_surft(l,n))
+            IF (l_lice_point(l) .AND. nsnow_surft(l,n) > 0) THEN
 
-            IF (SUM(ds_surft(l,n,1:k)) > 1.0e-3) THEN
-              rho_snow_surf = (SUM(sice_surft(l,n,1:k)) +                      &
-                               SUM(sliq_surft(l,n,1:k))) /                     &
-                              SUM(ds_surft(l,n,1:k))
-            ELSE
-              rho_snow_surf = rho_snow_const
-            END IF
+               snow_surface = .false.
 
-            IF (rho_snow_surf > rho_firn_albedo) THEN
-              snow_alb_vis_as = aicemax(1) + (rho_snow_surf - rho_ice) *       &
-                                ((amax(1) - aicemax(1)) /                      &
-                                 (rho_snow_const - rho_ice))
+               IF (l_meltlake) THEN
 
-              snow_alb_nir_as = aicemax(2) + (rho_snow_surf - rho_ice) *       &
-                                ((amax(2) - aicemax(2)) /                      &
-                                 (rho_snow_const - rho_ice))
+        !------------------------------------------------------------
+        ! Case 1: Snow on a permanent or virtual lid.
+        ! Treat the surface as fresh snow.
+        !------------------------------------------------------------
+                  IF (snow_on_lid(l,n)) THEN
 
-              alb_snow_surft(l,1) = MIN(alb_snow_surft(l,1),snow_alb_vis_as)
-              alb_snow_surft(l,2) = MIN(alb_snow_surft(l,2),snow_alb_vis_as)
-              alb_snow_surft(l,3) = MIN(alb_snow_surft(l,3),snow_alb_nir_as)
-              alb_snow_surft(l,4) = MIN(alb_snow_surft(l,4),snow_alb_nir_as)
-            ELSE
-              alb_snow_surft(l,1) = MIN(alb_snow_surft(l,1),amax(1))
-              alb_snow_surft(l,2) = MIN(alb_snow_surft(l,2),amax(1))
-              alb_snow_surft(l,3) = MIN(alb_snow_surft(l,3),amax(2))
-              alb_snow_surft(l,4) = MIN(alb_snow_surft(l,4),amax(2))
-            END IF
-          END IF !on an elevated ice tile with deep snow
-        END DO !loop points
-      END IF !elevated ice tiles exist somewhere for this n
+                     snow_surface = .true.
+                     rho_snow_surf = rho_snow_const
+
+        !------------------------------------------------------------
+        ! Case 2: Bare permanent or virtual lid.
+        ! Use fixed ice albedo.
+        !------------------------------------------------------------
+                  ELSE IF (has_vlid(l,n) .OR. has_lid(l,n)) THEN
+
+                     alb_snow_surft(l,1) = aicemax(1)
+                     alb_snow_surft(l,2) = aicemax(1)
+                     alb_snow_surft(l,3) = aicemax(2)
+                     alb_snow_surft(l,4) = aicemax(2)
+
+        !------------------------------------------------------------
+        ! Case 3: Exposed lake water.
+        ! Use the lake depth dependent albedo from Buzzard et al. 2018. Eqn 13
+        !------------------------------------------------------------
+        ELSE IF (exposed_water(l,n)) THEN
+
+          expon_term = 3.6 * lake_depth_ml(l,n)
+
+          IF (expon_term < 50.0) THEN
+            ex = EXP(-expon_term)
+
+            alb_snow_surft(l,:) = (9702.0 * ex + 1000.0) /   &
+                                  (-539.0 * ex + 20000.0)
+          ELSE
+            alb_snow_surft(l,:) = 0.05
+          END IF
+
+        !------------------------------------------------------------
+        ! Case 4: No lake present use elevated ice surface  
+        !------------------------------------------------------------
+        ELSE
+
+          snow_surface = .true.
+
+          ssum = 0.0
+          DO k = 1,nsnow_surft(l,n)
+            ssum = ssum + ds_surft_ml(l,n,k)
+            IF (ssum > 0.1) EXIT
+          END DO
+          k = MIN(k,nsnow_surft(l,n))
+
+          IF (SUM(ds_surft_ml(l,n,1:k)) > 1.0e-3) THEN
+            rho_snow_surf =                                      &
+                 (SUM(sice_surft_ml(l,n,1:k)) +                  &
+                  SUM(sliq_surft_ml(l,n,1:k))) /                 &
+                  SUM(ds_surft_ml(l,n,1:k))
+          ELSE
+            rho_snow_surf = rho_snow_const
+          END IF
+
+        END IF
+
+      ELSE
+
+        !----------------------------------------------------------
+        ! Meltlake model off
+        ! Use the original elevated ice snow density calculation.
+        !----------------------------------------------------------
+        snow_surface = .true.
+
+        ssum = 0.0
+        DO k = 1,nsnow_surft(l,n)
+          ssum = ssum + ds_surft(l,n,k)
+          IF (ssum > 0.1) EXIT
+        END DO
+        k = MIN(k,nsnow_surft(l,n))
+
+        IF (SUM(ds_surft(l,n,1:k)) > 1.0e-3) THEN
+          rho_snow_surf =                                        &
+               (SUM(sice_surft(l,n,1:k)) +                      &
+                SUM(sliq_surft(l,n,1:k))) /                     &
+                SUM(ds_surft(l,n,1:k))
+        ELSE
+          rho_snow_surf = rho_snow_const
+        END IF
+
+      END IF
+
+      !------------------------------------------------------------
+      ! Apply density dependent albedo only to snow surfaces
+      !------------------------------------------------------------
+      IF (snow_surface) THEN
+
+        IF (rho_snow_surf > rho_firn_albedo) THEN
+          snow_alb_vis_as = aicemax(1) +                         &
+               (rho_snow_surf - rho_ice) *                       &
+               ((amax(1) - aicemax(1)) /                         &
+                (rho_snow_const - rho_ice))
+
+          snow_alb_nir_as = aicemax(2) +                         &
+               (rho_snow_surf - rho_ice) *                       &
+               ((amax(2) - aicemax(2)) /                         &
+                (rho_snow_const - rho_ice))
+
+          alb_snow_surft(l,1) = MIN(alb_snow_surft(l,1),         &
+                                    snow_alb_vis_as)
+          alb_snow_surft(l,2) = MIN(alb_snow_surft(l,2),         &
+                                    snow_alb_vis_as)
+          alb_snow_surft(l,3) = MIN(alb_snow_surft(l,3),         &
+                                    snow_alb_nir_as)
+          alb_snow_surft(l,4) = MIN(alb_snow_surft(l,4),         &
+                                    snow_alb_nir_as)
+
+        ELSE
+
+          alb_snow_surft(l,1) = MIN(alb_snow_surft(l,1),amax(1))
+          alb_snow_surft(l,2) = MIN(alb_snow_surft(l,2),amax(1))
+          alb_snow_surft(l,3) = MIN(alb_snow_surft(l,3),amax(2))
+          alb_snow_surft(l,4) = MIN(alb_snow_surft(l,4),amax(2))
+
+        END IF
+
+      END IF
+
+    END IF ! Elevated ice point with snow
+  END DO   ! Snow points
+END IF     ! Elevated land-ice tile
+      
+      
 
       IF (l_mask_snow_orog) THEN
         !
@@ -1098,7 +1196,7 @@ IF (l_spec_albedo) THEN
 
   ! ---------------------------------------------------------------------
   ! Assign snow albedos using the default scheme, essentially assuming
-  ! that the snow is on the canopy.
+  ! that the snow is on the canopy. do for l_embedded_snow=.true. Robin ???
   ! ---------------------------------------------------------------------
   IF ( .NOT. l_embedded_snow) THEN
     IF (l_snow_albedo) THEN
@@ -1113,8 +1211,9 @@ IF (l_spec_albedo) THEN
       ! For land ice surfaces where deep, dense snow may be emulating firn/bare
       ! ice, scattering physics as in albedo_ts less valid. As in MAR, scale
       ! albedo above threshold with surface density (Gruell and Konzellmann '94)
-      ! using ~ top 10cm
+      ! using ~ top 10cm. 
       !------------------------------------------------------------------------
+     
 IF (l_elev_land_ice) THEN
   DO n = 1, ntype
     IF (l_lice_surft(n)) THEN
@@ -1124,17 +1223,18 @@ IF (l_elev_land_ice) THEN
         IF (l_lice_point(l) .AND. nsnow_surft(l,n) > 0) THEN
 
           !------------------------------------------------------------
-          ! The meltlake surface can have 3 surfaces snow, exposed water 
-          ! and frozen lid. 
+          ! The meltlake model can have 4 surface types: snow on lid, 
+          ! bare lid, exposed water or snow covered 
           !------------------------------------------------------------
            snow_surface = .false.
 
-          !------------------------------------------------------------
-          ! Case 1: meltlake scheme active
-          !------------------------------------------------------------
            IF (l_meltlake) THEN
 
-
+              !------------------------------------------------------------
+              ! Case 1: Snow on a permanent or virtual lid.
+              ! Treat the surface as fresh snow.
+              !------------------------------------------------------------
+              
               IF (snow_on_lid(l,n)) THEN
 
               !--------------------------------------------------------
@@ -1142,40 +1242,46 @@ IF (l_elev_land_ice) THEN
               !--------------------------------------------------------
                  snow_surface = .true.
 
-              ! use snow-on-lid properties, not underlying snowpack
                  rho_snow_surf = rho_snow_const
 
-            
+              !----------------------------------------------------------------
+              ! Case 2: Bare permanent or virtual lid.
+              ! Use fixed ice albedo.
+              !----------------------------------------------------------------
               ELSE IF (has_vlid(l,n) .OR. has_lid(l,n)) THEN
 
+             
+                 alb_snow(l,n,1) = aicemax(1)
+                 alb_snow(l,n,2) = aicemax(1)
+                 alb_snow(l,n,3) = aicemax(2)
+                 alb_snow(l,n,4) = aicemax(2)
+                
               !--------------------------------------------------------
-              ! Lid present, fixed lid albedo
-              !--------------------------------------------------------
-                 alb_snow(l,n,:) = 0.6
-            
+              ! Case 3: Exposed water present.
+              ! Use the lake depth dependent albedo from Buzzard et al.
+              ! eqn 13. Note: this assumes vis and nir albedos are the
+              ! same. Need to fix this. 
+              !--------------------------------------------------------   
+              ELSE IF (exposed_water(l,n)) THEN
+             
+                 expon_term = 3.6 * lake_depth_ml(l,n)
 
-             ! ELSE IF (exposed_water(l,n)) THEN
-                ELSE IF (lake_depth_ml(l,n) >= 0.01) THEN
-              !--------------------------------------------------------
-              ! Exposed water present, lake-depth albedo
-              !--------------------------------------------------------
-              
-              expon_term = 3.6 * lake_depth_ml(l,n)
+                 IF (expon_term < 50.0) THEN
+                    ex = EXP(-expon_term)
+                    alb_snow(l,n,:) = (9702.0 * ex + 1000.0)              &
+                         / (-539.0 * ex + 20000.0)
+                 ELSE
+                    alb_snow(l,n,:) = 0.05
+                 END IF   
 
-              IF (expon_term < 50.0) THEN
-                ex = EXP(-expon_term)
-                alb_snow(l,n,:) = (9702.0 * ex + 1000.0)              &
-                     / (-539.0 * ex + 20000.0)
               ELSE
-                alb_snow(l,n,:) = 0.05
-              END IF   ! expon_term < 50.0
-
-            ELSE
 
               !--------------------------------------------------------
-              ! Meltlake scheme on, but surface is snow
+              !  Case 4: No lake present, snow covered surface 
+              !  but with more snow layers (note snow variables with
+              !  _ml in name)  
               !--------------------------------------------------------
-              !print *, 'meltlake model on, surface is snow'
+            
               snow_surface = .true.
 
               ssum = 0.0
@@ -1191,16 +1297,16 @@ IF (l_elev_land_ice) THEN
                                   SUM(ds_surft_ml(l,n,1:k))
               ELSE
                 rho_snow_surf = rho_snow_const
-              END IF   ! SUM(ds_surft_ml(l,n,1:k)) > 1.0e-3
+              END IF   
 
-            END IF   ! has_lid / exposed_water / snow surface
+            END IF   ! snow_on_lid / has_lid / exposed_water / snow surface
 
           ELSE !l_meltlake
 
             !----------------------------------------------------------
-            ! Case 2: meltlake scheme off, surface is snow
+            ! Meltlake model is off, surface is snow
             !----------------------------------------------------------
-            !print *, 'meltlake model is off'
+           
             snow_surface = .true.
 
             ssum = 0.0
@@ -1216,7 +1322,7 @@ IF (l_elev_land_ice) THEN
                                 SUM(ds_surft(l,n,1:k))
             ELSE
               rho_snow_surf = rho_snow_const
-            END IF   ! SUM(ds_surft(l,n,1:k)) > 1.0e-3
+            END IF   
 
           END IF   ! l_meltlake
 
@@ -1250,13 +1356,13 @@ IF (l_elev_land_ice) THEN
 
             END IF   ! rho_snow_surf > rho_firn_albedo
 
-          END IF   ! snow_surface
+         END IF   ! snow_surface
 
-        END IF   ! l_lice_point(l) .AND. nsnow_surft(l,n) > 0
+      END IF   ! l_lice_point(l) .AND. nsnow_surft(l,n) > 0
 
-      END DO   ! j
-    END IF   ! l_lice_surft(n)
-  END DO   ! n
+   END DO   ! j
+END IF   ! l_lice_surft(n)
+END DO   ! n
 END IF   ! l_elev_land_ice
 
       
