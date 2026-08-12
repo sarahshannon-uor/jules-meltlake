@@ -1237,7 +1237,7 @@ END IF     ! Elevated land-ice tile
 
   ! ---------------------------------------------------------------------
   ! Assign snow albedos using the default scheme, essentially assuming
-  ! that the snow is on the canopy. do for l_embedded_snow=.true. Robin ???
+  ! that the snow is on the canopy. 
   ! ---------------------------------------------------------------------
   IF ( .NOT. l_embedded_snow) THEN
     IF (l_snow_albedo) THEN

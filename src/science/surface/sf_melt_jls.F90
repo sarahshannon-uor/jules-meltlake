@@ -231,20 +231,12 @@ DO k = 1,surft_pts
     ! the melting point.
     melt_surft(l) = -snowinc_surft(l) / timestep - ei_surft(l)
     dtstar        = -lf * melt_surft(l) / lsmelt
-
-    ! For melt lake points, suppress the standard JULES snowmelt treatment
-    ! when the exposed surface is lake water or a bare ice lid. The snowpack
-    ! below the lake is not melted directly by this surface melt flux. Its
-    ! thermal evolution is instead controlled by the conductive heat flux
-    ! and the Stefan-condition treatment in meltlake_evolve.F90.
-    !
-    ! A bare permanent or virtual lid is also not melted from its upper
-    ! surface using melt_surft. Lid melt is calculated separately
-    ! using the Stefan condition in lid_evolve.F90.
-    !
-    ! When snow is present on top of the lid, retain melt_surft and the
-    ! associated dtstar correction because the actual surface is snow.
-    
+    !-----------------------------------------------------------------------
+    ! melt_surft is only needed when the surface is snow. This happens when
+    ! there is no melt lake or there is snow on top of the lid. 
+    ! melt_surft is used to melt the snow on top of the lid.  
+    !-----------------------------------------------------------------------
+              
     IF (l_meltlake .AND. PRESENT(has_lake) .AND. PRESENT(snow_on_lid)) THEN
        IF (has_lake(l) .AND. .NOT. snow_on_lid(l)) THEN
           melt_surft(l) = 0.0
