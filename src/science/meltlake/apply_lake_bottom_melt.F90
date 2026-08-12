@@ -8,10 +8,13 @@
 
 ! *****************************COPYRIGHT*******************************
 !  SUBROUTINE apply_lake_bottom_melt-----------------------------------
-
+!  
 ! Description:
-!     
-
+! Melt the snowpack using the Stefan condition.      
+! Method:
+! Reduce mass and depth by the Stefan boundary change.
+! Add melted water to the lake depth
+! Note: doing this after layersnow has set up the layer depths 
 ! Subroutine Interface:
 MODULE apply_lake_bottom_melt_mod
   CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='APPLY_LAKE_BOTTOM_MELT'
