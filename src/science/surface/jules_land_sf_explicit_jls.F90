@@ -810,8 +810,6 @@ REAL(KIND=real_jlslsm), INTENT(OUT) :: smc_soilt_wtrac(land_pts,nsoilt,        &
                              ! OUT Water tracer in available moisture in the
                              !     soil profile (kg/m2).
 
-!meltlake model (OUT)
-!REAL(KIND=real_jlslsm), INTENT(OUT) :: dt_elev_ml(land_pts,nsurft)
 
 !-----------------------------------------------------------------------
 ! LOCAL variables
@@ -2016,7 +2014,9 @@ DO n = 1,nsurft
 !$OMP        l_moruses_storage, urban_roof, l_fix_moruses_roof_rad_coupling,   &
 !$OMP        vfrac_surft, ashtf_surft, scaling_urban, l_soil_point,has_lid,    &
 !$OMP        has_vlid,snow_on_lid,lid_depth_ml,vlid_depth_ml,lid_snow_depth_ml,&
-!$OMP        lid_temp_ml,exposed_water,lake_temp_ml,tstar_surft) SCHEDULE(STATIC)
+!$OMP        lid_temp_ml,exposed_water,lake_temp_ml,tstar_surft,l_meltlake,    &
+!$OMP        r_snow,r_ice,ice_depth_eff)                                       &
+!$OMP SCHEDULE(STATIC)
   
   DO l = 1,land_pts
     j = (land_index(l) - 1) / t_i_length + 1
@@ -2123,7 +2123,9 @@ DO n = 1,nsurft
 
     !-----------------------------------------------------------------------
     ! Case 1: Snow on permanent or virtual lid.
-    !
+    !   F = hcon DeltaT/ depth
+    !   r = depth/hcon so F = deltaT/r
+    !   R = ashtf.DeltaT so ashtf = 1/r
     ! tsurf is treated as the lid midpoint temperature:
     !
     !   permanent lid: tsurf = lid_temp_ml

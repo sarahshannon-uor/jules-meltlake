@@ -25,7 +25,7 @@ SUBROUTINE sf_melt (                                                           &
 ,fracs,resft,rhokh_1,tile_frac,timestep,r_gamma                                &
 ,ei_surft,fqw_1,ftl_1,fqw_surft,ftl_surft                                      &
 ,tstar_surft,snow_surft,snowdepth                                              &
-,melt_surft,snowinc_surft,has_lake                                             &
+,melt_surft,snowinc_surft,has_lake,snow_on_lid                                 &
  )
 
 USE atm_fields_bounds_mod, ONLY: tdims
@@ -136,9 +136,10 @@ INTEGER ::                                                                     &
                       ! Loop counter - land field.
 
 LOGICAL, INTENT(IN), OPTIONAL ::                                               &
- has_lake(points)
-                     ! IN flag meltlake depth > 10cm surface is no longer snow
-                     ! covered
+ has_lake(points),                                                             &
+                     ! IN meltlake present  
+ snow_on_lid(points)
+                     ! IN snow on frozen lid
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -223,20 +224,36 @@ DO k = 1,surft_pts
         (lcmelt * (tstar_surft(l) - tm) / lf + ei_surft(l)) * timestep)
     END IF
 
-! --- no melting if lake is present
-     IF (l_meltlake .AND. PRESENT(has_lake)) THEN
-        IF (has_lake(l)) THEN
-           melt_surft(l) = 0.0
-           dtstar = 0.0
-        ELSE
-           melt_surft(l) = - snowinc_surft(l) / timestep - ei_surft(l)
-           dtstar = - lf * melt_surft(l) / lsmelt
-           tstar_surft(l) = tstar_surft(l) + dtstar
-        END IF !lake water is present
-     END IF ! l_meltlake
+
+    ! start l_meltlake changes 
+    ! Standard JULES surface melt calculation. Excess surface energy is
+    ! used to melt snow rather than raise the surface temperature above
+    ! the melting point.
+    melt_surft(l) = -snowinc_surft(l) / timestep - ei_surft(l)
+    dtstar        = -lf * melt_surft(l) / lsmelt
+
+    ! For melt lake points, suppress the standard JULES snowmelt treatment
+    ! when the exposed surface is lake water or a bare ice lid. The snowpack
+    ! below the lake is not melted directly by this surface melt flux. Its
+    ! thermal evolution is instead controlled by the conductive heat flux
+    ! and the Stefan-condition treatment in meltlake_evolve.F90.
+    !
+    ! A bare permanent or virtual lid is also not melted from its upper
+    ! surface using melt_surft. Lid melt is calculated separately
+    ! using the Stefan condition in lid_evolve.F90.
+    !
+    ! When snow is present on top of the lid, retain melt_surft and the
+    ! associated dtstar correction because the actual surface is snow.
     
-    !print *, 'sf_melt: dtstar, tstar', dtstar , tstar_surft(l)
-! --- end sarah
+    IF (l_meltlake .AND. PRESENT(has_lake) .AND. PRESENT(snow_on_lid)) THEN
+       IF (has_lake(l) .AND. .NOT. snow_on_lid(l)) THEN
+          melt_surft(l) = 0.0
+          dtstar        = 0.0
+       END IF
+    END IF
+
+    tstar_surft(l) = tstar_surft(l) + dtstar
+    ! end l_meltlake changes
     
     dftl = cp * rhokh1_prime * dtstar
     dfqw = alpha1(l) * resft(l) * rhokh1_prime * dtstar

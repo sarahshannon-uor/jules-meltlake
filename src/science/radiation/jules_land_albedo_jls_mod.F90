@@ -201,11 +201,15 @@ REAL(KIND=real_jlslsm), INTENT(IN) :: sice_surft_ml(land_pts,nsurft,nsmax_ml)
 REAL(KIND=real_jlslsm), INTENT(IN) :: sliq_surft_ml(land_pts,nsurft,nsmax_ml)
 REAL(KIND=real_jlslsm), INTENT(IN) :: ds_surft_ml(land_pts,nsurft,nsmax_ml)
 REAL(KIND=real_jlslsm), INTENT(IN) :: lake_depth_ml(land_pts,nsurft)
+
 LOGICAL, INTENT(IN) :: has_lid(land_pts,nsurft)
 LOGICAL, INTENT(IN) :: has_vlid(land_pts,nsurft)
 LOGICAL, INTENT(IN) :: exposed_water(land_pts,nsurft)
 LOGICAL, INTENT(IN) :: snow_on_lid(land_pts,nsurft)
 
+REAL, PARAMETER     ::                                                         &
+ snow_melt_alb_ml(2) = (/ 0.78, 0.36 /)
+  ! albedo of melted snow on lid (vis/nir)
 
 !Local variables:
 INTEGER, PARAMETER ::       ilayers_dummy = 1
@@ -247,7 +251,9 @@ LOGICAL ::                                                                     &
                                       !Switch IN to albpft
   l_infer_direct
                                       !Switch to apply calculation of direct
-LOGICAL :: snow_surface            
+LOGICAL ::                                                                     &
+  density_albedo
+                                      !Switch for using density albedo
 
 INTEGER ::                                                                     &
   snow_pts(ntype),                                                             &
@@ -950,19 +956,54 @@ IF (l_spec_albedo) THEN
 
             IF (l_lice_point(l) .AND. nsnow_surft(l,n) > 0) THEN
 
-               snow_surface = .false.
+               density_albedo = .false.
 
                IF (l_meltlake) THEN
 
         !------------------------------------------------------------
         ! Case 1: Snow on a permanent or virtual lid.
-        ! Treat the surface as fresh snow.
+        ! Snow on the lid is represented as a separate zero layer
+        ! snow store and does not use the multilayer
+        ! snow density albedo calculation below
+        !
+        ! Use the simple JULES temperature dependence:
+        ! Cold snow uses amax. As the surface warms from tcland
+        ! to tm, albedo decreases linearly towards snow_melt_alb_ml.
+        ! Darkening is capped at the melting temperature tm.
+        ! Similar to but not an exact copy of code at L1539 below
         !------------------------------------------------------------
                   IF (snow_on_lid(l,n)) THEN
+                     
+                     ! just re-stating it's false for readability
+                     ! don't use density albedo scheme 
+                     density_albedo = .false.
+                     
 
-                     snow_surface = .true.
-                     rho_snow_surf = rho_snow_const
+                     ! Visible albedo
+                     IF (tstar_surft(l,n) < tcland) THEN
+                        snow_alb_vis_as = amax(1)
+                     ELSE
+                        snow_alb_vis_as = amax(1) +                              &
+                             ((snow_melt_alb_ml(1) - amax(1)) /                  &
+                             (tm - tcland)) *                                    &
+                             (MIN(tstar_surft(l,n),tm) - tcland)
+                     END IF
 
+                     ! Near-infrared albedo
+                     IF (tstar_surft(l,n) < tcland) THEN
+                        snow_alb_nir_as = amax(2)
+                     ELSE
+                        snow_alb_nir_as = amax(2) +                              &
+                             ((snow_melt_alb_ml(2) - amax(2)) /                  &
+                             (tm - tcland)) *                                    &
+                             (MIN(tstar_surft(l,n),tm) - tcland)
+                     END IF
+   
+                     alb_snow_surft(l,1) = snow_alb_vis_as
+                     alb_snow_surft(l,2) = snow_alb_vis_as
+                     alb_snow_surft(l,3) = snow_alb_nir_as
+                     alb_snow_surft(l,4) = snow_alb_nir_as
+                     
         !------------------------------------------------------------
         ! Case 2: Bare permanent or virtual lid.
         ! Use fixed ice albedo.
@@ -996,7 +1037,7 @@ IF (l_spec_albedo) THEN
         !------------------------------------------------------------
         ELSE
 
-          snow_surface = .true.
+          density_albedo = .true.
 
           ssum = 0.0
           DO k = 1,nsnow_surft(l,n)
@@ -1022,7 +1063,7 @@ IF (l_spec_albedo) THEN
         ! Meltlake model off
         ! Use the original elevated ice snow density calculation.
         !----------------------------------------------------------
-        snow_surface = .true.
+        density_albedo = .true.
 
         ssum = 0.0
         DO k = 1,nsnow_surft(l,n)
@@ -1045,7 +1086,7 @@ IF (l_spec_albedo) THEN
       !------------------------------------------------------------
       ! Apply density dependent albedo only to snow surfaces
       !------------------------------------------------------------
-      IF (snow_surface) THEN
+      IF (density_albedo) THEN
 
         IF (rho_snow_surf > rho_firn_albedo) THEN
           snow_alb_vis_as = aicemax(1) +                         &
@@ -1226,23 +1267,56 @@ IF (l_elev_land_ice) THEN
           ! The meltlake model can have 4 surface types: snow on lid, 
           ! bare lid, exposed water or snow covered 
           !------------------------------------------------------------
-           snow_surface = .false.
+           density_albedo = .false.
 
            IF (l_meltlake) THEN
 
-              !------------------------------------------------------------
-              ! Case 1: Snow on a permanent or virtual lid.
-              ! Treat the surface as fresh snow.
-              !------------------------------------------------------------
-              
+        !------------------------------------------------------------
+        ! Case 1: Snow on a permanent or virtual lid.
+        ! To keep the snow on the lid as simple as possible use a
+        ! a zero layer snow model. Density is constant.
+        !
+        ! Use the existing JULES temperature dependence:
+        ! cold snow has the maximum snow albedo (amax), while snow
+        ! warmer than tcland progressively darkens towards the
+        ! snow_melt_alb_ml. 
+        ! tcland=-2oC
+        !------------------------------------------------------------
+
               IF (snow_on_lid(l,n)) THEN
+                 
+                 ! Prevent the density dependent 
+                 density_albedo = .false.
 
-              !--------------------------------------------------------
-              ! Snow on top of lid or vlid, treat surface as snow
-              !--------------------------------------------------------
-                 snow_surface = .true.
+                 ! Visible albedo
+                 IF (tstar_surft(l,n) < tcland) THEN
+                    snow_alb_vis_as = amax(1)
+                 ELSE
+                    snow_alb_vis_as = amax(1) +                              &
+                         ((snow_melt_alb_ml(1) - amax(1)) /                  &
+                         (tm - tcland)) *                                    &
+                         (MIN(tstar_surft(l,n),tm) - tcland)
+                 END IF
+                 
+                 ! Near-infrared albedo
+                 IF (tstar_surft(l,n) < tcland) THEN
+                    snow_alb_nir_as = amax(2)
+                 ELSE
+                    snow_alb_nir_as = amax(2) +                              &
+                         ((snow_melt_alb_ml(2) - amax(2)) /                  &
+                         (tm - tcland)) *                                    &
+                         (MIN(tstar_surft(l,n),tm) - tcland)
+                 END IF
+                     
+                 
+                 ! This is the non-embedded snow branch, so modify
+                 ! alb_snow, which is subsequently used to construct
+                 ! the tile albedo.
+                 alb_snow(l,n,1) = snow_alb_vis_as
+                 alb_snow(l,n,2) = snow_alb_vis_as
+                 alb_snow(l,n,3) = snow_alb_nir_as
+                 alb_snow(l,n,4) = snow_alb_nir_as
 
-                 rho_snow_surf = rho_snow_const
 
               !----------------------------------------------------------------
               ! Case 2: Bare permanent or virtual lid.
@@ -1282,7 +1356,7 @@ IF (l_elev_land_ice) THEN
               !  _ml in name)  
               !--------------------------------------------------------
             
-              snow_surface = .true.
+              density_albedo = .true.
 
               ssum = 0.0
               DO k = 1, nsnow_surft(l,n)
@@ -1307,7 +1381,7 @@ IF (l_elev_land_ice) THEN
             ! Meltlake model is off, surface is snow
             !----------------------------------------------------------
            
-            snow_surface = .true.
+            density_albedo = .true.
 
             ssum = 0.0
             DO k = 1, nsnow_surft(l,n)
@@ -1329,7 +1403,7 @@ IF (l_elev_land_ice) THEN
           !------------------------------------------------------------
           ! Apply the snow-density albedo only for snow surface
           !------------------------------------------------------------
-          IF (snow_surface) THEN
+          IF (density_albedo) THEN
 
             IF (rho_snow_surf > rho_firn_albedo) THEN
               snow_alb_vis_as = aicemax(1) +                           &
@@ -1356,7 +1430,7 @@ IF (l_elev_land_ice) THEN
 
             END IF   ! rho_snow_surf > rho_firn_albedo
 
-         END IF   ! snow_surface
+         END IF   ! density_albedo
 
       END IF   ! l_lice_point(l) .AND. nsnow_surft(l,n) > 0
 

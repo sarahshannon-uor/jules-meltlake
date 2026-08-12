@@ -2655,6 +2655,10 @@ CASE ( 'snow_liq_ml' )
   cube_land = cube_from_array(progs%sliq_surft_ml)
   cube = map_from_land(cube_land)
 
+CASE ( 'rgrainl_ml' )
+  cube_land = cube_from_array(progs%rgrainl_surft_ml)
+  cube = map_from_land(cube_land)
+
 CASE ( 'tsnow_ml' )
   cube_land = cube_from_array(progs%tsnow_surft_ml)
   cube = map_from_land(cube_land)
@@ -2729,6 +2733,10 @@ CASE ( 'lid_snow_depth_ml' )
 
 CASE ( 'lid_snow_temp_ml' )
   cube_land = cube_from_array(meltlake_vars%lid_snow_temp_ml)
+  cube = map_from_land(cube_land)
+
+CASE ( 'water_on_lid_depth_ml' )
+  cube_land = cube_from_array(meltlake_vars%water_on_lid_depth_ml)
   cube = map_from_land(cube_land)
 
 CASE ( 'rflow' )

@@ -334,7 +334,7 @@ DO k = 1,surft_pts
     WRITE(*,'(A,F16.8)') 'dtstar(l)                           = ', dtstar(l)
     WRITE(*,'(A,F16.8)') 'dtstar(l) + dstar(l)                = ', tstar(l) +  dtstar(l) -273.15
 
-  !WRITE(*,*) '-----------------------------------------------'
+  
   END IF
    !IF (timestep_number==632) STOP
  ! for snow simplifies to

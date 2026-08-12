@@ -9,16 +9,11 @@
 ! *****************************COPYRIGHT*******************************
 !-----------------------------------------------------------------------------
 ! Description:
-! A Mathematical Model of Melt Lake Development on an Ice Shelf,
-! Buzzard et al. (2018), https://doi.org/10.1002/2017MS001155
-! Python implementation https://github.com/monarchs-ice/monarchs
-
-!   Purpose:
-!   Simulates vertical meltwater percolation through the multi-layer snow
+!   Vertical meltwater percolation through the multilayer snow
 !   column, including refreezing, capillary retention, ice lens
 !   formation, and upward perching of water.
 !
-! Description:
+! Method:
 !   The scheme follows a Buzzard-style percolation approach in which
 !   meltwater is added at the surface and passed sequentially through
 !   snow layers within a single timestep.
@@ -34,18 +29,17 @@
 !           - Downward percolation is blocked.
 !           - Excess water is redistributed upward, filling overlying
 !             layers to their pore capacity.
-!     (5) Water that cannot be stored within the snowpack after upward filling
-!             exits at the surface and is passed to the melt lake (lake_inflow). 
-!   
+!      5) Excess water that remains after upward filling above an
+!            impermeable ice lens is routed to lake_inflow and used to grow
+!            the melt lake. Water that percolates out of the bottom of the
+!            snowpack is also added to lake_inflow.
+!
 !
 ! Notes:
 !   - Percolation is instantaneous within a timestep (no hydraulic delay).
 !   - Full layer saturation occurs only in the presence of a lens.
 !   - The subroutine loops top-down through the snow column (reverse of monarchs)
 !
-! Mass Conservation: check this 
-!   The scheme conserves mass such that:
-!       input (win) = storage change + downward flux + surface outflow
 !
 !
 ! Code Owner: Please refer to ModuleLeaders.txt
@@ -78,7 +72,7 @@ USE jules_water_tracers_mod, ONLY: l_wtrac_jls, wtrac_calc_ratio_fn_jules
 
 USE jules_snow_mod,          ONLY: rho_firn_pore_closure
   ! Density threshold at which pores are assumed closed (kg m-3).
-  ! Used here as an "ice lens / impermeable layer" criterion.
+  ! Used for the ice lens criterion.
 
 USE water_constants_mod, ONLY:                                                 &
   lf,                                                                          &
@@ -133,12 +127,9 @@ LOGICAL, INTENT(IN) ::                                                        &
 ! Scalar arguments with intent(inout)
 !-----------------------------------------------------------------------------
 REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
-  win!,                                                                         &
-    ! Liquid water mass in transit downward (kg m-2).
-  !wout
-    ! liquid water mass out after upward fill (kgm-2)
-
-!TYPE(meltlake_vars_type), INTENT(IN OUT) :: meltlake_vars
+  win
+    ! Liquid water mass in transit downward (kg m-2). Water out bottom at end of 
+    ! subroutine
 
 TYPE (strnewsfdiag), INTENT(IN OUT) :: sf_diag
   ! Diagnostics structure, updated here for refreezing flux.
@@ -171,7 +162,7 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                    &
 
 REAL(KIND=real_jlslsm), INTENT(OUT) ::                                       &
      refreeze(land_pts,nsmax)
-    ! Mass that is refreezing in snow layer (kgm-2)
+    ! Mass that is refreezing in snow layer (kgm-2). Only for plotting 
 
 !-----------------------------------------------------------------------------
 ! Local indices
@@ -189,23 +180,24 @@ INTEGER ::                                                                    &
 ! Local logicals
 !-----------------------------------------------------------------------------
 LOGICAL :: blocked
-  ! True once an effective impermeable barrier has been encountered above
-  ! (lens depth or saturation barrier).
-  !
-  ! When .TRUE., all downward hydraulic processes are disabled for deeper
-  ! layers in this timestep (no percolation, no capillary drainage).
-  ! Refreezing may still occur below.
+  ! True once downward percolation has been blocked by an ice lens
+  ! during the current timestep. Deeper layers no longer receive
+  ! liquid water from above, although refreezing can still happen.
 
-LOGICAL :: new_lens
-  ! True if the *current layer* satisfies the instantaneous pore-closure
-  ! criterion (sice >= rho_firn_pore_closure * ds).
-  ! This indicates that a lens is *forming here now*.
+LOGICAL :: lens_found
+  ! True if a layer satisfies the pore closure criterion
+  ! during the current timestep.
   !
-  ! NOTE: This is a local, diagnostic flag only.
-! It does NOT represent a persistent lens state.
+  ! This is used to indicate that a valid ice lens layer has been
+  ! identified during the present percolation calculation. It does
+  ! not itself store the persistent ice lens state.
 
 LOGICAL :: ice_lens
-  ! either a new lens or the persistant lens 
+  ! Persistent ice lens state for the column.
+  !
+  ! True if an ice lens already existed on entry to the subroutine or
+  ! if a new valid ice lens is identified during this timestep.
+
 
 !-----------------------------------------------------------------------------
 ! Local scalars
@@ -216,35 +208,27 @@ REAL(KIND=real_jlslsm) ::                                                      &
     ! Positive means layer is below tm and can refreeze liquid.
   dsice,                                                                       &
     ! Mass of liquid refrozen into ice this timestep in a layer (kg m-2).
-  pfrac,                                                                       &
-    ! Fraction of volume that is pore space (dimensionless), 1 - ice volume fraction.
   cap_full,                                                                    &
-    ! Pore space available for refreezing/percolation (kg m-2) 
+    ! Maximum liquid water capacity of the current layer (kg m-2) 
+  cap_full_m,                                                                  &
+   ! Maximum liquid water capacity of layers above the lens (kg m-2)  
   cap_mass,                                                                    &
     ! Capillary retained liquid mass in layer (kg m-2) 5% cap_full
   excess,                                                                      &
     ! Liquid mass (kg m-2) in excess of capillary retention, available to percolate.
   w_up,                                                                        &
     ! Perched mass (kg m-2) that must be stored above a lens.
-  pfrac_m,                                                                     &
-    ! Pore fraction in layer m when redistributing upward.
-  space,                                                                       &
-    ! Additional capacity (kg m-2) available in layer m pore space.
-  addm,                                                                        &
-    ! Amount (kg m-2) added to layer m during upward redistribution.
   ratio_sliq,                                                                  &
-    ! Tracer-to-liquid ratio used for refreezing bookkeeping.
+    ! Tracer to liquid ratio used for refreezing bookkeeping.
   z_top,                                                                       &
     ! depth from surface to top of current layer (m)
   z_bot,                                                                       &
    ! depth from surface to bottom of current layer (m)
   z_mid,                                                                       &
    ! depth from surface to bottom of current layer (m)
-  retain, &
-  cap_full_m, &
-  wout, &
+  wout,                                                                        &
    ! liquid water mass out of top after upward fill (kgm-2)
-  ice_capacity, &
+  ice_capacity,                                                                &
    !maximum additional ice mass that can fit in the layer 
   win_in
    ! water into snowpack 
@@ -317,8 +301,6 @@ DO n = 1, nsnow
     !--- otherwise bulk density (rho_snow_ml) can go > 917 and Sfrac > 1
     dsice = MIN(sliq(i,n), coldsnow / lf, ice_capacity)
 
-!    dsice = MIN(sliq(i,n), coldsnow / lf)
-
    
     IF (l_wtrac_jls) THEN
       DO i_wt = 1, n_wtrac_jls
@@ -339,7 +321,7 @@ DO n = 1, nsnow
     tsnow(i,n) = tsnow(i,n) + lf * dsice / csnow(i,n)
 
     
-    refreeze(i,n) = dsice   ! (kg m-2) for output netCDF 
+    refreeze(i,n) = dsice   ! (kg m-2) just for output netCDF 
 
     IF (sf_diag%l_snice) THEN
      sf_diag%snice_freez_surft(i,surft_n) = sf_diag%snice_freez_surft(i,surft_n) &
@@ -369,31 +351,24 @@ DO n = 1, nsnow
      CYCLE
   END IF
 
-  pfrac = 1.0 - sice(i,n) / (rho_ice * ds(i,n))
-  pfrac = MAX(0.0, MIN(1.0, pfrac))
-
-  ! monarchs method to get full pore capacity (kg m-2) but gives bulk density > 917
-  !cap_full = pfrac * rho_water * ds(i,n) ! FULL pore capacity (kg m-2)
-
-  ! this prevents bulk densities > 917
+    
+  ! Maximum water capacity of layer. Limited so the bulk density does not to go > 917
   cap_full = MAX(0.0, rho_ice * ds(i,n) - sice(i,n))
   
   !---------------------------------------------------------------------------
-  ! Instantaneous lens formation test (pore-closure density)
+  ! Instantaneous lens formation test (pore closure density)
   !---------------------------------------------------------------------------
-  new_lens = ( sice(i,n) >= rho_firn_pore_closure * ds(i,n) )
+  lens_found = (sice(i,n) >= rho_firn_pore_closure * ds(i,n))
 
-! Update persistent lens: keep existing, or replace if new is shallower
-  IF (new_lens) THEN
+  ! Update persistent lens: keep existing, or replace if new is shallower
+  IF (lens_found) THEN
 
      ! find depth of new lens 
      IF (ice_lens_depth(i) < 0.0 .OR. z_mid < ice_lens_depth(i)) THEN
         ice_lens_depth(i) = z_mid
-
-        !print *, 'a shallower lens has formed, replace presistant lens'
-       
+        
      END IF
-  END IF! new_lens
+  END IF! lens_found
 
 
 ! find the snow layer that contains the lens
@@ -404,16 +379,22 @@ DO n = 1, nsnow
   END IF
 
 
-! bug fix  
-! Stored lens depth falls in this layer, but this layer no longer meets
-! the pore-closure criterion, so remove the persistent lens.
-  IF (ice_lens .AND. .NOT. new_lens) THEN
+  !-----------------------------------------------------------------------
+  ! Remove a previously stored ice lens if no layer satisfies the
+  ! ice lens criterion after the current percolation.
+  !
+  ! ice_lens indicates that a lens existed on entry to the routine,
+  ! while found_lens is set true if a lens is found during
+  ! this timestep.
+  !-----------------------------------------------------------------------
+  
+  IF (ice_lens .AND. .NOT. lens_found) THEN
      ice_lens_depth(i) = -1.0
      ice_lens_index(i) = -1.0
      ice_lens = .FALSE.
   END IF
 
-  ! bug fix
+
   
   !---------------------------------------------------------------------------
   ! 4) If lens exists here, then upward percoalte water into layer above 
@@ -426,44 +407,40 @@ DO n = 1, nsnow
        
        blocked = .TRUE.
 
-      ! IF (timestep_number >= 329 .AND. timestep_number <= 331) THEN
-      !    WRITE(*,*) 'timestep=', timestep_number, &
-      !         'lens layer=', n, &
-      !         'sliq at lens=', sliq(i,n)
-      ! END IF
-       
-       ! option 1: allow the lens to keep pore capacity liquid
-       ! --- compute pore capacity in lens layer
-       !pfrac = 1.0 - sice(i,n) / (rho_ice * ds(i,n))
-       !pfrac = MAX(0.0, MIN(1.0, pfrac))
-       !cap_full = pfrac * rho_water * ds(i,n)
-
-       ! --- remove excess liquid 
-       !w_up = MAX(0.0, sliq(i,n) - cap_full)
-       !sliq(i,n) = MIN(sliq(i,n), cap_full)
-
-       ! option 2: make lens completely dry
+       ! make lens completely dry
        w_up      = sliq(i,n)
-       sliq(i,n) = 0.0!1.0e-6
+       sliq(i,n) = 0.0
 
-
-       !print *, 'sfrac in lens', timestep_number, n, sice(i,n) / (rho_ice   * ds(i,n)), sliq(i,n)
-       
+             
      ! upward fill 
        DO m = n-1, 1, -1
 
-          IF (ds(i,m) <= EPSILON(0.0)) CYCLE  ! nothing to fill
+          IF (ds(i,m) <= EPSILON(0.0)) CYCLE  ! no layer so nothing to fill
 
-          ! --- pore space available (1-Sfrac) 
-          pfrac_m = 1.0 - sice(i,m) / (rho_ice * ds(i,m))
-          pfrac_m = MAX(0.0, MIN(1.0, pfrac_m))
-
-          ! --- max mass a layer can hold following monarchs method but gives
-          !--- bulk densities > 917. This means just fill all the empty space with water 
-          !cap_full_m = pfrac_m * rho_water * ds(i,m)
-
-          !  max mass a layer can hold preventing bulk densities > 917.
-          ! This means fill all empty space with water but dont allow bulk density > 917
+          !-----------------------------------------------------------------------
+          ! Original MONARCHS liquid water capacity.
+          ! Fill the available pore volume with water:
+          !
+          !   cap_full_m = pore fraction * water density * layer thickness
+          !
+          ! In the JULES layer representation this can produce a total layer
+          ! mass corresponding to a bulk density greater than rho_ice, so this
+          ! expression is not used here.
+          !-----------------------------------------------------------------------
+          ! cap_full_m = pfrac_m * rho_water * ds(i,m)
+          !
+          ! where 
+          ! pfrac_m = 1.0 - sice(i,m) / (rho_ice * ds(i,m))
+          ! pfrac_m = MAX(0.0, MIN(1.0, pfrac_m))
+          !-----------------------------------------------------------------------
+          ! Limit the liquid water capacity so that the total mass of ice plus
+          ! liquid water does not exceed rho_ice * layer thickness.
+          !
+          ! cap_full_m is the additional liquid water mass that can
+          ! be stored before the layer reaches an equivalent bulk density of
+          ! rho_ice.
+          !-----------------------------------------------------------------------
+          
           cap_full_m = MAX(0.0, rho_ice * ds(i,m) - sice(i,m))
           
           ! --- water to upfill
@@ -478,18 +455,11 @@ DO n = 1, nsnow
              w_up = 0.0 ! no more water to upfill
           END IF
 
-          !IF (timestep_number >= 329 .AND. timestep_number <= 331) THEN
-          !   WRITE(*,*) 'timestep=', timestep_number, &
-          !        'fill layer=', m, &
-                 ! 'cap_full=', cap_full_m, &
-           !       'sliq=', sliq(i,m), &
-           !       'w_up left=', w_up
-          !END IF
-         
+                   
           IF (w_up <= 0.0) EXIT
-       END DO
 
-       
+       END DO ! m loop
+
      
      ! leftover after filling upward goes out of top into lake
        wout = wout + w_up
@@ -501,8 +471,9 @@ DO n = 1, nsnow
      END IF
 
   ELSE 
+
      !-----------------------------------------------------------------------
-     ! 3) No lens: downward percolation with 5% capillary retain
+     ! 3) No lens: downward percolation with 5% capillary retained
      !-----------------------------------------------------------------------
 
      cap_mass = 0.05 * cap_full
@@ -525,25 +496,12 @@ DO n = 1, nsnow
 END DO ! nsnow
 
 !-----------------------------------------------------------------------
-! 5) water exiting the snowpack (water out bottom + out top)
+! 5) water exiting the snowpack (water out bottom [win] + out top [wout])
+! Check with Robin. Should water out the bottom go into lake ?
 !-----------------------------------------------------------------------
 
-!IF (timestep_number >= 329 .AND. timestep_number <= 331) THEN
-
- !  WRITE(*,*) 'timestep=', timestep_number, &
- !       'win_in=', win_in, &
- !       'win_bottom=', win, &
- !       'wout=', wout, &
- !       'lake_inflow=', win + wout
-   
-!END IF
-
-!IF (timestep_number == 331) STOP
-
-win = win + wout
-
-lake_inflow(i) = win
-
+lake_inflow(i) = win + wout
+win = 0
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN

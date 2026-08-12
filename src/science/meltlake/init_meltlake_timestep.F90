@@ -10,7 +10,8 @@
 !
 ! Code Description:
 !   Language: FORTRAN 90
-!
+!   Initialise varaible every timestep.
+!   Note: This subroutine is doing nothing. Keep in case it's useful later 
 ! Code Owner: Please refer to ModuleLeaders.txt
 !
 

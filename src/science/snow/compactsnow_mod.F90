@@ -148,22 +148,6 @@ DO k = 1,surft_pts
     mass = mass + 0.5 * (sice(l,n) + sliq(l,n))
     rho  = rho_snow(l,n)
 
-
-
-    IF (tsnow(l,n) < 100.0 .OR. tsnow(l,n) > 350.0 .OR.                        &
-         14.643 - 4.0e3 / tsnow(l,n) - 0.02 * rho > 80.0) THEN
-
-       WRITE(*,*) '--- BAD COMPACTION STATE ---'
-       WRITE(*,*) 'l,n                = ', l, n
-       WRITE(*,'(A,F16.8)') 'rho             = ', rho
-       WRITE(*,'(A,F16.8)') 'mass            = ', mass
-       WRITE(*,'(A,F16.8)') 'tsnow(l,n) oC   = ', tsnow(l,n)-273.15
-       WRITE(*,'(A,F16.8)') 'argument to exp = ',                               &
-            14.643 - 4.0e3 / tsnow(l,n) - 0.02 * rho
-       STOP
-    END IF
-
-
     rho  = rho + 0.5e-7 * rho * g * mass * timestep *                          &
                 EXP(14.643-4.0e3 / tsnow(l,n) - 0.02 * rho)
     
@@ -177,23 +161,14 @@ DO k = 1,surft_pts
     ! Do not allow the density to rise above that of solid ice.
     rho = MIN(rho, rho_ice)
 
-    
-    !--- Water sitting on top of lens causes rho_snow > 917 kgm-3
-    !--- This fix prevents ds from growing if rho > 917 
-    IF (rho_snow(l,n) >= rho_ice) THEN
-    !   print '(A, I4, A, F10.4, A, F10.4, A, F10.2, A, F10.2, A, F10.4)', &
-    !  'com l=', n, &
-    !  ' sice=', sice(l,n), &
-    !  ' sliq=', sliq(l,n), &
-    !  ' rho_snow=', rho_snow(l,n), &
-    !  ' rho=', rho, &
-    !  ' ds=', ds_input(l,n)
-
-       rho = MAX(rho, rho_snow(l,n))
-             
+    ! check that moving water upwards into layers above lens in percolate_monarchs
+    ! has not created layers with unrealistically high densities 
+    IF (rho_snow(l,n) > 918.0) THEN
+       print *, 'snow density > 918.0'
+       stop
     END IF
-   
-    
+
+          
     ! Note: mass (and hence rho) can be zero but nsnow>0 (likely 1!) if a very
     ! shallow snowpack has been exhausted in this timestep.
     IF ( rho > EPSILON(rho) )                                                  &

@@ -423,8 +423,7 @@ DO k = 1,surft_pts
    dhdt_lake_snow_ml(i) = 0.0
    
    IF (exposed_water(i)) THEN
-     ! IF (lake_depth_ml(i)>=0.01) THEN
-                     
+                         
       expon_term = 3.6 * lake_depth_ml(i)
 
       IF (expon_term < 50.0) THEN

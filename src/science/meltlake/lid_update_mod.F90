@@ -53,8 +53,10 @@ SUBROUTINE lid_update(land_pts,               & !IN
                       has_vlid,               & !IN/OUT
                       did_insert_lid,         & !IN/OUT
                       snow_on_lid,            & !IN/OUT
+                      snow_on_lid_melt_ml,    & !IN/OUT
                       lake_state_ml,          & !IN/OUT
                       snow_surft,             & !IN/OUT
+                      melt_surft,             & !IN/OUT
                       snowdepth,              & !IN/OUT
                       rho_snow_grnd,          & !IN/OUT
                       rho_snow_ml,            & !IN/OUT
@@ -65,6 +67,8 @@ SUBROUTINE lid_update(land_pts,               & !IN
                       dhdt_lid_lake_ml,       & !IN/OUT
                       lid_snow_depth_ml,      & !IN/OUT
                       lid_snow_temp_ml,       & !IN/OUT
+                      water_on_lid_depth_ml,  & !IN/OUT
+                      ei_surft_ml,            & !IN/OUT
                       l_lice_point,           & !IN (land_pts)
                       l_lice_surft)             !IN (ntype)  
                      
@@ -147,8 +151,10 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Tile surface temperature (K)
    snow_surft(land_pts,nsurft),                                                &
     ! Snow mass on tiles (kg m-2)
+   melt_surft(land_pts,nsurft),                                                & 
+    ! Surface snowmelt on tiles (kg/m2/s).
    snowdepth(land_pts,nsurft),                                                 &
-     ! Snow depth (m).
+    ! Snow depth (m).
    tsnow_ml(land_pts,nsurft,nsmax_ml),                                         &
     ! Snowpack layer temperatures (K).
    ds_ml(land_pts,nsurft,nsmax_ml),                                            &
@@ -167,15 +173,20 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Snowpack bulk density (kg/m3).
    lid_snow_depth_ml(land_pts, nsurft),                                        &
     ! Snow depth on virtual or permanent lid (m) 
-   lid_snow_temp_ml(land_pts, nsurft)
+   lid_snow_temp_ml(land_pts, nsurft),                                         &
     ! Temp of snow on virtual or permanent lid (K) 
-   
+   snow_on_lid_melt_ml(land_pts, nsurft),                                      &
+    ! Surface melt from energy balance (kg/m2/s) (melt_surft from sf_melt) 
+   water_on_lid_depth_ml(land_pts, nsurft),                                    &
+    ! Depth of melt water on lid (m)
+   ei_surft_ml(land_pts, nsurft),                                              &
+    ! Sublimation of snow (kg/m2/s).
+   lake_state_ml(land_pts,nsurft)
+     ! lake states (maybe should make this integer)
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(out)
 !-----------------------------------------------------------------------------
 REAL(KIND=real_jlslsm), INTENT(OUT) ::                                        &
-   lake_state_ml(land_pts,nsurft),                                            & 
-     ! lake states
    rho_snow_ml(land_pts,nsurft,nsmax_ml),                                     &
     ! Snow layer densities for meltlake(kg/m3).
    dhdt_lid_lake_ml(land_pts,nsurft)
@@ -279,30 +290,20 @@ DO n = 1,nsurft
            has_vlid(:,n),                 &
            did_insert_lid(:,n),           &
            snow_on_lid(:,n),              &
-           nsnow(:,n),                    &
-           ds_ml(:,n,:),                  &
-           sice_ml(:,n,:),                &
-           sliq_ml(:,n,:),                &
-           tsnow_ml(:,n,:),               &
-           snow_surft(:,n),               &
+           snow_on_lid_melt_ml(:,n),      &
            lake_state_ml(:,n),            &
            dhdt_lid_lake_ml(:,n),         &
            lid_snow_depth_ml(:,n),        &
            lid_snow_temp_ml(:,n),         &
-           snowfall,                      &
-           tsnow0,                        &
-           rho0,                          &
-           rgrain0,                       &
-           sice0)
-
+           water_on_lid_depth_ml(:,n),    &
+           ei_surft_ml(:,n))
+          
       
       IF (ANY(did_insert_lid(surft_index(1:surft_pts(n),n),n))) THEN
 
-         !----------------------------------------------------------------
-         ! First insertion: permanent lid ice
-         !----------------------------------------------------------------
-         
-         print *, 'insert ice'
+         print *, '------------------------------------------------------------'
+         print *, ':-)  Inserting lid ice into snowpack '
+         print *, '------------------------------------------------------------'
          
          snowfall(:)       = 0.0
          sice0(:)          = 0.0
@@ -354,9 +355,10 @@ DO n = 1,nsurft
               rho_snow_ml(:,n,:),                               &
               snowdepth(:,n) )
 
-         !----------------------------------------------------------------
-         ! Second insertion: snow in lid
-         !----------------------------------------------------------------
+         print *, '------------------------------------------------------------'
+         print *, ':-)  Inserting snow on lid into snowpack '
+         print *, '------------------------------------------------------------'
+
          
          snowfall(:)       = 0.0
          sice0(:)          = 0.0
@@ -423,6 +425,8 @@ DO n = 1,nsurft
 
             IF (did_insert_lid(i,n)) THEN
 
+               did_insert_lid(i,n)    = .false.
+               
                lake_depth_ml(i,n)     = 0.0
                lid_depth_ml(i,n)      = 0.0
                vlid_depth_ml(i,n)     = 0.0
@@ -430,14 +434,15 @@ DO n = 1,nsurft
 
                lid_snow_depth_ml(i,n) = 0.0
                lid_snow_temp_ml(i,n)  = tm
-
+               
+               lake_state_ml(i,n)     = 0
                has_lake(i,n)          = .false.
                exposed_water(i,n)     = .false.
                has_lid(i,n)           = .false.
                has_vlid(i,n)          = .false.
+
                snow_on_lid(i,n)       = .false.
                
-               did_insert_lid(i,n)    = .false.
 
             END IF
 

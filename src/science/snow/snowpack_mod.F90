@@ -377,11 +377,11 @@ REAL(KIND=real_jlslsm) ::                                                      &
     ! Water tracer entering layer (kg/m2).
 
 ! --- debugging stuff
-REAL(KIND=real_jlslsm) :: store_before, store_after, win_in, win_out, err_mass
-REAL :: ztop, zbot
-REAL :: band_top, band_bot, overlap, sice_band
-INTEGER :: iw
-CHARACTER(LEN=*), PARAMETER :: dbgfile = 'before_after_relayer_compactsnow_fix.txt'
+!REAL(KIND=real_jlslsm) :: store_before, store_after, win_in, win_out, err_mass
+!REAL :: ztop, zbot
+!REAL :: band_top, band_bot, overlap, sice_band
+!INTEGER :: iw
+!CHARACTER(LEN=*), PARAMETER :: dbgfile = 'before_after_relayer_compactsnow_fix.txt'
 
 
 
@@ -696,21 +696,7 @@ DO k = 1,surft_pts
 
   END IF  !  NSNOW
 
-  IF (timestep_number >= 46523) THEN
-     WRITE(*,*) '-----------------------------'
-     WRITE(*,*) 'timestep_number   = ', timestep_number
-     WRITE(*,*) 'i                 = ', i
-     WRITE(*,'(A,F16.8)') 'g_snow_surf    = ', g_snow_surf
-     WRITE(*,'(A,F16.8)') 'asnow(1)       = ', asnow(1)
-     WRITE(*,'(A,F16.8)') 'tsnow(1) oC    = ', tsnow(i,1) - 273.15
-     WRITE(*,'(A,F16.8)') 'tsnow(2) oC    = ', tsnow(i,2) - 273.15
-     WRITE(*,'(A,F16.8)') 'cond term      = ', asnow(1) * (tsnow(i,1) - tsnow(i,2))
-     WRITE(*,'(A,F16.8)') 'r(1)           = ', r(1)
-     WRITE(*,'(A,F16.8)') 'dt(1)          = ', dt(1)
-  END IF
-
   
-
     !-------------------------------------------------------------------------
     ! Melt snow in layers with temperature exceeding melting point
     !-------------------------------------------------------------------------
@@ -769,7 +755,7 @@ DO k = 1,surft_pts
     IF ( .NOT. cansnowtile ) THEN
 
        dsice = MAX( ei_surft(i), 0.0 ) * timestep
-       !print *, "sublimination layer", n, "dsice", dsice
+     
       IF (l_wtrac_jls) THEN
         DO i_wt = 1,n_wtrac_jls
           dsice_wtrac(i_wt) = MAX( ei_surft_wtrac(i,surft_n,i_wt), 0.0 )       &
@@ -817,15 +803,7 @@ DO k = 1,surft_pts
     ! canopy into the snowpack.
     IF (l_snow_infilt) THEN
 
-       !IF (timestep_number >= 2160) THEN
-          !print *, 'adding water at timestep', timestep_number
-        !  win = 1.0 + can_melt * timestep ! 1 kg m-2 per hour = 1 mm/hr for 48 hours
-       !ELSE
-       !   win = infiltration(i) + can_melt * timestep
-       !END IF
-
-       
-      win = infiltration(i) + can_melt * timestep
+       win = infiltration(i) + can_melt * timestep
 
        IF (l_wtrac_jls) THEN
         ! Repeat for water tracers

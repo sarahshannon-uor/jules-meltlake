@@ -132,10 +132,15 @@ USE hydrol_mod,               ONLY: hydrol
 USE snow_mod,                 ONLY: snow
 USE jules_rivers_mod,         ONLY: l_rivers, l_inland, rivers_call
 
+! meltlake 
 USE jules_meltlake_mod,       ONLY: l_meltlake
 USE lid_update_mod,           ONLY: lid_update
 USE calculate_lake_bottom_melt_mod, ONLY: calculate_lake_bottom_melt 
 USE init_meltlake_timestep_mod, ONLY: init_meltlake_timestep
+USE water_constants_mod,     ONLY: rho_water, rho_ice
+USE jules_snow_mod,          ONLY: rho_snow_const
+USE model_time_mod,          ONLY: timestep_number
+   
 
 ! Code which isn't currently suitable for building into LFRic
 #if !defined(LFRIC)
@@ -492,6 +497,11 @@ REAL(KIND=real_jlslsm) ::                                                      &
 ! Smoothing factor of exponential filter used with temperature acclimation.
 REAL(KIND=real_jlslsm) :: alpha_acclim
 
+REAL(KIND=real_jlslsm) ::                                                      &
+  meltlake_mass_before,                                                        &
+  meltlake_mass_after, &
+  mass_inout
+
 ! Water tracer local arrays
 TYPE(wtrac_ex_type) :: wtrac_ex
 
@@ -706,8 +716,6 @@ CASE ( jules )
 
     IF (l_meltlake) THEN
 
-       CALL init_meltlake_timestep(meltlake_vars) ! redundant
-       
        CALL calculate_lake_bottom_melt(                       &
             land_pts,                                         & ! IN
             timestep,                                         & ! IN
@@ -744,9 +752,19 @@ CASE ( jules )
             meltlake_vars%dhdt_lake_snow_ml,                  & ! OUT
             ainfo%l_lice_point,                               & ! IN 
             ainfo%l_lice_surft)                                 ! IN
-            
-      
-   END IF
+
+!----------------------------------------------------------------------------
+! Total mass: snowpack + lake + lid/vlid + snow on lid  
+!----------------------------------------------------------------------------
+       meltlake_mass_before =                                               &
+            progs%snow_surft(1,9)                                           &
+            + rho_water * meltlake_vars%lake_depth_ml(1,9)                  &
+            + rho_ice * meltlake_vars%lid_depth_ml(1,9)                     &
+            + rho_ice * meltlake_vars%vlid_depth_ml(1,9)                    &
+            + rho_snow_const * meltlake_vars%lid_snow_depth_ml(1,9)
+           
+        
+    END IF
         
        !Snow (standalone and UM)
     CALL snow (a_step,                      & !IN
@@ -767,7 +785,7 @@ CASE ( jules )
             fluxes%ei_surft,                & !IN (land_pts,nsurft) 
             psparms%hcap_soilt(:,:,1),      & !IN (land_pts,nsoilt)
             hcons_soilt,                    & !IN (land_pts)
-            fluxes%melt_surft,              & !IN/OUT (land_pts,nsurft)
+            fluxes%melt_surft,              & !IN/OUT ******** this is no longer melt_surft from sf_flux but is water out of snowpack melt_surft(i) = win / timestep
             fluxes%snowinc_surft,           & !IN (land_pts,nsurft)
             progs%smcl_soilt(:,:,1),        & !IN (land_pts,nsoilt)
             psparms%sthf_soilt(:,:,1),      & !IN (land_pts,nsoilt) Frozen soil moisture content of surface layer
@@ -831,23 +849,21 @@ CASE ( jules )
             progs%sliq_surft_ml,            & !IN/OUT (land_pts,nsurft,nsmax_ml)
             progs%tsnow_surft_ml,           & !IN/OUT (land_pts,nsurft,nsmax_ml)
             progs%rgrainl_surft_ml,         & !IN/OUT (land_pts,nsurft,nsmax_ml)
-            progs%rho_snow_surft_ml,        & !OUT (land_pts,nsurft,nsmax_ml) snow layer densities
+            progs%rho_snow_surft_ml,        & !OUT (land_pts,nsurft,nsmax_ml) 
             meltlake_vars%sfrac_ml,         & !OUT ((land_pts,nsurft,nsmax_ml)
             meltlake_vars%lfrac_ml,         & !OUT ((land_pts,nsurft,nsmax_ml)
             meltlake_vars%refreeze_ml,      & !OUT ((land_pts,nsurft,nsmax_ml)
             meltlake_vars%melt_ml,          & !OUT ((land_pts,nsurft,nsmax_ml)
             meltlake_vars%lake_depth_ml,    & !IN/OUT (land_pts,nsurft)
-            !meltlake_vars%lid_depth_ml,     & !IN/OUT (land_pts,nsurft)
-            !meltlake_vars%lid_temp_ml,      & !IN/OUT (land_pts,nsurft)
-            meltlake_vars%has_lake,          & !IN/OUT (land_pts,nsurft
-            !meltlake_vars%has_lid,          & !IN/OUT (land_pts,nsurft)
-            !meltlake_vars%has_vlid,         & !IN/OUT (land_pts,nsurft)
-            !meltlake_vars%exposed_water,    & !IN (land_pts,nsurft)
-            meltlake_vars%ice_lens_depth,   & !IN/OUT (land_pts,nsurft)   
-            meltlake_vars%ice_lens_index,   & !IN/OUT (land_pts,nsurft)   
-            meltlake_vars%lake_inflow,      & !IN/OUT (land_pts,nsurft)
-            meltlake_vars%ksnow0_ml,        & !OUT 
-            meltlake_vars%kdtdz_ml,         & !IN 
+            meltlake_vars%has_lake,           & !IN/OUT (land_pts,nsurft
+            meltlake_vars%snow_on_lid,        & !IN (land_pts,nsurft)
+            meltlake_vars%snow_on_lid_melt_ml,& !IN/OUT (land_pts,nsurft)     
+            meltlake_vars%ei_surft_ml,        & !IN/OUT (land_pts,nsurft)  
+            meltlake_vars%ice_lens_depth,     & !IN/OUT (land_pts,nsurft)   
+            meltlake_vars%ice_lens_index,     & !IN/OUT (land_pts,nsurft)   
+            meltlake_vars%lake_inflow,        & !IN/OUT (land_pts,nsurft)
+            meltlake_vars%ksnow0_ml,          & !OUT 
+            meltlake_vars%kdtdz_ml,           & !IN 
             meltlake_vars%dhdt_lake_snow_ml)  !IN
 
     
@@ -879,8 +895,10 @@ CASE ( jules )
             meltlake_vars%has_vlid,                      & ! IN/OUT
             meltlake_vars%did_insert_lid,                & ! IN/OUT
             meltlake_vars%snow_on_lid,                   & ! IN/OUT
+            meltlake_vars%snow_on_lid_melt_ml,           & ! IN/OUT
             meltlake_vars%lake_state_ml,                 & ! IN/OUT
             progs%snow_surft,                            & ! IN/OUT
+            fluxes%melt_surft,                           & ! IN/OUT 
             progs%snowdepth_surft,                       & ! IN/OUT
             progs%rho_snow_grnd_surft,                   & ! IN/OUT
             progs%rho_snow_surft_ml,                     & ! IN/OUT
@@ -891,9 +909,73 @@ CASE ( jules )
             meltlake_vars%dhdt_lid_lake_ml,              & ! IN/OUT
             meltlake_vars%lid_snow_depth_ml,             & ! IN/OUT
             meltlake_vars%lid_snow_temp_ml,              & ! IN
+            meltlake_vars%water_on_lid_depth_ml,         & ! IN/OUT
+            meltlake_vars%ei_surft_ml,                   & ! IN/OUT
             ainfo%l_lice_point,                          & ! IN 
             ainfo%l_lice_surft)                            ! IN
-    END IF
+
+!---------------------------------------------------------------------
+! Total mass: include water removed from the snowpack by percolate_monarchs 
+! but not yet transferred to lake_depth_ml until calculate_lake_bottom_melt 
+! is called on the next timestep. 
+! ---------------------------------------------------------------------      
+       
+       meltlake_mass_after =                                          &
+            progs%snow_surft(1,9)                                     &
+            + rho_water * meltlake_vars%lake_depth_ml(1,9)            &
+            + rho_ice * meltlake_vars%lid_depth_ml(1,9)               &
+            + rho_ice * meltlake_vars%vlid_depth_ml(1,9)              &
+            + rho_snow_const * meltlake_vars%lid_snow_depth_ml(1,9)   &
+            + meltlake_vars%lake_inflow(1,9)
+
+       IF (meltlake_vars%has_lake(1,9)) THEN
+          mass_inout =                                                   &
+               (ls_snow_gb(1) + con_snow_gb(1) + ls_rain_gb(1)           &
+               + con_rain_gb(1) - meltlake_vars%ei_surft_ml(1,9)) * timestep
+       ELSE
+          mass_inout =                                                   &
+               (ls_snow_gb(1) + con_snow_gb(1) + ls_rain_gb(1)           &
+               + con_rain_gb(1) - meltlake_vars%ei_surft(1,9)) * timestep
+       
+!---------------------------------------------------------------------
+! Force crash if meltlake mass is not conserved 
+!---------------------------------------------------------------------
+       IF (ABS(meltlake_mass_after - meltlake_mass_before - mass_inout)          &
+            > 1.0e-1) THEN
+          IF (timestep_number > 1) THEN
+             PRINT *, 'Melt lake mass conservation error'
+             PRINT *, 'timestep          = ', timestep_number
+        
+             PRINT *, 'has_lake         =', meltlake_vars%has_lake(1,9)
+             PRINT *, 'has_lid          =', meltlake_vars%has_lid(1,9)
+             PRINT *, 'has_vlid         =', meltlake_vars%has_vlid(1,9)
+             PRINT *, 'exposed_water    =', meltlake_vars%exposed_water(1,9)
+             PRINT *, 'snow_on_lid      =', meltlake_vars%snow_on_lid(1,9)
+             
+             PRINT *, 'lake inflow mass  = ', meltlake_vars%lake_inflow(1,9)
+             PRINT *, 'dhdt_lake_snow_ml = ', meltlake_vars%dhdt_lake_snow_ml(1,9)
+             PRINT *, 'dhdt_lid_lake_ml  = ', meltlake_vars%dhdt_lid_lake_ml(1,9)
+             PRINT *, 'ei_surft_ml       =',  meltlake_vars%ei_surft_ml(1,9)*timestep         
+             PRINT *, 'ei_surft          = ', fluxes%ei_surft(1,9)*timestep
+             
+             PRINT *, 'ls_snow           =',ls_snow_gb(1)*timestep
+             PRINT *, 'con_snow          =',con_snow_gb(1)*timestep
+             PRINT *, 'ls_rain           =',ls_rain_gb(1)*timestep
+             PRINT *, 'con_rain          =',con_rain_gb(1)*timestep  
+
+             PRINT *, 'mass before       = ', meltlake_mass_before
+             PRINT *, 'mass after        = ', meltlake_mass_after
+             PRINT *, 'mass inout        = ', mass_inout
+             
+             PRINT *, 'mass difference   = ',                        &
+                   meltlake_mass_after - meltlake_mass_before - mass_inout
+                
+             !stop
+          END IF
+       END IF
+          
+    END IF !l_meltlake
+
 
     IF (l_wtrac_jls) THEN
 

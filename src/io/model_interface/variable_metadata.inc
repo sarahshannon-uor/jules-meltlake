@@ -9394,9 +9394,22 @@ DATA metadata(725) / var_metadata(                                             &
     "kg m-2"                                                                   &
   ) /
 !-----------------------------------------------------------------------------
-! Metadata for tsnow_ml
+! Metadata for rgrainl
 !-----------------------------------------------------------------------------
 DATA metadata(726) / var_metadata(                                             &
+! String identifier
+    'rgrainl_ml',                                                              &
+! Variable type
+    var_type_snow_ml,                                                          &
+! Long name
+    "Grain size in snow layers for each tile for melt lake model",             &
+! Units
+    "microns"                                                                  &
+  ) /
+!-----------------------------------------------------------------------------
+! Metadata for tsnow_ml
+!-----------------------------------------------------------------------------
+DATA metadata(727) / var_metadata(                                             &
 ! String identifier
     'tsnow_ml',                                                                &
 ! Variable type
@@ -9409,7 +9422,7 @@ DATA metadata(726) / var_metadata(                                             &
 !-----------------------------------------------------------------------------
 ! Metadata for rho_snow_ml
 !-----------------------------------------------------------------------------
-DATA metadata(727) / var_metadata(                                             &
+DATA metadata(728) / var_metadata(                                             &
 ! String identifier
     'rho_snow_ml',                                                             &
 ! Variable type
@@ -9422,7 +9435,7 @@ DATA metadata(727) / var_metadata(                                             &
 !-----------------------------------------------------------------------------
 ! Metadata for sfrac
 !-----------------------------------------------------------------------------
-DATA metadata(728) / var_metadata(                                             &
+DATA metadata(729) / var_metadata(                                             &
 ! String identifier
     'sfrac_ml',                                                                &
 ! Variable type
@@ -9435,7 +9448,7 @@ DATA metadata(728) / var_metadata(                                             &
 !-----------------------------------------------------------------------------
 ! Metadata for lfrac
 !-----------------------------------------------------------------------------
-DATA metadata(729) / var_metadata(                                             &
+DATA metadata(730) / var_metadata(                                             &
 ! String identifier
     'lfrac_ml',                                                                &
 ! Variable type
@@ -9448,7 +9461,7 @@ DATA metadata(729) / var_metadata(                                             &
 !-----------------------------------------------------------------------------
 ! Metadata for refreeze
 !-----------------------------------------------------------------------------
-DATA metadata(730) / var_metadata(                                             &
+DATA metadata(731) / var_metadata(                                             &
 ! String identifier
     'refreeze_ml',                                                             &
 ! Variable type
@@ -9461,7 +9474,7 @@ DATA metadata(730) / var_metadata(                                             &
 !-----------------------------------------------------------------------------
 ! Metadata for refreeze
 !-----------------------------------------------------------------------------
-DATA metadata(731) / var_metadata(                                             &
+DATA metadata(732) / var_metadata(                                             &
 ! String identifier
     'melt_ml',                                                                 &
 ! Variable type
@@ -9474,7 +9487,7 @@ DATA metadata(731) / var_metadata(                                             &
 !-----------------------------------------------------------------------------
 !! Metadata for melt lake depth
 !!-----------------------------------------------------------------------------
-DATA metadata(732) / var_metadata(                                             &
+DATA metadata(733) / var_metadata(                                             &
 ! String identifier 
     'lake_depth_ml',                                                           &
 ! Variable type
@@ -9487,7 +9500,7 @@ DATA metadata(732) / var_metadata(                                             &
 !-----------------------------------------------------------------------------
 !! Metadata for melt lake albedo
 !!-----------------------------------------------------------------------------
-DATA metadata(733) / var_metadata(                                             &
+DATA metadata(734) / var_metadata(                                             &
 ! String identifier 
     'lake_albedo_ml',                                                          &
 ! Variable type
@@ -9500,7 +9513,7 @@ DATA metadata(733) / var_metadata(                                             &
  !-----------------------------------------------------------------------------
 !! Metadata for melt lake temperature
 !!-----------------------------------------------------------------------------
-DATA metadata(734) / var_metadata(                                             &
+DATA metadata(735) / var_metadata(                                             &
 ! String identifier 
     'lake_temp_ml',                                                            &
 ! Variable type
@@ -9508,12 +9521,12 @@ DATA metadata(734) / var_metadata(                                             &
 ! Long name
     "Melt lake temperature",                                                   &
 ! Units
-    "Kelvin"                                                                  &
+    "Kelvin"                                                                   &
  ) /
  !-----------------------------------------------------------------------------
 !! Metadata for melt lake exists mask
 !!-----------------------------------------------------------------------------
-!DATA metadata(735) / var_metadata(                                             &
+!DATA metadata(736) / var_metadata(                                             &
 !! String identifier 
 !    'is_meltlake',                                                             &
 !! Variable type
@@ -9526,7 +9539,7 @@ DATA metadata(734) / var_metadata(                                             &
  !-----------------------------------------------------------------------------
 !! Metadata for ice lens depth (most upper lens)
 !!-----------------------------------------------------------------------------
-DATA metadata(736) / var_metadata(                                             &
+DATA metadata(737) / var_metadata(                                             &
 ! String identifier 
     'ice_lens_depth',                                                          &
 ! Variable type
@@ -9539,7 +9552,7 @@ DATA metadata(736) / var_metadata(                                             &
 !-----------------------------------------------------------------------------
 !! Metadata for ice lens index (most upper lens)
 !!-----------------------------------------------------------------------------
-DATA metadata(737) / var_metadata(                                             &
+DATA metadata(738) / var_metadata(                                             &
 ! String identifier 
     'ice_lens_index',                                                          &
 ! Variable type
@@ -9552,7 +9565,7 @@ DATA metadata(737) / var_metadata(                                             &
 !-----------------------------------------------------------------------------
 !! Metadata for lid depth 
 !!-----------------------------------------------------------------------------
-DATA metadata(738) / var_metadata(                                             &
+DATA metadata(739) / var_metadata(                                             &
 ! String identifier 
     'lid_depth_ml',                                                            &
 ! Variable type
@@ -9565,7 +9578,7 @@ DATA metadata(738) / var_metadata(                                             &
 !-----------------------------------------------------------------------------
 !! Metadata for virtual lid depth 
 !!-----------------------------------------------------------------------------
-DATA metadata(739) / var_metadata(                                             &
+DATA metadata(740) / var_metadata(                                             &
 ! String identifier 
     'vlid_depth_ml',                                                           &
 ! Variable type
@@ -9578,7 +9591,7 @@ DATA metadata(739) / var_metadata(                                             &
 !-----------------------------------------------------------------------------
 !! Metadata for lid temperature 
 !!-----------------------------------------------------------------------------
-DATA metadata(740) / var_metadata(                                             &
+DATA metadata(741) / var_metadata(                                             &
 ! String identifier 
     'lid_temp_ml',                                                             &
 ! Variable type
@@ -9591,7 +9604,7 @@ DATA metadata(740) / var_metadata(                                             &
 !-----------------------------------------------------------------------------
 !! Metadata for water into lake from snowpack
 !!-----------------------------------------------------------------------------
-DATA metadata(741) / var_metadata(                                             &
+DATA metadata(742) / var_metadata(                                             &
 ! String identifier 
     'lake_inflow',                                                             &
 ! Variable type
@@ -9604,20 +9617,21 @@ DATA metadata(741) / var_metadata(                                             &
 !-----------------------------------------------------------------------------
 !! Metadata for melt lake state 
 !!-----------------------------------------------------------------------------
-DATA metadata(742) / var_metadata(                                             &
+DATA metadata(743) / var_metadata(                                             &
 ! String identifier 
     'lake_state_ml',                                                           &
 ! Variable type
     var_type_surft,                                                            &
 ! Long name
-    "Lake state 0=nolake 1=exposed water 2=vlid 3=lid",                        &
+    'Lake state: 0=no lake, 1=exposed water, 2=virtual lid, ' //               &
+    '3=permanent lid, 4=snow on virtual lid, 5=snow on permanent lid',         &
 ! Units
     " "                                                                        &
  ) /
 !-----------------------------------------------------------------------------
 !! Metadata for Stefan boundary movement between lake bottom and snowpack top  
 !!-----------------------------------------------------------------------------
-DATA metadata(743) / var_metadata(                                             &
+DATA metadata(744) / var_metadata(                                             &
 ! String identifier 
     'dhdt_lake_snow_ml',                                                       &
 ! Variable type
@@ -9625,12 +9639,12 @@ DATA metadata(743) / var_metadata(                                             &
 ! Long name
     "dhdt lake snow",                                                          &
 ! Units
-    "m hr-1 ice equiv"                                                                    &
+    "m hr-1 ice equiv"                                                         &
  ) /
 !-----------------------------------------------------------------------------
 !! Metadata for Stefan boundary movement between lid bottom and lake top  
 !!-----------------------------------------------------------------------------
-DATA metadata(744) / var_metadata(                                             &
+DATA metadata(745) / var_metadata(                                             &
 ! String identifier 
     'dhdt_lid_lake_ml',                                                        &
 ! Variable type
@@ -9643,7 +9657,7 @@ DATA metadata(744) / var_metadata(                                             &
 !-----------------------------------------------------------------------------
 !! Metadata for snow depth on top of melt lake frozen lid
 !!-----------------------------------------------------------------------------
-DATA metadata(745) / var_metadata(                                             &
+DATA metadata(746) / var_metadata(                                             &
 ! String identifier 
     'lid_snow_depth_ml',                                                       &
 ! Variable type
@@ -9656,7 +9670,7 @@ DATA metadata(745) / var_metadata(                                             &
 !-----------------------------------------------------------------------------
 !! Metadata for temperature of snow on top of melt lake frozen lid
 !!-----------------------------------------------------------------------------
-DATA metadata(746) / var_metadata(                                             &
+DATA metadata(747) / var_metadata(                                             &
 ! String identifier 
     'lid_snow_temp_ml',                                                        &
 ! Variable type
@@ -9665,5 +9679,18 @@ DATA metadata(746) / var_metadata(                                             &
     "Temperature of fresh snow on top of lid",                                 &
 ! Units
     "K"                                                                        &
+ ) /
+!-----------------------------------------------------------------------------
+!! Metadata for melted water depth on lid
+!!-----------------------------------------------------------------------------
+DATA metadata(748) / var_metadata(                                             &
+! String identifier 
+    'water_on_lid_depth_ml',                                                   &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    "Depth of melted water + rain on lid",                                            &
+! Units
+    "m"                                                                        &
  ) / 
 #endif

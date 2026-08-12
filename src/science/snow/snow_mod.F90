@@ -44,28 +44,26 @@ SUBROUTINE snow (a_step, land_pts, timestep, stf_hf_snow_melt, nsurft, n_wtrac_j
                   ! Types Variables
                   lake_h_ice_gb, hcon_lake, ts1_lake_gb, lake_snow_melt,       &
                   non_lake_frac, lake_h_mxl_gb, lake_depth_gb,                 &
-                  ds_ml,         &     !(land_pts,nsurft,nsmax_ml)       
-                  sice_ml,       &     !(land_pts,nsurft,nsmax_ml)            
-                  sliq_ml,       &     !(land_pts,nsurft,nsmax_ml)
-                  tsnow_ml,      &     !(land_pts,nsurft,nsmax_ml)
-                  rgrainl_ml,    &     !(land_pts,nsurft,nsmax_ml) 
-                  rho_snow_ml,   &     !(land_pts,nsurft,nsmax_ml)
-                  sfrac_ml,      &     !(land_pts,nsurft,nsmax_ml)   
-                  lfrac_ml,      &     !(land_pts,nsurft,nsmax_ml)
-                  refreeze_ml,   &     !(land_pts,nsurft,nsmax_ml)
-                  melt_ml,       &     !(land_pts,nsurft,nsmax_ml)
-                  lake_depth_ml, &     !(land_pts,nsurft)
-                  !lid_depth_ml,  &     !(land_pts,nsurft)
-                  !lid_temp_ml,   &     !(land_pts,nsurft)   
-                  has_lake,      &     !(land_pts,nsurft)
-                  !has_lid,       &     !(land_pts,nsurft)
-                  !has_vlid,      &     !(land_pts,nsurft)
-                  !exposed_water, &     !(land_pts,nsurft)
-                  ice_lens_depth,&     !(land_pts,nsurft)
-                  ice_lens_index,&     !(land_pts,nsurft)
-                  lake_inflow,   &     !(land_pts,nsurft)
-                  ksnow0_ml,     &       !(land_pts,nsurft)
-                  kdtdz_ml,&
+                  ds_ml,                                                       &     
+                  sice_ml,                                                     &     
+                  sliq_ml,                                                     &     
+                  tsnow_ml,                                                    &     
+                  rgrainl_ml,                                                  &     
+                  rho_snow_ml,                                                 &     
+                  sfrac_ml,                                                    &     
+                  lfrac_ml,                                                    &     
+                  refreeze_ml,                                                 &     
+                  melt_ml,                                                     &     
+                  lake_depth_ml,                                               &     
+                  has_lake,                                                    &     
+                  snow_on_lid,                                                 &    
+                  snow_on_lid_melt_ml,                                         &
+                  ei_surft_ml,                                                 &
+                  ice_lens_depth,&     
+                  ice_lens_index,&     
+                  lake_inflow,   &     
+                  ksnow0_ml,     &     
+                  kdtdz_ml,      &
                   dhdt_lake_snow_ml)
                   
 USE canopysnow_mod,  ONLY: canopysnow
@@ -166,14 +164,14 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
   tile_frac(land_pts,nsurft),                                                  &
     ! Tile fractions.
   !ei_surft(land_pts,nsurft),                                                   &
-    ! Sublimation of snow (kg/m2/s).
+    ! Sublimation of snow (kg/m2/s). move to in/out
   !snowinc_surft(land_pts,nsurft),                                              &
     ! Total increment to snow from the surface scheme, including sublimation
     ! and melting (kg m-2 TS-1).
     ! Using the increment, rather than the rate times the timestep allows
     ! the mass of snow to be reduced to 0, whereas using the rate can
     ! result in very small presisting amounts of snow because of rounding
-    ! errors.
+    ! errors. moved to in/out
   hcaps1_soilt(land_pts,nsoilt),                                               &
     ! Soil heat capacity of top layer(J/K/m3).
   hcons(land_pts),                                                             &
@@ -214,12 +212,12 @@ INTEGER, INTENT(IN OUT) ::                                                     &
     ! Number of snow layers.
       
 LOGICAL, INTENT(IN) ::                                                         &
-  has_lake(land_pts,nsurft)!,                                                   &
+  has_lake(land_pts,nsurft),                                                   &
     ! meltlake water present 
   !has_lid(land_pts, nsurft),                                                   & 
     ! permanent lid present
   !has_vlid(land_pts, nsurft),                                                  &
-  !exposed_water(land_pts, nsurft)
+  snow_on_lid(land_pts, nsurft)
  
 
 REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
@@ -303,10 +301,10 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Melt mass in snow layers (kg/m2).   
   lake_depth_ml(land_pts,nsurft),                                              &    
     ! Melt lake depth (m)
-  !lid_depth_ml(land_pts,nsurft),                                               &    
-    ! Frozen lid depth (m)
-  !lid_temp_ml(land_pts,nsurft),                                                &    
-    ! Frozen lid temp (K)
+  snow_on_lid_melt_ml(land_pts,nsurft),                                        &
+    ! Surface melt from energy balance (kg/m2/s)
+  ei_surft_ml(land_pts,nsurft),                                                &
+    ! Sublimation of snow (kg/m2/s) 
   ice_lens_depth(land_pts,nsurft),                                             &
     ! Ice lens depth (m)
   ice_lens_index(land_pts,nsurft),                                             &                                             
@@ -317,15 +315,15 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
   ! Surface heat flux (W/m2). moved from intent IN
   tstar_surft(land_pts,nsurft),                                                &
     ! Tile surface temperature (K). moved from intent IN
-  ei_surft(land_pts,nsurft),                                                   &                                                 
-    ! Sublimation of snow (kg/m2/s) was in now in/out
+  ei_surft(land_pts,nsurft),                                                   &
+    ! Sublimation of snow (kg/m2/s). was in, now in/out
   snowinc_surft(land_pts,nsurft)
     ! Total increment to snow from the surface scheme, including sublimation
     ! and melting (kg m-2 TS-1).
     ! Using the increment, rather than the rate times the timestep allows
     ! the mass of snow to be reduced to 0, whereas using the rate can
     ! result in very small presisting amounts of snow because of rounding
-    ! errors. was in now in/out	
+    ! errors. was in, now in/out	
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(out)
 !-----------------------------------------------------------------------------
@@ -471,13 +469,13 @@ REAL(KIND=real_jlslsm) ::                                                      &
   rgrainl_sl_ml(land_pts,nsmax_ml),                                            &                                                   
     ! Snow layer grain size for meltlake(microns).	
   sfrac_sl_ml(land_pts,nsmax_ml),                                              &
-    ! Ice fraction of snow layers for meltlake 
+    ! Ice fraction of snow layers for meltlake. Only used for plots 
   lfrac_sl_ml(land_pts,nsmax_ml),                                              &
-    ! Liquid fraction of snow layers for meltlake 
+    ! Liquid fraction of snow layers for meltlake. Only used for plots 
   refreeze_sl_ml(land_pts,nsmax_ml),                                           &
-    ! Refrozen mass in snow layers  (kgm-2)
+    ! Refrozen mass in snow layers  (kgm-2). Only used for plots
   melt_sl_ml(land_pts,nsmax_ml),                                               &
-    ! Melt mass in snow layers  (kgm-2)   
+    ! Melt mass in snow layers  (kgm-2).  Ony used for plots
   snowdepth_before(land_pts,nsurft),                                           &                                                  
        ! Snow depth previous timestep (m).
   dz_snowdepth(land_pts,nsurft)
@@ -562,14 +560,13 @@ IF (sf_diag%l_snice) THEN
       DO k = 1,surft_pts(n)
         i = surft_index(k,n)
         IF (nsnow(i,n) > 0) THEN
-           IF (l_meltlake .AND. l_elev_land_ice .AND. l_lice_surft(n)) THEN
-           ! IF (l_meltlake.AND.l_lice_surft(n)) THEN 
-                sice_old(i,n) = SUM(sice_ml(i,n,1:nsnow(i,n)))
-                sliq_old(i,n) = SUM(sliq_ml(i,n,1:nsnow(i,n)))
-             ELSE
-                sice_old(i,n) = SUM(sice(i,n,1:nsnow(i,n)))
-                sliq_old(i,n) = SUM(sliq(i,n,1:nsnow(i,n)))
-            END IF ! l_meltlake
+           IF (l_meltlake.AND.l_lice_surft(n)) THEN 
+              sice_old(i,n) = SUM(sice_ml(i,n,1:nsnow(i,n)))
+              sliq_old(i,n) = SUM(sliq_ml(i,n,1:nsnow(i,n)))
+           ELSE
+              sice_old(i,n) = SUM(sice(i,n,1:nsnow(i,n)))
+              sliq_old(i,n) = SUM(sliq(i,n,1:nsnow(i,n)))
+           END IF ! l_meltlake
           
         END IF
       END DO
@@ -915,29 +912,55 @@ END IF
         
 
 !---------------------------------------------------------------------------
-! An active lake sitting on top of snowpack
+! Adjust inputs to snowpack when a meltlake exists
+!
+! When a lake is present, the multi level snowpack below it 
+! does not receive surface melt, sublimation, or snowfall. 
+! Melting of the snowpack by the lake is dealty with in
+! calculate_lake_bottom_melt.F90 and apply_lake_bottom_melt.F90 instead
+! Save the surf_melt varaible for use in the zero layer snow on lid 
+! scheme. 
+! Ask Robin about this code block.  
+!       
 !---------------------------------------------------------------------------
         DO k=1,surft_pts(n)
            i = surft_index(k,n)
 
+           snow_on_lid_melt_ml(i,n) = 0.0
+
            IF (has_lake(i,n)) THEN
 
-              !--- No melting
-              melt_surft(i,n)     = 0.0
-              
-              ! No increment in snowmass from sublim/melt 
-              snowinc_surft(i,n)  = 0.0
-           
-              !--- Heat flux into snow pack is conductive from lake 
-              surf_htf_surft(i,n) = kdtdz_ml(i,n)
-           
-              !--- Stefan condition needs thermal conductitivy of top snow layer
-              ksnow0_ml(i,n)       = ksnow_ml(i,1)
+              ! Pinching this surface melt flux varaible for the separate 
+              ! zero layer snow on lid treatment in lid_evolve.F90
+              IF (snow_on_lid(i,n)) THEN
+                 snow_on_lid_melt_ml(i,n) = MAX(melt_surft(i,n), 0.0)
+              END IF
 
-              !--- No snowfall (this is intercepeted by lid or added to lake depth) 
-              snowfall(i)          = 0.0
-          
-        END IF
+                            
+              ! Prevent the melting, lake is on top of snowpack
+              melt_surft(i,n) = 0.0
+
+              ! Prevent sublimation, need to make sure mass is 
+              ! sublimated / evaporated from exposed_water, lid, virtual lid,
+              ! or snow on lid
+              ei_surft_ml(i,n) = ei_surft(i,n) 
+              ei_surft(i,n) = 0.0
+              
+              ! No sublimation or melt increment to the snowpack
+              snowinc_surft(i,n) = 0.0
+
+              ! Conductive heat flux into the snowpack is coming from the
+              ! lake water not the atmosphere now
+              surf_htf_surft(i,n) = kdtdz_ml(i,n)
+
+              ! Top snow layer conductivity needed to get thermal conduction
+              ! between snowpack top and lake bottom (calculate_lake_bottom_melt.F90)
+              ksnow0_ml(i,n) = ksnow_ml(i,1)
+
+              ! ls_snow, con_snow falls into the lake or onto the frozen lid
+              snowfall(i) = 0.0
+
+           END IF
      END DO
   
  

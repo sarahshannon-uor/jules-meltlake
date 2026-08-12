@@ -1972,6 +1972,14 @@ CASE ( 'tsnow_ml' )
     progs%tsnow_surft_ml(:,:,:) = const_val
   END IF
 
+CASE ( 'rgrainl_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, progs%rgrainl_surft_ml)
+  ELSE
+    progs%rgrainl_surft_ml(:,:,:) = const_val
+  END IF
+  
 CASE ( 'rho_snow_ml' )
   IF ( PRESENT(cube) ) THEN
     cube_land = map_to_land(cube)
@@ -2107,7 +2115,15 @@ CASE ( 'lid_snow_temp_ml' )
   ELSE
     meltlake_vars%lid_snow_temp_ml(:,:) = const_val
   END IF
-    
+
+CASE ( 'water_on_lid_depth_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, meltlake_vars%water_on_lid_depth_ml)
+  ELSE
+    meltlake_vars%water_on_lid_depth_ml(:,:) = const_val
+  END IF
+  
 CASE ( 'f_nsc' )
   IF ( PRESENT(cube) ) THEN
     cube_land = map_to_land(cube)
