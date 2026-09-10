@@ -93,7 +93,8 @@ CONTAINS
        ds_ml,                    & !IN/OUT
        cold_puddle_hrs_ml,       & !IN/OUT 
        kdtdz_ml,                 & !OUT
-       dhdt_lake_snow_ml,        &  !OUT
+       dhdt_lake_snow_ml,        & !OUT
+       ei_surft_ml,              & !IN
        !Ancil info (IN)
        l_lice_point,             & !IN (land_pts)
        l_lice_surft)               !IN (ntype)  
@@ -142,7 +143,7 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
 
 
 REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
-  sw_surft(land_pts,nsurft),                                                   &                                                   
+  sw_surft(land_pts,nsurft),                                                   &                                               
     ! Net shortwave radiation on tile (W/m2). Lake albedo used
   lw_down_surft(land_pts,nsurft),                                              &
     ! Surface downward LW radiation on tiles (W/m2)
@@ -156,9 +157,10 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
     ! thermal conductivity of top snow layer (W m⁻¹ K⁻¹)
   lid_depth_ml(land_pts,nsurft),                                               &
     ! depth of frozen lid (m)
-  vlid_depth_ml(land_pts,nsurft) 
+  vlid_depth_ml(land_pts,nsurft),                                              &
     ! depth of frozen virtual lid (m)
-   
+  ei_surft_ml(land_pts,nsurft)
+    ! > 0 evaporation, < 0 condensation (kgm-2)
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(in)
 !-----------------------------------------------------------------------------
@@ -413,28 +415,36 @@ DO n = 1,nsurft
       cold_puddle_hrs_ml(i,n) = 0.0
    END IF
 
-      
+
+
+
 !-----------------------------------------------------------------------------
-! Rain and snow go into lake and reset fields   
+! Rain, snow, evaporation and condensation for exposed lake water
 !-----------------------------------------------------------------------------
    IF (exposed_water(i,n)) THEN
+   
+      lake_depth_ml(i,n) = MAX(0.0, lake_depth_ml(i,n) - &
+           ei_surft_ml(i,n) * timestep / rho_water)
 
-         IF (ls_rain(i) > 0.0 .OR. con_rain(i) > 0.0) THEN
-
+      IF (ls_rain(i) > 0.0 .OR. con_rain(i) > 0.0 .OR. &
+           ls_snow(i) > 0.0 .OR. con_snow(i) > 0.0) THEN
+      
+   
          rain_add = ls_rain(i) + con_rain(i)
          snow_add = ls_snow(i) + con_snow(i)
 
-         lake_depth_ml(i,n) = lake_depth_ml(i,n) +                  &
+         lake_depth_ml(i,n) = lake_depth_ml(i,n) + &
               (rain_add + snow_add) * timestep / rho_water
-   
-                         
+
          ls_rain(i)  = 0.0
          con_rain(i) = 0.0
          ls_snow(i)  = 0.0
          con_snow(i) = 0.0
-        
-      END IF
+
    END IF
+
+END IF
+
 
 !-----------------------------------------------------------------------------
 ! Get albedo - doing this again to output albedo to nc. this is already in
