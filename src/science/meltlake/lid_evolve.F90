@@ -46,10 +46,9 @@
 ! When the remaining lake water has completely frozen, a flag is
 ! set so that the permanent lid, and any snow lying on it, can be
 ! transferred into the JULES snowpack later in lid_update_mod.F90
-! 
-! To do: need to decide the fate of the rain on lid and the water 
-! from melted snow on the lid. At the moment they are both put into
-! water_on_lid_depth_ml. 
+!
+! Meltwater produced from snow on the lid is stored separately in
+! lid_snowmelt_water_ml for subsequent lateral redistribution.
 ! 
 ! Code Owner: s.r.shannon@reading.ac.uk
 ! Subroutine Interface:
@@ -78,18 +77,14 @@ CONTAINS
                       has_vlid,                 & !IN/OUT
                       did_insert_lid,           & !IN/OUT
                       snow_on_lid,              & !IN/OUT
-                      snow_on_lid_melt_ml,      & !IN/OUT
-                      !nsnow,                    & !IN/OUT
-                      !ds_ml,                    & !IN/OUT
-                      !sice_ml,                  & !IN/OUT
-                      !sliq_ml,                  & !IN/OUT
-                      !tsnow_ml,                 & !IN/OUT
-                      !snow_surft,               & !OUT
+                      lid_snow_melt_flux_ml,  & !IN
                       lake_state_ml,            & !OUT
                       dhdt_lid_lake_ml,         & !OUT
                       lid_snow_depth_ml,        & !IN/OUT
                       lid_snow_temp_ml,         & !IN/OUT
-                      water_on_lid_depth_ml,    & !IN/OUT
+                      lid_snowmelt_water_ml,    & !IN/OUT
+                      lid_ice_melt_flux_ml,     & !IN
+                      lid_ice_meltwater_ml,     & !IN/OUT
                       ei_surft_ml)
                       
                      
@@ -150,15 +145,22 @@ INTEGER, INTENT(IN) ::                                                         &
     ! Index of tile points.
   
 REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
-  tstar_surft(land_pts)
+  tstar_surft(land_pts),                                                       &
     ! Tile surface temperature (K)
-
+  lid_snow_melt_flux_ml(land_pts),                                             &
+    ! Snowmelt flux from snow on the lake lid (kg m-2 s-1).
+  lid_ice_melt_flux_ml(land_pts)
+    ! Melt flux from the upper surface of bare lake ice (kg m-2 s-1).
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(inout)
 !-----------------------------------------------------------------------------
 !INTEGER, INTENT(IN OUT) ::                                                     &
 !   nsnow(land_pts)                                                        
     ! Number of snow layers.
+
+!REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
+ ! lid_snow_melt_flux_ml(land_pts)
+   ! Snowmelt flux from snow on the lake lid (kg/m2/s)
 
 REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
   con_rain(land_pts),                                                          &
@@ -179,14 +181,14 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Depth of lid (m)
   vlid_depth_ml(land_pts),                                                     &
    ! Depth of virtual lid (m)
-  snow_on_lid_melt_ml(land_pts),                                               &   
-   !  Surface snowmelt on tiles (kg/m2/s).
-  lid_snow_depth_ml(land_pts),                                                 & 
+  lid_snow_depth_ml(land_pts),                                                & 
     ! Depth of snow on virtual or permanent lid (m)
   lid_snow_temp_ml(land_pts),                                                  &
     ! Temp of zero layer snow on lid or vlid (K)
-  water_on_lid_depth_ml(land_pts),                                             &
-    ! Depth of water on lid from rain and melting of snow on lid (m) 
+  lid_snowmelt_water_ml(land_pts),                                             &
+    !  Liquid water from melting snow on the lake lid (m).
+  lid_ice_meltwater_ml(land_pts),                                              &
+    ! Liquid water from melting the upper surface of the lake ice lid (m).
   ei_surft_ml(land_pts)
     ! Sublimation of snow (kg/m2/s).
 
@@ -243,11 +245,13 @@ REAL(KIND=real_jlslsm) ::                                                      &
    ! Mass of snow on lid (kg/m2)
   snow_remove, &
     ! Mass of snow on lid to be removed by melting (kg/m2)
-  sublim_remove
-    ! Mass to be removed by sublimination (kgm-2)
+  lid_ice_melt_mass
+    ! Mass removed from the upper surface of the ice lid (kg m-2).
+
 LOGICAL ::                                                                    &
   seeded_vlid
     ! true if a virtual lid has formed
+  
 
 ! Move some of these constants to jules_meltlake.nml
 REAL(KIND=real_jlslsm), PARAMETER ::                                          &
@@ -286,7 +290,7 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 !$OMP PARALLEL DO DEFAULT(SHARED)                                            &
 !$OMP PRIVATE(k,i,n,kdtdz_ml,flux_lower,delta_t,t_lid_top,dhdt,dh_ice,       &
 !$OMP         dh_water,lid_depth_eff,rain_add,snow_add,seeded_vlid,          &
-!$OMP         snowmass_lid,snow_remove)
+!$OMP         snowmass_lid,snow_remove,lid_ice_melt_mass)
 DO k = 1,surft_pts
    i = surft_index(k)
 
@@ -299,17 +303,23 @@ DO k = 1,surft_pts
    dh_ice             = 0.0
    dh_water           = 0.0
    did_insert_lid(i)  = .false.
-   seeded_vlid       = .false.
+   seeded_vlid        = .false.
    snow_on_lid(i)     = lid_snow_depth_ml(i) > 0.0
-   
+
+   PRINT *, 'lake before seed   = ', lake_depth_ml(i)
 !-----------------------------------------------------------------------------
 ! Seed a virtual lid if conditions are freezing. Reduce the lake depth
 ! by the equivalent seeded depth
 !-----------------------------------------------------------------------------
-   IF (has_lake(i) .AND. lake_temp_ml(i) <= tm.and.tstar_surft(i) < tm) THEN
-         
-      IF (vlid_depth_ml(i) < vlid_seed_depth .AND. .NOT. has_lid(i)) THEN
+   !IF (has_lake(i) .AND. lake_temp_ml(i) <= tm.and.tstar_surft(i) < tm) THEN
 
+      IF (has_lake(i) .AND. exposed_water(i) .AND. tstar_surft(i) < tm) THEN
+         
+      !IF (vlid_depth_ml(i) < vlid_seed_depth .AND. .NOT. has_lid(i)) THEN
+
+         IF (vlid_depth_ml(i) < vlid_seed_depth .AND. &
+              .NOT. has_lid(i) .AND. .NOT. has_vlid(i)) THEN
+            
          vlid_depth_ml(i) = vlid_seed_depth
          seeded_vlid = .true.
          
@@ -318,11 +328,13 @@ DO k = 1,surft_pts
 
    END IF
 
+   
 !-----------------------------------------------------------------------------
 ! update states after possible lid seeding
 !-----------------------------------------------------------------------------
    CALL update_lake_states(i)
-
+   
+   PRINT *, 'lake after seed    = ', lake_depth_ml(i)
 !-----------------------------------------------------------------------------
 ! Refreeze or melt lid using Stefan condition 
 !-----------------------------------------------------------------------------
@@ -397,6 +409,7 @@ DO k = 1,surft_pts
       dh_ice   = timestep * dhdt
       dh_water = dh_ice * rho_ice / rho_water
 
+     
 !-----------------------------------------------------------------------------
 ! output Stefan boundary as diagnostic
 !-----------------------------------------------------------------------------
@@ -438,12 +451,27 @@ DO k = 1,surft_pts
          vlid_depth_ml(i) = vlid_depth_ml(i) - dh_ice
          lake_depth_ml(i) = lake_depth_ml(i) + dh_water
 
+ !-----------------------------------------------------------------------------
+ ! If the remaining virtual lid is thinner than the seed depth
+ ! melt the remainder and add this tiny mass to the lake depth to conserve mass
+ !-----------------------------------------------------------------------------
+         IF (vlid_depth_ml(i) > 0.0 .AND. &
+              vlid_depth_ml(i) < vlid_seed_depth) THEN
+
+            lake_depth_ml(i) = lake_depth_ml(i) + &
+                 vlid_depth_ml(i) * rho_ice / rho_water
+
+            vlid_depth_ml(i) = 0.0
+
+         END IF
+         
       END IF
 
    END IF ! seeded_lid
    
 END IF ! has_lid or has_vlid Stefan condition
-     
+
+PRINT *, 'lake after Stefan  = ', lake_depth_ml(i)
 !-----------------------------------------------------------------------------
 ! The virtual lid has grown enough in depth so convert to a permanent lid
 !-----------------------------------------------------------------------------
@@ -457,91 +485,48 @@ END IF ! has_lid or has_vlid Stefan condition
 !-----------------------------------------------------------------------------
    CALL update_lake_states(i)
 
-   IF (has_lid(i) .OR. has_vlid(i)) THEN
-
-!--------------------------------------------------------------------------
-! Rain falling onto a virtual or permanent lid cannot enter the
-! underlying lake directly. Store it as liquid water above the lid.
-! This applies whether the lid is bare or snow covered
-!--------------------------------------------------------------------------
-      IF (ls_rain(i) > 0.0 .OR. con_rain(i) > 0.0) THEN
-
-         rain_add = ls_rain(i) + con_rain(i)
-
-         water_on_lid_depth_ml(i) = water_on_lid_depth_ml(i) +               &
-              rain_add * timestep / rho_water
-         
-         ls_rain(i)  = 0.0
-         con_rain(i) = 0.0
-
-      END IF
-
 !-----------------------------------------------------------------------------
-! Snow can accumulate on virtual or permanent lid
-!-----------------------------------------------------------------------------      
-      IF (ls_snow(i) > 0.0 .OR. con_snow(i) > 0.0) THEN
-        
-         snow_add = ls_snow(i) + con_snow(i)
-
-         lid_snow_depth_ml(i) = lid_snow_depth_ml(i) +                      &
-              snow_add * timestep /rho_snow_const 
-         
+! Melt the upper surface of a bare ice lid.
 !-----------------------------------------------------------------------------
-! Set a flag for snow on lid. Flag is used later to set albedos 
-!-----------------------------------------------------------------------------
-         snow_on_lid(i) = (lid_snow_depth_ml(i) > 0.0)
-         
-!-----------------------------------------------------------------------------
-! Zero the snowfall. It's now on the lid
-!-----------------------------------------------------------------------------
-         ls_snow(i)  = 0.0
-         con_snow(i) = 0.0
-       
-        
-      END IF !ls_snow/con_snow > 0.0
+   IF ((has_lid(i) .OR. has_vlid(i)) .AND. .NOT. snow_on_lid(i)) THEN
 
-!------------------------------------------------------------
-! Remove mass by sublimation. 
-! Remove in this order that would be exposed to atmospere
-! snow on lid, permanent lid, virtual lid
-!
-!------------------------------------------------------------
-   sublim_remove = MAX(ei_surft_ml(i), 0.0) * timestep
+      lid_ice_melt_mass = MAX(lid_ice_melt_flux_ml(i), 0.0) * timestep
 
-   IF (sublim_remove > 0.0) THEN
+      PRINT *, 'ice melt flux    = ', lid_ice_melt_flux_ml(i)
+      PRINT *, 'top melt mass    = ', lid_ice_melt_mass
+      PRINT *, 'top melt depth   = ', lid_ice_melt_mass / rho_ice
 
-      IF (snow_on_lid(i)) THEN
+      IF (has_lid(i)) THEN
 
-         snowmass_lid = lid_snow_depth_ml(i) * rho_snow_const
+         lid_ice_melt_mass = MIN(lid_ice_melt_mass,                           &
+           rho_ice * lid_depth_ml(i))
 
-         sublim_remove = MIN(sublim_remove, snowmass_lid)
-
-         snowmass_lid = snowmass_lid - sublim_remove
-
-         lid_snow_depth_ml(i) = snowmass_lid / rho_snow_const
-
-         snow_on_lid(i) = (lid_snow_depth_ml(i) > 0.0)
-
-      ELSE IF (has_lid(i)) THEN
-
-         sublim_remove = MIN(sublim_remove,                     &
-              rho_ice * lid_depth_ml(i))
-
-         lid_depth_ml(i) = lid_depth_ml(i) -                    &
-              sublim_remove / rho_ice
+         lid_depth_ml(i) = lid_depth_ml(i) -                                  &
+           lid_ice_melt_mass / rho_ice
 
       ELSE IF (has_vlid(i)) THEN
 
-         sublim_remove = MIN(sublim_remove,                     &
+         lid_ice_melt_mass = MIN(lid_ice_melt_mass,                            &
               rho_ice * vlid_depth_ml(i))
 
-         vlid_depth_ml(i) = vlid_depth_ml(i) -                  &
-              sublim_remove / rho_ice
+         vlid_depth_ml(i) = vlid_depth_ml(i) -                                 &
+              lid_ice_melt_mass / rho_ice
 
       END IF
 
-   END IF ! if ei is negative sublimate
+      lid_ice_meltwater_ml(i) = lid_ice_meltwater_ml(i) +                      &
+           lid_ice_melt_mass / rho_water
 
+   END IF
+
+
+   
+   IF (has_lid(i) .OR. has_vlid(i)) THEN
+
+!-----------------------------------------------------------------------------
+! Apply surface mass loss by sublimation.
+!-----------------------------------------------------------------------------
+      CALL apply_lid_sublimation(i)
       
 !-----------------------------------------------------------------------------
 ! Remove snow on lid mass by melting.  
@@ -554,8 +539,8 @@ END IF ! has_lid or has_vlid Stefan condition
          snowmass_lid =  lid_snow_depth_ml(i) * rho_snow_const 
          
          ! Snow mass melted during this timestep 
-         snow_remove = MAX(snow_on_lid_melt_ml(i), 0.0) * timestep
-
+         snow_remove = MAX(lid_snow_melt_flux_ml(i), 0.0) * timestep
+         
          ! Only remove what exists
          snow_remove = MIN(snow_remove, snowmass_lid)
 
@@ -571,23 +556,10 @@ END IF ! has_lid or has_vlid Stefan condition
          ! Keep the water depth on lid in a seperate variable. 
         
          IF (snow_remove > 0.0) THEN
-            water_on_lid_depth_ml(i) = water_on_lid_depth_ml(i)           &
+            lid_snowmelt_water_ml(i) = lid_snowmelt_water_ml(i)           &
                  + snow_remove / rho_water
          END IF
-
-         IF (timestep_number >= 680 .AND. timestep_number <= 727) THEN
-            print *, '------- snow on lid ---------'
-            WRITE(*,'(A,I8)')    'timestep                = ', timestep_number
-            WRITE(*,'(A,I8)')    'i                       = ', i
-            WRITE(*,'(A,L2)')    'has_lid                 = ', has_lid(i)
-            WRITE(*,'(A,L2)')    'has_vlid                = ', has_vlid(i)
-            WRITE(*,'(A,L2)')    'snow_on_lid             = ', snow_on_lid(i)
-            WRITE(*,'(A,F12.6)') 'snow_on_lid_melt_ml     = ', snow_on_lid_melt_ml(i)
-            WRITE(*,'(A,F12.6)') 'snowmass_lid            = ', snowmass_lid
             
-         END IF
-         !IF (timestep_number==727) STOP
-   
    END IF
       
 END IF ! has_lid or has_vlid 
@@ -600,13 +572,16 @@ END IF ! has_lid or has_vlid
       lake_depth_ml(i)  = 0.0
       did_insert_lid(i) = .true.
    END IF
-   
+
+
 !-----------------------------------------------------------------------------
 ! update states now the lid and lake depths have changed
 !-----------------------------------------------------------------------------   
    CALL update_lake_states(i)
 
-  
+   PRINT *, 'lake end           = ', lake_depth_ml(i)
+PRINT *, 'has_lid end        = ', has_lid(i)
+PRINT *, 'has_vlid end       = ', has_vlid(i)
 !-----------------------------------------------------------------------------
 ! Reset inactive temperatures and depths 
 !-----------------------------------------------------------------------------
@@ -781,8 +756,63 @@ SUBROUTINE get_lid_thermo_zero_layer(                                        &
      lid_temp_ml = tm
   END IF
 
+  
 END SUBROUTINE get_lid_thermo_zero_layer
 
+SUBROUTINE apply_lid_sublimation(i)
+
+!-----------------------------------------------------------------------------
+! Remove surface mass associated with ei_surft_ml.
+! Mass is removed from the material exposed to the atmosphere in the
+! following order: snow on lid, permanent lid, virtual lid.
+!-----------------------------------------------------------------------------
+INTEGER, INTENT(IN) ::                                                        &
+  i
+    ! Land point index.
+
+REAL(KIND=real_jlslsm) ::                                                     &
+  sublim_remove,                                                              &
+    ! Mass to be removed by sublimation during timestep (kg m-2).
+  snowmass_lid
+    ! Mass of snow on lid (kg m-2).
+
+sublim_remove = MAX(ei_surft_ml(i), 0.0) * timestep
+
+IF (sublim_remove > 0.0) THEN
+
+  IF (snow_on_lid(i)) THEN
+
+    snowmass_lid = lid_snow_depth_ml(i) * rho_snow_const
+
+    sublim_remove = MIN(sublim_remove, snowmass_lid)
+
+    snowmass_lid = snowmass_lid - sublim_remove
+
+    lid_snow_depth_ml(i) = snowmass_lid / rho_snow_const
+
+    snow_on_lid(i) = (lid_snow_depth_ml(i) > 0.0)
+
+  ELSE IF (has_lid(i)) THEN
+
+    sublim_remove = MIN(sublim_remove,                                        &
+         rho_ice * lid_depth_ml(i))
+
+    lid_depth_ml(i) = lid_depth_ml(i) -                                       &
+         sublim_remove / rho_ice
+
+  ELSE IF (has_vlid(i)) THEN
+
+    sublim_remove = MIN(sublim_remove,                                        &
+         rho_ice * vlid_depth_ml(i))
+
+    vlid_depth_ml(i) = vlid_depth_ml(i) -                                     &
+         sublim_remove / rho_ice
+
+  END IF
+
+END IF
+
+END SUBROUTINE apply_lid_sublimation
 
 END SUBROUTINE lid_evolve
 END MODULE lid_evolve_mod

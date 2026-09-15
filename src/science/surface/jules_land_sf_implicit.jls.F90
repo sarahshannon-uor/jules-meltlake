@@ -676,17 +676,11 @@ IF (l_flake_model .AND. .NOT. l_aggregate .AND. (n == lake)) THEN
     fracaero_s(:,n),resft(:,n),rhokh_surft(:,n),tile_frac(:,n),                &
     timestep,r_gamma, ei_surft(:,n),fqw_1,ftl_1,fqw_surft(:,n),ftl_surft(:,n), &
     tstar_surft(:,n),snow_surft(:,n),snowdep_surft(:,n),                       &
-    melt_surft(:,n),snowinc_surft(:,n), meltlake_vars%has_lake(:,n),           &
-    meltlake_vars%snow_on_lid(:,n))
-
-	!print *, '----inside jules_land_sf_implicit------------' 
-    !print *, 'snow_surft', n,snow_surft(:,n)
-	!print *, 'snowdep_surft', n, snowdep_surft(:,n)
-	!print *, 'melt_surft',n,melt_surft(:,n)
-	!print *, 'snowinc_surft',n ,snowinc_surft(:,n) 
-	!print *, '----- end sf_implicit-----------' 
-
-
+    melt_surft(:,n),snowinc_surft(:,n),                                        &
+    meltlake_vars%has_vlid(:,n),meltlake_vars%has_lid(:,n),                    &
+    meltlake_vars%exposed_water(:,n), meltlake_vars%snow_on_lid(:,n),          &
+    meltlake_vars%lid_ice_melt_flux_ml(:,n))
+  
   END IF
 
   !-----------------------------------------------------------------------

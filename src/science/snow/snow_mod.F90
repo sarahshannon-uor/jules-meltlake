@@ -57,7 +57,7 @@ SUBROUTINE snow (a_step, land_pts, timestep, stf_hf_snow_melt, nsurft, n_wtrac_j
                   lake_depth_ml,                                               &     
                   has_lake,                                                    &     
                   snow_on_lid,                                                 &    
-                  snow_on_lid_melt_ml,                                         &
+                  lid_snow_melt_flux_ml,                                     & 
                   ei_surft_ml,                                                 &
                   ice_lens_depth,&     
                   ice_lens_index,&     
@@ -301,8 +301,8 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Melt mass in snow layers (kg/m2).   
   lake_depth_ml(land_pts,nsurft),                                              &    
     ! Melt lake depth (m)
-  snow_on_lid_melt_ml(land_pts,nsurft),                                        &
-    ! Surface melt from energy balance (kg/m2/s)
+  lid_snow_melt_flux_ml(land_pts,nsurft),                                    &
+    ! ! Snowmelt flux from snow on the lake lid (kg/m2/s)
   ei_surft_ml(land_pts,nsurft),                                                &
     ! Sublimation of snow (kg/m2/s) 
   ice_lens_depth(land_pts,nsurft),                                             &
@@ -925,15 +925,15 @@ END IF
 !---------------------------------------------------------------------------
         DO k=1,surft_pts(n)
            i = surft_index(k,n)
-
-           snow_on_lid_melt_ml(i,n) = 0.0
-
+           
+           lid_snow_melt_flux_ml(i,n) = 0.0
+           
            IF (has_lake(i,n)) THEN
 
               ! Pinching this surface melt flux varaible for the separate 
               ! zero layer snow on lid treatment in lid_evolve.F90
               IF (snow_on_lid(i,n)) THEN
-                 snow_on_lid_melt_ml(i,n) = MAX(melt_surft(i,n), 0.0)
+                 lid_snow_melt_flux_ml(i,n) = MAX(melt_surft(i,n), 0.0)
               END IF
 
                             
@@ -957,7 +957,9 @@ END IF
               ! between snowpack top and lake bottom (calculate_lake_bottom_melt.F90)
               ksnow0_ml(i,n) = ksnow_ml(i,1)
 
-              ! ls_snow, con_snow falls into the lake or onto the frozen lid
+
+              ! Snowfall over the melt lake tile has already been handled by
+              ! meltlake_surface_precip, so prevent it entering the underlying snowpack.
               snowfall(i) = 0.0
 
            END IF
@@ -985,21 +987,26 @@ END IF !nsmax
     DO k = 1,surft_pts(n)
       i = surft_index(k,n)
 
-      ! Where there is snow on the ground direct rainfall into infiltration.
-      IF (nsnow(i,n) > 0) THEN
-        infiltration(i)       = ( ls_rain(i) + con_rain(i) ) * timestep
-        infil_rate_con_gbm(i) = infil_rate_con_gbm(i) +                        &
-                                tile_frac(i,n) * con_rain(i)
-        infil_rate_ls_gbm(i)  = infil_rate_ls_gbm(i) +                         &
-                                tile_frac(i,n) * ls_rain(i)
+      IF (l_meltlake .AND. has_lake(i,n)) THEN
+
+         ! Rain has already been routed to the melt lake surface.
+         infiltration(i) = 0.0
+         
+         ! Where there is snow on the ground direct rainfall into infiltration.
+      ELSE IF (nsnow(i,n) > 0) THEN
+         infiltration(i)       = ( ls_rain(i) + con_rain(i) ) * timestep
+         infil_rate_con_gbm(i) = infil_rate_con_gbm(i) +                        &
+              tile_frac(i,n) * con_rain(i)
+         infil_rate_ls_gbm(i)  = infil_rate_ls_gbm(i) +                         &
+              tile_frac(i,n) * ls_rain(i)
       ELSE
-        infiltration(i) = 0.0
-        infil_ground_con_gbm(i) = infil_ground_con_gbm(i) +                    &
-                                  tile_frac(i,n) * con_rain(i)
-        infil_ground_ls_gbm(i)  = infil_ground_ls_gbm(i) +                     &
+         infiltration(i) = 0.0
+         infil_ground_con_gbm(i) = infil_ground_con_gbm(i) +                    &
+              tile_frac(i,n) * con_rain(i)
+         infil_ground_ls_gbm(i)  = infil_ground_ls_gbm(i) +                     &
                                 tile_frac(i,n) * ls_rain(i)
       END IF
-    END DO
+   END DO
 !$OMP END DO NOWAIT
 
     IF (l_wtrac_jls) THEN

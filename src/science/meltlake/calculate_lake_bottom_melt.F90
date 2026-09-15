@@ -149,7 +149,7 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
     ! Surface downward LW radiation on tiles (W/m2)
   tstar_surft(land_pts,nsurft),                                                &
     ! Tile surface temperature (K)
-  lake_inflow(land_pts,nsurft),                                                &
+  !lake_inflow(land_pts,nsurft),                                                &
     ! melt water from snowpack (kgm-2)
   tsnow0_ml(land_pts,nsurft),                                                  &
     ! snowpack top level temp (K)  
@@ -200,8 +200,10 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Snow layer thicknesses (m)
    cold_puddle_hrs_ml(land_pts,nsurft),                                        & 
     ! Number of accum hours with lake_depth < 0.1m a cold orphan puddle
-   snowdepth(land_pts,nsurft)
+   snowdepth(land_pts,nsurft), &
     ! Snowdepth (m)
+   lake_inflow(land_pts,nsurft)
+    ! melt water from snowpack (kgm-2)
    
 REAL(KIND=real_jlslsm), INTENT(OUT) ::                                         &
    kdtdz_ml(land_pts,nsurft),                                                  &
@@ -341,8 +343,10 @@ DO n = 1,nsurft
                      
          lake_depth_ml(i,n) = lake_depth_ml(i,n) +                          &
               lake_inflow(i,n) / rho_water
-            
-      END IF
+         
+            lake_inflow(i,n) = 0.0
+
+         END IF
    END IF
 
    !cum_inflow_m = cum_inflow_m + lake_inflow(i) / rho_water
@@ -421,29 +425,29 @@ DO n = 1,nsurft
 !-----------------------------------------------------------------------------
 ! Rain, snow, evaporation and condensation for exposed lake water
 !-----------------------------------------------------------------------------
-   IF (exposed_water(i,n)) THEN
+  ! IF (exposed_water(i,n)) THEN
    
-      lake_depth_ml(i,n) = MAX(0.0, lake_depth_ml(i,n) - &
-           ei_surft_ml(i,n) * timestep / rho_water)
+   !   lake_depth_ml(i,n) = MAX(0.0, lake_depth_ml(i,n) - &
+   !        ei_surft_ml(i,n) * timestep / rho_water)
 
-      IF (ls_rain(i) > 0.0 .OR. con_rain(i) > 0.0 .OR. &
-           ls_snow(i) > 0.0 .OR. con_snow(i) > 0.0) THEN
+    !  IF (ls_rain(i) > 0.0 .OR. con_rain(i) > 0.0 .OR. &
+    !       ls_snow(i) > 0.0 .OR. con_snow(i) > 0.0) THEN
       
    
-         rain_add = ls_rain(i) + con_rain(i)
-         snow_add = ls_snow(i) + con_snow(i)
+     !    rain_add = ls_rain(i) + con_rain(i)
+     !    snow_add = ls_snow(i) + con_snow(i)
 
-         lake_depth_ml(i,n) = lake_depth_ml(i,n) + &
-              (rain_add + snow_add) * timestep / rho_water
+      !   lake_depth_ml(i,n) = lake_depth_ml(i,n) + &
+      !        (rain_add + snow_add) * timestep / rho_water
 
-         ls_rain(i)  = 0.0
-         con_rain(i) = 0.0
-         ls_snow(i)  = 0.0
-         con_snow(i) = 0.0
+      !   ls_rain(i)  = 0.0
+      !   con_rain(i) = 0.0
+      !   ls_snow(i)  = 0.0
+      !   con_snow(i) = 0.0
 
-   END IF
+   !END IF
 
-END IF
+!END IF
 
 
 !-----------------------------------------------------------------------------

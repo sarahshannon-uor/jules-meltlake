@@ -25,8 +25,9 @@ SUBROUTINE sf_melt (                                                           &
 ,fracs,resft,rhokh_1,tile_frac,timestep,r_gamma                                &
 ,ei_surft,fqw_1,ftl_1,fqw_surft,ftl_surft                                      &
 ,tstar_surft,snow_surft,snowdepth                                              &
-,melt_surft,snowinc_surft,has_lake,snow_on_lid                                 &
- )
+,melt_surft,snowinc_surft                                                      &
+,has_vlid,has_lid,exposed_water,snow_on_lid                                    &
+,lid_ice_melt_flux_ml)
 
 USE atm_fields_bounds_mod, ONLY: tdims
 USE theta_field_sizes, ONLY: t_i_length
@@ -42,6 +43,7 @@ USE water_constants_mod, ONLY:                                                 &
  lc, lf, rho_water, tm
 
 USE jules_meltlake_mod,  ONLY: l_meltlake
+USE model_time_mod, ONLY: timestep_number
 
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
@@ -136,10 +138,19 @@ INTEGER ::                                                                     &
                       ! Loop counter - land field.
 
 LOGICAL, INTENT(IN), OPTIONAL ::                                               &
- has_lake(points),                                                             &
+ !has_lake(points),                                                             &
                      ! IN meltlake present  
- snow_on_lid(points)
+ snow_on_lid(points),                                                          &
                      ! IN snow on frozen lid
+ has_lid(points),                                                              &
+                     ! IN permanent lid 
+ has_vlid(points),                                                             &
+                     ! IN virtual lid 
+ exposed_water(points)
+
+REAL (KIND=real_jlslsm), INTENT(OUT), OPTIONAL ::                              &
+ lid_ice_melt_flux_ml(points)
+                     ! OUT Top melt of bare lid (kg/m2/s)
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -150,6 +161,8 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='SF_MELT'
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 melt_surft(:) = 0.0
+
+IF (PRESENT(lid_ice_melt_flux_ml)) lid_ice_melt_flux_ml(:) = 0.0
 
 !-----------------------------------------------------------------------
 !  Melt snow on tile if TSTAR_SURFT is greater than TM.
@@ -224,28 +237,54 @@ DO k = 1,surft_pts
         (lcmelt * (tstar_surft(l) - tm) / lf + ei_surft(l)) * timestep)
     END IF
 
-
-    ! start l_meltlake changes 
-    ! Standard JULES surface melt calculation. Excess surface energy is
-    ! used to melt snow rather than raise the surface temperature above
-    ! the melting point.
+!---------------------------------------------------------------------------
+! start l_meltlake changes
+! In standard melt calculation excess surface energy is
+! used for melting rather than raising the surface temperature above
+! the melting point.
+!---------------------------------------------------------------------------
     melt_surft(l) = -snowinc_surft(l) / timestep - ei_surft(l)
     dtstar        = -lf * melt_surft(l) / lsmelt
-    !-----------------------------------------------------------------------
-    ! melt_surft is only needed when the surface is snow. This happens when
-    ! there is no melt lake or there is snow on top of the lid. 
-    ! melt_surft is used to melt the snow on top of the lid.  
-    !-----------------------------------------------------------------------
-              
-    IF (l_meltlake .AND. PRESENT(has_lake) .AND. PRESENT(snow_on_lid)) THEN
-       IF (has_lake(l) .AND. .NOT. snow_on_lid(l)) THEN
+
+!---------------------------------------------------------------------------
+! check opional args exist. Ask if optional args are ok to use 
+!--------------------------------------------------------------------------    
+    IF (l_meltlake .AND. PRESENT(exposed_water) .AND. &
+         PRESENT(has_lid) .AND. PRESENT(has_vlid) .AND. &
+         PRESENT(snow_on_lid) .AND. PRESENT(lid_ice_melt_flux_ml)) THEN
+
+!---------------------------------------------------------------------------
+! Case 1. exposed water, set melting & temp increment to zero 
+!--------------------------------------------------------------------------
+       IF (exposed_water(l)) THEN
+
           melt_surft(l) = 0.0
           dtstar        = 0.0
+
+!---------------------------------------------------------------------------
+! Case 2. bare virtual or permanent lid, save the melt rate for melting
+! the top of the lid. Keep dtstar so the surface temperature is pinned to tm
+! this is different to Buzzard model but prevents
+! tstar_surft > tm for bare lids. 
+!--------------------------------------------------------------------------
+       ELSE IF ((has_lid(l) .OR. has_vlid(l)) .AND. &
+            .NOT. snow_on_lid(l)) THEN
+          
+          lid_ice_melt_flux_ml(l) = melt_surft(l)
+
+          melt_surft(l) = 0.0
+         
        END IF
+
     END IF
 
+    
     tstar_surft(l) = tstar_surft(l) + dtstar
-    ! end l_meltlake changes
+
+!---------------------------------------------------------------------------
+! end l_meltlake changes
+!---------------------------------------------------------------------------
+
     
     dftl = cp * rhokh1_prime * dtstar
     dfqw = alpha1(l) * resft(l) * rhokh1_prime * dtstar

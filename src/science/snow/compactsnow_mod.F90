@@ -164,8 +164,8 @@ DO k = 1,surft_pts
     ! check that moving water upwards into layers above lens in percolate_monarchs
     ! has not created layers with unrealistically high densities 
     IF (rho_snow(l,n) > 918.0) THEN
-       print *, 'snow density > 918.0'
-       stop
+       print *, 'WARNING ***** snow density > 918.0 ****** '
+       !stop
     END IF
 
           

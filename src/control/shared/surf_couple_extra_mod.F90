@@ -137,6 +137,7 @@ USE jules_meltlake_mod,       ONLY: l_meltlake
 USE lid_update_mod,           ONLY: lid_update
 USE calculate_lake_bottom_melt_mod, ONLY: calculate_lake_bottom_melt 
 USE init_meltlake_timestep_mod, ONLY: init_meltlake_timestep
+USE meltlake_surface_precip_mod, ONLY: meltlake_surface_precip
 USE water_constants_mod,     ONLY: rho_water, rho_ice
 USE jules_snow_mod,          ONLY: rho_snow_const
 USE model_time_mod,          ONLY: timestep_number
@@ -499,16 +500,20 @@ REAL(KIND=real_jlslsm) :: alpha_acclim
 
 REAL(KIND=real_jlslsm) ::                                                      &
   meltlake_mass_before,                                                        &
-  meltlake_mass_after, &
-  mass_inout, &
+  meltlake_mass_after,                                                         &
+  precip_mass,                                                                 &
+  vapour_mass,                                                                 &
+  mass_inout,                                                                  &
+  mass_error,                                                                  &
+  snow_before,                                                                 &
+  lake_before,                                                                 &
+  ice_before, &
   meltlake_mass_after_snow, &
-  sice_mass_before, &
-  sliq_mass_before, &
-  snow_mass_before, &
-  ls_snow_before_snow, &
-  con_snow_before_snow, &
-  ls_rain_before_snow, &
-  con_rain_before_snow
+  lid_snow_before, &
+  water_lid_before, &
+  inflow_before, &
+  rain_lid_before, &
+  snowmelt_lid_before
 
 
 ! Water tracer local arrays
@@ -763,33 +768,67 @@ CASE ( jules )
             ainfo%l_lice_point,                               & ! IN 
             ainfo%l_lice_surft)                                 ! IN
 
-!----------------------------------------------------------------------------
-! Total mass: snowpack + lake + lid/vlid + snow on lid  
-!----------------------------------------------------------------------------
 
-       meltlake_mass_before =                                        &
-            progs%snow_surft(1,9)                                    &
-            + rho_water * meltlake_vars%lake_depth_ml(1,9)           &
-            + rho_ice * meltlake_vars%lid_depth_ml(1,9)              &
-            + rho_ice * meltlake_vars%vlid_depth_ml(1,9)             &
-            + rho_snow_const * meltlake_vars%lid_snow_depth_ml(1,9)  &
-            + rho_water * meltlake_vars%water_on_lid_depth_ml(1,9)
+!---------------------------------------------------------------------------
+! Melt-lake mass before surface precipitation, snow and lid evolution
+!---------------------------------------------------------------------------
+       meltlake_mass_before =                                         &
+     progs%snow_surft(1,9)                                     &
+     + rho_water * meltlake_vars%lake_depth_ml(1,9)            &
+     + rho_ice * meltlake_vars%lid_depth_ml(1,9)               &
+     + rho_ice * meltlake_vars%vlid_depth_ml(1,9)              &
+     + rho_snow_const * meltlake_vars%lid_snow_depth_ml(1,9)   &
+     + rho_water * meltlake_vars%lid_rain_water_ml(1,9)           &
+     + rho_water * meltlake_vars%lid_snowmelt_water_ml(1,9)       &
+     + meltlake_vars%lake_inflow(1,9)
        
        
-           
-        snow_mass_before = progs%snow_surft(1,9)
+       snow_before = progs%snow_surft(1,9)
 
-        sice_mass_before = SUM(progs%sice_surft_ml(1,9,:))
-        sliq_mass_before = SUM(progs%sliq_surft_ml(1,9,:))
+       lake_before = rho_water * meltlake_vars%lake_depth_ml(1,9)
 
-        ! Diagnostic copies of precipitation before CALL snow modifies fields
-        ls_snow_before_snow  = ls_snow_gb(1)
-        con_snow_before_snow = con_snow_gb(1)
-        ls_rain_before_snow  = ls_rain_gb(1)
-        con_rain_before_snow = con_rain_gb(1)
+       ice_before = rho_ice *                                       &
+            (meltlake_vars%lid_depth_ml(1,9)                        &
+            + meltlake_vars%vlid_depth_ml(1,9))
 
-    END IF
-        
+       lid_snow_before = rho_snow_const * &
+            meltlake_vars%lid_snow_depth_ml(1,9)
+
+       rain_lid_before = rho_water *                               &
+            meltlake_vars%lid_rain_water_ml(1,9)
+
+       snowmelt_lid_before = rho_water *                           &
+            meltlake_vars%lid_snowmelt_water_ml(1,9)
+
+
+       inflow_before = meltlake_vars%lake_inflow(1,9)
+
+       precip_mass =                                                  &
+            (ls_snow_gb(1) + con_snow_gb(1)                          &
+            + ls_rain_gb(1) + con_rain_gb(1)) * timestep
+
+     
+          CALL meltlake_surface_precip(                               &
+               land_pts,                                              &
+               timestep,                                              &
+               nsurft,                                                & 
+               surft_pts,                                             & 
+               ainfo%surft_index,                                     & 
+               ls_snow_gb,                                            &
+               con_snow_gb,                                           &
+               ls_rain_gb,                                            &
+               con_rain_gb,                                           &
+               meltlake_vars%has_lid,                                 &
+               meltlake_vars%has_vlid,                                &
+               meltlake_vars%exposed_water,                           &
+               meltlake_vars%snow_on_lid,                             &
+               meltlake_vars%lake_depth_ml,                           &
+               meltlake_vars%lid_snow_depth_ml,                       &
+               meltlake_vars%lid_rain_water_ml)
+
+     
+       END IF
+
        !Snow (standalone and UM)
     CALL snow (a_step,                      & !IN
             land_pts,                       & !IN
@@ -881,7 +920,7 @@ CASE ( jules )
             meltlake_vars%lake_depth_ml,    & !IN/OUT (land_pts,nsurft)
             meltlake_vars%has_lake,           & !IN/OUT (land_pts,nsurft
             meltlake_vars%snow_on_lid,        & !IN (land_pts,nsurft)
-            meltlake_vars%snow_on_lid_melt_ml,& !IN/OUT (land_pts,nsurft)     
+            meltlake_vars%lid_snow_melt_flux_ml,& !IN/OUT (land_pts,nsurft)     
             meltlake_vars%ei_surft_ml,        & !IN/OUT (land_pts,nsurft)  
             meltlake_vars%ice_lens_depth,     & !IN/OUT (land_pts,nsurft)   
             meltlake_vars%ice_lens_index,     & !IN/OUT (land_pts,nsurft)   
@@ -890,15 +929,15 @@ CASE ( jules )
             meltlake_vars%kdtdz_ml,           & !IN 
             meltlake_vars%dhdt_lake_snow_ml)  !IN
 
-
     meltlake_mass_after_snow =                                     &
-         progs%snow_surft(1,9)                                    &
-         + rho_water * meltlake_vars%lake_depth_ml(1,9)           &
-         + rho_ice * meltlake_vars%lid_depth_ml(1,9)              &
-         + rho_ice * meltlake_vars%vlid_depth_ml(1,9)             &
-         + rho_snow_const * meltlake_vars%lid_snow_depth_ml(1,9)  &
-         + rho_water * meltlake_vars%water_on_lid_depth_ml(1,9)   &
-         + meltlake_vars%lake_inflow(1,9)
+     progs%snow_surft(1,9)                                     &
+     + rho_water * meltlake_vars%lake_depth_ml(1,9)            &
+     + rho_ice * meltlake_vars%lid_depth_ml(1,9)               &
+     + rho_ice * meltlake_vars%vlid_depth_ml(1,9)              &
+     + rho_snow_const * meltlake_vars%lid_snow_depth_ml(1,9)   &
+     + rho_water * meltlake_vars%lid_rain_water_ml(1,9)           &
+     + rho_water * meltlake_vars%lid_snowmelt_water_ml(1,9)       &
+     + meltlake_vars%lake_inflow(1,9)
     
     
     IF (l_meltlake) THEN
@@ -929,7 +968,7 @@ CASE ( jules )
             meltlake_vars%has_vlid,                      & ! IN/OUT
             meltlake_vars%did_insert_lid,                & ! IN/OUT
             meltlake_vars%snow_on_lid,                   & ! IN/OUT
-            meltlake_vars%snow_on_lid_melt_ml,           & ! IN/OUT
+            meltlake_vars%lid_snow_melt_flux_ml,         & ! IN
             meltlake_vars%lake_state_ml,                 & ! IN/OUT
             progs%snow_surft,                            & ! IN/OUT
             fluxes%melt_surft,                           & ! IN/OUT 
@@ -943,146 +982,113 @@ CASE ( jules )
             meltlake_vars%dhdt_lid_lake_ml,              & ! IN/OUT
             meltlake_vars%lid_snow_depth_ml,             & ! IN/OUT
             meltlake_vars%lid_snow_temp_ml,              & ! IN
-            meltlake_vars%water_on_lid_depth_ml,         & ! IN/OUT
+            meltlake_vars%lid_snowmelt_water_ml,         & ! IN/OUT
+            meltlake_vars%lid_ice_melt_flux_ml,          & ! IN
+            meltlake_vars%lid_ice_meltwater_ml,          & ! IN/OUT
             meltlake_vars%ei_surft_ml,                   & ! IN/OUT
             ainfo%l_lice_point,                          & ! IN 
             ainfo%l_lice_surft)                            ! IN
 
-!---------------------------------------------------------------------
-! Total mass: include water removed from the snowpack by percolate_monarchs 
-! but not yet transferred to lake_depth_ml until calculate_lake_bottom_melt 
-! is called on the next timestep. 
-! ---------------------------------------------------------------------      
+!---------------------------------------------------------------------------
+! Melt-lake mass after snow and lid evolution
+!---------------------------------------------------------------------------
        meltlake_mass_after =                                          &
-            progs%snow_surft(1,9)                                    &
-            + rho_water * meltlake_vars%lake_depth_ml(1,9)           &
-            + rho_ice * meltlake_vars%lid_depth_ml(1,9)              &
-            + rho_ice * meltlake_vars%vlid_depth_ml(1,9)             &
-            + rho_snow_const * meltlake_vars%lid_snow_depth_ml(1,9)  &
-            + rho_water * meltlake_vars%water_on_lid_depth_ml(1,9)   &
+            progs%snow_surft(1,9)                                     &
+            + rho_water * meltlake_vars%lake_depth_ml(1,9)            &
+            + rho_ice * meltlake_vars%lid_depth_ml(1,9)               &
+            + rho_ice * meltlake_vars%vlid_depth_ml(1,9)              &
+            + rho_snow_const * meltlake_vars%lid_snow_depth_ml(1,9)   &
+            + rho_water * meltlake_vars%lid_rain_water_ml(1,9)           &
+            + rho_water * meltlake_vars%lid_snowmelt_water_ml(1,9)       &
             + meltlake_vars%lake_inflow(1,9)
        
        
+!---------------------------------------------------------------------------
+! External atmospheric mass flux
+!---------------------------------------------------------------------------
        IF (meltlake_vars%has_lake(1,9)) THEN
-
-          mass_inout = &
-               (ls_snow_before_snow + con_snow_before_snow + &
-               ls_rain_before_snow + con_rain_before_snow - &
-               meltlake_vars%ei_surft_ml(1,9)) * timestep
-
+          vapour_mass = meltlake_vars%ei_surft_ml(1,9) * timestep
        ELSE
-
-          mass_inout = &
-               (ls_snow_before_snow + con_snow_before_snow + &
-               ls_rain_before_snow + con_rain_before_snow - &
-               fluxes%ei_surft(1,9)) * timestep
-
+          vapour_mass = fluxes%ei_surft(1,9) * timestep
        END IF
-       
-!---------------------------------------------------------------------
-! Force crash if meltlake mass is not conserved 
-!---------------------------------------------------------------------
-       IF (ABS(meltlake_mass_after - meltlake_mass_before - mass_inout)          &
-            > 1.0e-1) THEN
-          IF (timestep_number >1) THEN
 
-             PRINT *, '===================================================='
-             PRINT *, 'MELT LAKE MASS CONSERVATION ERROR'
-             PRINT *, '===================================================='
-             PRINT *, 'timestep = ', timestep_number
-             PRINT *, ''
 
-             PRINT *, '--- Surface state ---'
-             PRINT *, 'has_lake       = ', meltlake_vars%has_lake(1,9)
-             PRINT *, 'has_lid        = ', meltlake_vars%has_lid(1,9)
-             PRINT *, 'has_vlid       = ', meltlake_vars%has_vlid(1,9)
-             PRINT *, 'exposed_water  = ', meltlake_vars%exposed_water(1,9)
-             PRINT *, 'snow_on_lid    = ', meltlake_vars%snow_on_lid(1,9)
-             PRINT *, ''
+       mass_inout = precip_mass - vapour_mass
 
-             PRINT *, '--- Atmospheric mass terms [kg m-2] ---'
-             PRINT *, 'ls_snow before snow  = ', &
-                  ls_snow_before_snow * timestep
-             PRINT *, 'con_snow before snow = ', &
-                  con_snow_before_snow * timestep
-             PRINT *, 'ls_rain before snow  = ', &
-                  ls_rain_before_snow * timestep
-             PRINT *, 'con_rain before snow = ', &
-                  con_rain_before_snow * timestep
+       mass_error = meltlake_mass_after - meltlake_mass_before       &
+            - mass_inout
 
-             PRINT *, 'ls_snow after snow   = ', ls_snow_gb(1) * timestep
-             PRINT *, 'con_snow after snow  = ', con_snow_gb(1) * timestep
-             PRINT *, 'ls_rain after snow   = ', ls_rain_gb(1) * timestep
-             PRINT *, 'con_rain after snow  = ', con_rain_gb(1) * timestep
+!---------------------------------------------------------------------------
+! Force crash if melt-lake mass is not conserved
+!---------------------------------------------------------------------------
 
-             PRINT *, 'ei_surft             = ', &
-                  fluxes%ei_surft(1,9) * timestep
-             PRINT *, 'ei_surft_ml          = ', &
-                  meltlake_vars%ei_surft_ml(1,9) * timestep
-             PRINT *, 'snowinc_surft        = ', &
-                  fluxes%snowinc_surft(1,9)
-             PRINT *, 'melt_surft           = ', &
-                  fluxes%melt_surft(1,9) * timestep
-             PRINT *, 'water on lid depth = ', &
-                  meltlake_vars%water_on_lid_depth_ml(1,9)
+       IF (ABS(mass_error) > 1.0e-1 .AND. timestep_number > 1) THEN
 
-             PRINT *, 'water on lid mass  = ', &
-                  rho_water * meltlake_vars%water_on_lid_depth_ml(1,9)
-             PRINT *, ''
+          PRINT *, '===================================================='
+          PRINT *, 'MELT LAKE MASS CONSERVATION ERROR'
+          PRINT *, '===================================================='
+          PRINT *, 'timestep        = ', timestep_number
+          PRINT *, 'mass before     = ', meltlake_mass_before
+          PRINT *, 'mass after      = ', meltlake_mass_after
+          PRINT *, 'precipitation   = ', precip_mass
+          PRINT *, 'vapour mass     = ', vapour_mass
+          PRINT *, 'expected change = ', mass_inout
+          PRINT *, 'actual change   = ',                                  &
+               meltlake_mass_after - meltlake_mass_before
+          PRINT *, 'mass error      = ', mass_error
+          PRINT *, ''
+          PRINT *, '--- Surface state ---'
+          PRINT *, 'has_lake        = ', meltlake_vars%has_lake(1,9)
+          PRINT *, 'has_lid         = ', meltlake_vars%has_lid(1,9)
+          PRINT *, 'has_vlid        = ', meltlake_vars%has_vlid(1,9)
+          PRINT *, 'exposed_water   = ', meltlake_vars%exposed_water(1,9)
+          PRINT *, 'snow_on_lid     = ', meltlake_vars%snow_on_lid(1,9)
+          PRINT *, 'did_insert_lid  = ', meltlake_vars%did_insert_lid(1,9)
+          PRINT *, ''
+          PRINT *, '--- Reservoir changes [kg m-2] ---'
+          PRINT *, 'snow change     = ', progs%snow_surft(1,9) - snow_before
+          PRINT *, 'lake change     = ',                                  &
+               rho_water * meltlake_vars%lake_depth_ml(1,9) - lake_before
+          PRINT *, 'lid+vlid change = ',                                  &
+               rho_ice * (meltlake_vars%lid_depth_ml(1,9)                 &
+               + meltlake_vars%vlid_depth_ml(1,9)) - ice_before
+          PRINT *, 'lid snow mass   = ',                                  &
+               rho_snow_const * meltlake_vars%lid_snow_depth_ml(1,9)
 
-             PRINT *, '--- Snowpack mass [kg m-2] ---'
-             PRINT *, 'snow_surft before = ', snow_mass_before
-             PRINT *, 'snow_surft after  = ', progs%snow_surft(1,9)
-             PRINT *, 'snow_surft change = ', &
-                  progs%snow_surft(1,9) - snow_mass_before
 
-             PRINT *, 'sice_ml before   = ', sice_mass_before
-             PRINT *, 'sice_ml after    = ', &
-                  SUM(progs%sice_surft_ml(1,9,:))
-             PRINT *, 'sice_ml change   = ', &
-                  SUM(progs%sice_surft_ml(1,9,:)) - sice_mass_before
+          PRINT *, 'rain on lid change = ',                                     &
+               rho_water * meltlake_vars%lid_rain_water_ml(1,9)                    &
+               - rain_lid_before
 
-             PRINT *, 'sliq_ml before   = ', sliq_mass_before
-             PRINT *, 'sliq_ml after    = ', &
-                  SUM(progs%sliq_surft_ml(1,9,:))
-             PRINT *, 'sliq_ml change   = ', &
-                  SUM(progs%sliq_surft_ml(1,9,:)) - sliq_mass_before
+          PRINT *, 'snowmelt on lid change = ',                                 &
+               rho_water * meltlake_vars%lid_snowmelt_water_ml(1,9)                &
+               - snowmelt_lid_before
 
-             PRINT *, 'layer mass after = ', &
-                  SUM(progs%sice_surft_ml(1,9,:)) + &
-                  SUM(progs%sliq_surft_ml(1,9,:))
-             PRINT *, 'snow-layer diff  = ', &
-                  progs%snow_surft(1,9) - &
-                  SUM(progs%sice_surft_ml(1,9,:)) - &
-                  SUM(progs%sliq_surft_ml(1,9,:))
-             PRINT *, ''
+          PRINT *, 'lake inflow     = ', meltlake_vars%lake_inflow(1,9)
 
-             PRINT *, '--- Meltlake internal terms ---'
-             PRINT *, 'lake inflow mass   = ', &
-                  meltlake_vars%lake_inflow(1,9)
-             PRINT *, 'dhdt_lake_snow_ml  = ', &
-                  meltlake_vars%dhdt_lake_snow_ml(1,9)
-             PRINT *, 'dhdt_lid_lake_ml   = ', &
-                  meltlake_vars%dhdt_lid_lake_ml(1,9)
-             PRINT *, ''
-
-             PRINT *, '--- Total mass budget [kg m-2] ---'
-             PRINT *, 'mass before          = ', meltlake_mass_before
-             PRINT *, 'mass after snow       = ', meltlake_mass_after_snow
-             PRINT *, 'mass after lid_update = ', meltlake_mass_after
-             PRINT *, 'change during snow    = ', &
-                  meltlake_mass_after_snow - meltlake_mass_before
-             PRINT *, 'change during lid     = ', &
-                  meltlake_mass_after - meltlake_mass_after_snow
-             PRINT *, 'expected mass in/out  = ', mass_inout
-             PRINT *, 'TOTAL RESIDUAL        = ', &
-                  meltlake_mass_after - meltlake_mass_before - mass_inout
-             PRINT *, '===================================================='
-
-             stop
-          END IF
-       END IF
+          PRINT *, 'change during snow = ', &
+               meltlake_mass_after_snow - meltlake_mass_before
           
+          PRINT *, 'change during lid  = ', &
+               meltlake_mass_after - meltlake_mass_after_snow
+
+          PRINT *, 'lid snow change = ',                                &
+               rho_snow_const * meltlake_vars%lid_snow_depth_ml(1,9)    &
+               - lid_snow_before
+
+          PRINT *, 'water lid change = ',                               &
+               rho_water * meltlake_vars%water_on_lid_depth_ml(1,9)     &
+               - water_lid_before
+
+          PRINT *, 'lake inflow change = ',                             &
+               meltlake_vars%lake_inflow(1,9) - inflow_before
+
+          PRINT *, '===================================================='
+
+          !STOP
+
+       END IF
+
     END IF !l_meltlake
 
 

@@ -53,7 +53,7 @@ SUBROUTINE lid_update(land_pts,               & !IN
                       has_vlid,               & !IN/OUT
                       did_insert_lid,         & !IN/OUT
                       snow_on_lid,            & !IN/OUT
-                      snow_on_lid_melt_ml,    & !IN/OUT
+                      lid_snow_melt_flux_ml,  & !IN
                       lake_state_ml,          & !IN/OUT
                       snow_surft,             & !IN/OUT
                       melt_surft,             & !IN/OUT
@@ -67,7 +67,9 @@ SUBROUTINE lid_update(land_pts,               & !IN
                       dhdt_lid_lake_ml,       & !IN/OUT
                       lid_snow_depth_ml,      & !IN/OUT
                       lid_snow_temp_ml,       & !IN/OUT
-                      water_on_lid_depth_ml,  & !IN/OUT
+                      lid_snowmelt_water_ml,  & !IN/OUT
+                      lid_ice_melt_flux_ml,   & ! IN
+                      lid_ice_meltwater_ml,   & ! IN/OUT
                       ei_surft_ml,            & !IN/OUT
                       l_lice_point,           & !IN (land_pts)
                       l_lice_surft)             !IN (ntype)  
@@ -82,9 +84,9 @@ USE jules_surface_mod,       ONLY: l_elev_land_ice
 USE water_constants_mod,     ONLY: rho_ice, tm
 
 USE jules_snow_mod, ONLY:                                                    &
- rho_snow_fresh,                                                             &
-   ! Density of fresh snow (kg per m**3) = 100
-  r0
+ rho_snow_const,                                                             &
+  ! Constant density of lying snow (kg m-3) = 350
+ r0
    ! Grain size for fresh snow (microns).
        
 USE jules_meltlake_mod, ONLY: nsmax_ml, dzsnow_ml
@@ -109,15 +111,15 @@ INTEGER, INTENT(IN) ::                                                         &
     ! Number of water tracers
 
 REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
-  timestep              ! Timestep length (s).
+   timestep
+    ! Timestep length (s).
 
 
-
-!REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
-!  sw_surft(land_pts,nsurft),                                                   &                            
-!  lw_down_surft(land_pts,nsurft)
-    ! Surface downward LW radiation on tiles (W/m2), jules_land_sf_implicit.F90
-  
+REAL(KIND=real_jlslsm), INTENT(IN) ::                                         &
+  lid_snow_melt_flux_ml(land_pts, nsurft),                                    &
+    ! Snowmelt flux from snow on the lake lid (kg/m/s)
+  lid_ice_melt_flux_ml(land_pts,nsurft)
+    ! Melt flux from the upper surface of bare lake ice (kg/m/s)
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(in)
 !-----------------------------------------------------------------------------
@@ -151,7 +153,7 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Tile surface temperature (K)
    snow_surft(land_pts,nsurft),                                                &
     ! Snow mass on tiles (kg m-2)
-   melt_surft(land_pts,nsurft),                                                & 
+   melt_surft(land_pts,nsurft),                                               & 
     ! Surface snowmelt on tiles (kg/m2/s).
    snowdepth(land_pts,nsurft),                                                 &
     ! Snow depth (m).
@@ -175,10 +177,10 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Snow depth on virtual or permanent lid (m) 
    lid_snow_temp_ml(land_pts, nsurft),                                         &
     ! Temp of snow on virtual or permanent lid (K) 
-   snow_on_lid_melt_ml(land_pts, nsurft),                                      &
-    ! Surface melt from energy balance (kg/m2/s) (melt_surft from sf_melt) 
-   water_on_lid_depth_ml(land_pts, nsurft),                                    &
-    ! Depth of melt water on lid (m)
+   lid_snowmelt_water_ml(land_pts, nsurft),                                  &
+    ! snowmelt from zero-layer snow scheme on top of the lid 
+   lid_ice_meltwater_ml(land_pts,nsurft),                                      &
+    ! Liquid water produced by melting the upper surface of lake ice (m).
    ei_surft_ml(land_pts, nsurft),                                              &
     ! Sublimation of snow (kg/m2/s).
    lake_state_ml(land_pts,nsurft)
@@ -290,12 +292,14 @@ DO n = 1,nsurft
            has_vlid(:,n),                 &
            did_insert_lid(:,n),           &
            snow_on_lid(:,n),              &
-           snow_on_lid_melt_ml(:,n),      &
+           lid_snow_melt_flux_ml(:,n),    &
            lake_state_ml(:,n),            &
            dhdt_lid_lake_ml(:,n),         &
            lid_snow_depth_ml(:,n),        &
            lid_snow_temp_ml(:,n),         &
-           water_on_lid_depth_ml(:,n),    &
+           lid_snowmelt_water_ml(:,n),    &
+           lid_ice_melt_flux_ml(:,n),     & 
+           lid_ice_meltwater_ml(:,n),     & 
            ei_surft_ml(:,n))
           
       
@@ -362,7 +366,7 @@ DO n = 1,nsurft
          
          snowfall(:)       = 0.0
          sice0(:)          = 0.0
-         rho0(:)           = rho_snow_fresh
+         rho0(:)           = rho_snow_const
          tsnow0(:)         = tm
          rgrain0(:)        = r0
          sice0_wtrac(:,:)  = 0.0
@@ -373,10 +377,10 @@ DO n = 1,nsurft
             IF (did_insert_lid(i,n) .AND.                         &
                  lid_snow_depth_ml(i,n) > 0.0) THEN
 
-               sice0(i) = rho_snow_fresh *                        &
+               sice0(i) = rho_snow_const *                        &
                     lid_snow_depth_ml(i,n)
 
-               rho0(i)    = rho_snow_fresh
+               rho0(i)    = rho_snow_const
                tsnow0(i)  = lid_snow_temp_ml(i,n)
                rgrain0(i) = r0
 

@@ -2116,6 +2116,30 @@ CASE ( 'lid_snow_temp_ml' )
     meltlake_vars%lid_snow_temp_ml(:,:) = const_val
   END IF
 
+CASE ( 'lid_snowmelt_water_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, meltlake_vars%lid_snowmelt_water_ml)
+  ELSE
+    meltlake_vars%lid_snowmelt_water_ml(:,:) = const_val
+  END IF
+
+CASE ( 'lid_rain_water_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, meltlake_vars%lid_rain_water_ml)
+  ELSE
+    meltlake_vars%lid_rain_water_ml(:,:) = const_val
+  END IF
+
+CASE ( 'lid_ice_meltwater_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, meltlake_vars%lid_ice_meltwater_ml)
+  ELSE
+    meltlake_vars%lid_ice_meltwater_ml(:,:) = const_val
+  END IF
+
 CASE ( 'water_on_lid_depth_ml' )
   IF ( PRESENT(cube) ) THEN
     cube_land = map_to_land(cube)

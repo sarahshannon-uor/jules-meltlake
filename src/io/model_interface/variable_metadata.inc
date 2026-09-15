@@ -9681,15 +9681,59 @@ DATA metadata(747) / var_metadata(                                             &
     "K"                                                                        &
  ) /
 !-----------------------------------------------------------------------------
-!! Metadata for melted water depth on lid
+!! Metadata for snowmelt produced by the zero-layer snow scheme on top of the
+! lake lid
 !!-----------------------------------------------------------------------------
 DATA metadata(748) / var_metadata(                                             &
+! String identifier
+    'lid_snowmelt_water_ml',                                                   &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    "Meltwater from snow on the melt lake lid",                                &
+! Units
+    "m"                                                                        &
+ ) /
+
+!-----------------------------------------------------------------------------
+!! Metadata for rainfall reaching the surface of the lake lid
+!!-----------------------------------------------------------------------------
+DATA metadata(749) / var_metadata(                                             &
+! String identifier
+    'lid_rain_water_ml',                                                       &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    "Rainwater on the melt lake lid",                                          &
+! Units
+    "m"                                                                        &
+ ) /
+
+!-----------------------------------------------------------------------------
+!! Metadata for meltwater produced directly by melting of the upper surface
+! of the ice lid
+!!-----------------------------------------------------------------------------
+DATA metadata(750) / var_metadata(                                             &
+! String identifier
+    'lid_ice_meltwater_ml',                                                    &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    "Meltwater from surface melting of the melt lake ice lid",                 &
+! Units
+    "m"                                                                        &
+ ) /
+!-----------------------------------------------------------------------------
+!! Metadata for total liquid water available on the melt lake lid from snowmelt,
+! rainfall and lid surface melting, prior to lateral redistribution.
+!!-----------------------------------------------------------------------------
+DATA metadata(751) / var_metadata(                                             &
 ! String identifier 
     'water_on_lid_depth_ml',                                                   &
 ! Variable type
     var_type_surft,                                                            &
 ! Long name
-    "Depth of melted water + rain on lid",                                            &
+    "Liquid water stored on the melt lake lid",                                &
 ! Units
     "m"                                                                        &
  ) / 

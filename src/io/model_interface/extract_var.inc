@@ -2735,6 +2735,18 @@ CASE ( 'lid_snow_temp_ml' )
   cube_land = cube_from_array(meltlake_vars%lid_snow_temp_ml)
   cube = map_from_land(cube_land)
 
+CASE ( 'lid_snowmelt_water_ml' )
+  cube_land = cube_from_array(meltlake_vars%lid_snowmelt_water_ml)
+  cube = map_from_land(cube_land)
+
+CASE ( 'lid_rain_water_ml' )
+  cube_land = cube_from_array(meltlake_vars%lid_rain_water_ml)
+  cube = map_from_land(cube_land)
+
+CASE ( 'lid_ice_meltwater_ml' )
+  cube_land = cube_from_array(meltlake_vars%lid_ice_meltwater_ml)
+  cube = map_from_land(cube_land)
+
 CASE ( 'water_on_lid_depth_ml' )
   cube_land = cube_from_array(meltlake_vars%water_on_lid_depth_ml)
   cube = map_from_land(cube_land)

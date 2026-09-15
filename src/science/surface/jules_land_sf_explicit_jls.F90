@@ -2168,23 +2168,22 @@ DO n = 1,nsurft
        
        ashtf_surft(l,n) = 1.0 / (r_snow + r_ice)
    
-       IF (snow_on_lid(l,n) .AND. lid_snow_depth_ml(l,n) > 0.3) THEN
+!       IF (snow_on_lid(l,n) .AND. lid_snow_depth_ml(l,n) > 0.3) THEN
 
-
-          WRITE(*,*) 'snow_on_lid:'
-          WRITE(*,'(A,I8)')    'l                 = ', l
-          WRITE(*,'(A,I8)')    'n                 = ', n
-          WRITE(*,'(A,L2)')    'has_lid           = ', has_lid(l,n)
-          WRITE(*,'(A,L2)')    'has_vlid          = ', has_vlid(l,n)
-          WRITE(*,'(A,F12.6)') 'lid_snow_depth_ml = ', lid_snow_depth_ml(l,n)
-          WRITE(*,'(A,F12.6)') 'dzsurf            = ', dzsurf(l,n)
-          WRITE(*,'(A,F12.6)') 'r_snow            = ', r_snow
-          WRITE(*,'(A,F12.6)') 'tsurf             = ', tsurf(l,n)
-          WRITE(*,'(A,F12.6)') 'ice_depth_eff     = ', ice_depth_eff
-          WRITE(*,'(A,F12.6)') 'r_ice             = ', r_ice
-          WRITE(*,'(A,F12.6)') 'ashtf_surft       = ', ashtf_surft(l,n)
+ !         WRITE(*,*) 'snow_on_lid:'
+ !         WRITE(*,'(A,I8)')    'l                 = ', l
+ !         WRITE(*,'(A,I8)')    'n                 = ', n
+ !         WRITE(*,'(A,L2)')    'has_lid           = ', has_lid(l,n)
+ !         WRITE(*,'(A,L2)')    'has_vlid          = ', has_vlid(l,n)
+ !         WRITE(*,'(A,F12.6)') 'lid_snow_depth_ml = ', lid_snow_depth_ml(l,n)
+ !         WRITE(*,'(A,F12.6)') 'dzsurf            = ', dzsurf(l,n)
+ !         WRITE(*,'(A,F12.6)') 'r_snow            = ', r_snow
+ !         WRITE(*,'(A,F12.6)') 'tsurf             = ', tsurf(l,n)
+ !         WRITE(*,'(A,F12.6)') 'ice_depth_eff     = ', ice_depth_eff
+ !         WRITE(*,'(A,F12.6)') 'r_ice             = ', r_ice
+ !         WRITE(*,'(A,F12.6)') 'ashtf_surft       = ', ashtf_surft(l,n)
                
-       END IF
+ !      END IF
    
     !-----------------------------------------------------------------------
     ! Case 2: Exposed water.  
