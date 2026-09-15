@@ -494,26 +494,42 @@ END IF ! has_lid or has_vlid Stefan condition
 
       lid_ice_melt_mass = MAX(lid_ice_melt_flux_ml(i), 0.0) * timestep
 
-     
       IF (has_lid(i)) THEN
 
-         lid_ice_melt_mass = MIN(lid_ice_melt_mass,                           &
-           rho_ice * lid_depth_ml(i))
+         lid_ice_melt_mass = MIN(lid_ice_melt_mass, &
+              rho_ice * lid_depth_ml(i))
 
-         lid_depth_ml(i) = lid_depth_ml(i) -                                  &
-           lid_ice_melt_mass / rho_ice
+         lid_depth_ml(i) = lid_depth_ml(i) - &
+              lid_ice_melt_mass / rho_ice
 
       ELSE IF (has_vlid(i)) THEN
 
-         lid_ice_melt_mass = MIN(lid_ice_melt_mass,                            &
+         lid_ice_melt_mass = MIN(lid_ice_melt_mass, &
               rho_ice * vlid_depth_ml(i))
 
-         vlid_depth_ml(i) = vlid_depth_ml(i) -                                 &
+         vlid_depth_ml(i) = vlid_depth_ml(i) - &
               lid_ice_melt_mass / rho_ice
+         
+!-----------------------------------------------------------------------------
+! The vlid has melted to below the seeded value. Put the remaining melt water
+! into meltwater on lid store so mass is conserved
+!-----------------------------------------------------------------------------
+         IF (vlid_depth_ml(i) > 0.0 .AND. &
+              vlid_depth_ml(i) < vlid_seed_depth) THEN
 
-      END IF
+            lid_ice_melt_mass = lid_ice_melt_mass + &
+                 rho_ice * vlid_depth_ml(i)
 
-      lid_ice_meltwater_ml(i) = lid_ice_meltwater_ml(i) +                      &
+            vlid_depth_ml(i) = 0.0
+
+         END IF
+
+      END IF !end bare lid
+
+!-----------------------------------------------------------------------------
+! Keep this for growing lake area
+!-----------------------------------------------------------------------------  
+      lid_ice_meltwater_ml(i) = lid_ice_meltwater_ml(i) + &
            lid_ice_melt_mass / rho_water
 
    END IF
@@ -573,12 +589,27 @@ END IF ! has_lid or has_vlid
    END IF
 
 
+   if (timestep_number.eq.45624) then
+      PRINT *, 'before final state update'
+      PRINT *, 'lid depth  = ', lid_depth_ml(i)
+      PRINT *, 'vlid depth = ', vlid_depth_ml(i)
+      PRINT *, 'has_lid    = ', has_lid(i)
+      PRINT *, 'has_vlid   = ', has_vlid(i)
+   end if
 !-----------------------------------------------------------------------------
 ! update states now the lid and lake depths have changed
 !-----------------------------------------------------------------------------   
    CALL update_lake_states(i)
+   if (timestep_number.eq.45624) then
 
-  
+      PRINT *, 'after final state update'
+      PRINT *, 'lid depth  = ', lid_depth_ml(i)
+      PRINT *, 'vlid depth = ', vlid_depth_ml(i)
+      PRINT *, 'has_lid    = ', has_lid(i)
+      PRINT *, 'has_vlid   = ', has_vlid(i)
+   end if
+
+   
 !-----------------------------------------------------------------------------
 ! Reset inactive temperatures and depths 
 !-----------------------------------------------------------------------------
