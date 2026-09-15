@@ -22,33 +22,46 @@
 !    https://github.com/monarchs-ice/monarchs
 !
 ! Method:
-! When lake water and the surface are at freezing conditions, a
-! thin virtual lid is formed. The virtual lid can refreeze or 
-! melt according to a Stefan condition. 
-! 
-! 
-! Heat conduction through the lid is calculated using a zero layer
-! treatment. 
-! 
-! A virtual lid is converted to a permanent lid when it reaches
-! lid_min_depth. The vitual lid depth can refreeze (grow) or
-! melt (shrink) using the Stefan condition. The permanent lid 
-! can only refreeze (grow).  
-! 
-! Snow on the lid was not in original Buzzard model.  
-! Snowfall can accumlinate on the lid.  If snow is present on the  
-! lid, the thermal resistance of the snow is included when calculating 
-! the conductive heat flux and the temperature at the snow lid 
-! interface. Surface melt removes mass from the snow on the lid. 
-! The snow on the lid itself has constant density and no water 
-! content. 
+! A thin virtual lid is seeded when exposed lake water experiences
+! freezing surface conditions. The virtual lid subsequently grows or
+! melts at its lower boundary according to a Stefan condition using
+! conductive heat flux through the lid and turbulent heat exchange
+! with the underlying lake. When the virtual lid reaches
+! lid_min_depth it is converted to a permanent lid.
 !
-! When the remaining lake water has completely frozen, a flag is
-! set so that the permanent lid, and any snow lying on it, can be
-! transferred into the JULES snowpack later in lid_update_mod.F90
+! Conductive heat transfer through the lid uses a zero-layer
+! treatment. If snow is present on the lid, its thermal resistance is
+! included when calculating the snow-lid interface temperature and
+! conductive heat flux.
 !
-! Meltwater produced from snow on the lid is stored separately in
-! lid_snowmelt_water_ml for subsequent lateral redistribution.
+! Surface melt of bare virtual or permanent lake ice is calculated 
+! in sf_melt and removes mass from the upper
+! surface of the lid. This process is separate from melting at the
+! lower lake-lid boundary.
+!
+! Snowfall may accumulate on virtual or permanent lids. Snow on the
+! lid is represented with constant density. Surface melt removes snow
+! mass and produces liquid water on top of the lid.
+!
+! Meltwater produced at the lid surface is kept separate from the
+! underlying lake water because the ice lid is treated as impermeable.
+!
+! This routine maintains two separate surface meltwater stores:
+!
+! lid_snowmelt_water_ml
+! liquid water produced by melting snow lying on the lid
+!
+! lid_ice_meltwater_ml
+! liquid water produced by melting the upper surface of the ice lid
+!
+! Neither water store is added directly to lake_depth_ml. The water is
+! retained on top of the lid for subsequent lateral routing.
+!
+! Rainwater falling on the lid is handled separately outside this
+! routine and stored in lid_rain_water_ml. The rainwater and the two
+! meltwater stores can later be combined in water_on_lid_depth_ml for
+! lateral routing and melt lake area evolution.
+
 ! 
 ! Code Owner: s.r.shannon@reading.ac.uk
 ! Subroutine Interface:
@@ -151,17 +164,10 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
     ! Snowmelt flux from snow on the lake lid (kg m-2 s-1).
   lid_ice_melt_flux_ml(land_pts)
     ! Melt flux from the upper surface of bare lake ice (kg m-2 s-1).
+
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(inout)
 !-----------------------------------------------------------------------------
-!INTEGER, INTENT(IN OUT) ::                                                     &
-!   nsnow(land_pts)                                                        
-    ! Number of snow layers.
-
-!REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
- ! lid_snow_melt_flux_ml(land_pts)
-   ! Snowmelt flux from snow on the lake lid (kg/m2/s)
-
 REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
   con_rain(land_pts),                                                          &
     ! Convective rainfall rate (kg/m2/s).
@@ -181,7 +187,7 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Depth of lid (m)
   vlid_depth_ml(land_pts),                                                     &
    ! Depth of virtual lid (m)
-  lid_snow_depth_ml(land_pts),                                                & 
+  lid_snow_depth_ml(land_pts),                                                 & 
     ! Depth of snow on virtual or permanent lid (m)
   lid_snow_temp_ml(land_pts),                                                  &
     ! Temp of zero layer snow on lid or vlid (K)
@@ -306,37 +312,32 @@ DO k = 1,surft_pts
    seeded_vlid        = .false.
    snow_on_lid(i)     = lid_snow_depth_ml(i) > 0.0
 
-   PRINT *, 'lake before seed   = ', lake_depth_ml(i)
+  
 !-----------------------------------------------------------------------------
 ! Seed a virtual lid if conditions are freezing. Reduce the lake depth
 ! by the equivalent seeded depth
 !-----------------------------------------------------------------------------
-   !IF (has_lake(i) .AND. lake_temp_ml(i) <= tm.and.tstar_surft(i) < tm) THEN
-
-      IF (has_lake(i) .AND. exposed_water(i) .AND. tstar_surft(i) < tm) THEN
+   IF (has_lake(i) .AND. exposed_water(i) .AND. tstar_surft(i) < tm) THEN
          
-      !IF (vlid_depth_ml(i) < vlid_seed_depth .AND. .NOT. has_lid(i)) THEN
-
-         IF (vlid_depth_ml(i) < vlid_seed_depth .AND. &
-              .NOT. has_lid(i) .AND. .NOT. has_vlid(i)) THEN
+      IF (vlid_depth_ml(i) < vlid_seed_depth .AND. &
+           .NOT. has_lid(i) .AND. .NOT. has_vlid(i)) THEN
             
          vlid_depth_ml(i) = vlid_seed_depth
          seeded_vlid = .true.
          
          lake_depth_ml(i) = lake_depth_ml(i) - vlid_seed_depth * rho_ice / rho_water
       END IF
-
+      
    END IF
 
-   
 !-----------------------------------------------------------------------------
 ! update states after possible lid seeding
 !-----------------------------------------------------------------------------
    CALL update_lake_states(i)
    
-   PRINT *, 'lake after seed    = ', lake_depth_ml(i)
+   
 !-----------------------------------------------------------------------------
-! Refreeze or melt lid using Stefan condition 
+! Refreeze or melt bottom of lid using Stefan condition 
 !-----------------------------------------------------------------------------
    IF (has_vlid(i) .OR. has_lid(i)) THEN
 
@@ -471,7 +472,7 @@ DO k = 1,surft_pts
    
 END IF ! has_lid or has_vlid Stefan condition
 
-PRINT *, 'lake after Stefan  = ', lake_depth_ml(i)
+
 !-----------------------------------------------------------------------------
 ! The virtual lid has grown enough in depth so convert to a permanent lid
 !-----------------------------------------------------------------------------
@@ -486,16 +487,14 @@ PRINT *, 'lake after Stefan  = ', lake_depth_ml(i)
    CALL update_lake_states(i)
 
 !-----------------------------------------------------------------------------
-! Melt the upper surface of a bare ice lid.
+! Melt the upper surface of a bare ice lid. This was not in Buzzard model
+! but needed so tstar_surt is set to tm for a bare lid
 !-----------------------------------------------------------------------------
    IF ((has_lid(i) .OR. has_vlid(i)) .AND. .NOT. snow_on_lid(i)) THEN
 
       lid_ice_melt_mass = MAX(lid_ice_melt_flux_ml(i), 0.0) * timestep
 
-      PRINT *, 'ice melt flux    = ', lid_ice_melt_flux_ml(i)
-      PRINT *, 'top melt mass    = ', lid_ice_melt_mass
-      PRINT *, 'top melt depth   = ', lid_ice_melt_mass / rho_ice
-
+     
       IF (has_lid(i)) THEN
 
          lid_ice_melt_mass = MIN(lid_ice_melt_mass,                           &
@@ -579,9 +578,7 @@ END IF ! has_lid or has_vlid
 !-----------------------------------------------------------------------------   
    CALL update_lake_states(i)
 
-   PRINT *, 'lake end           = ', lake_depth_ml(i)
-PRINT *, 'has_lid end        = ', has_lid(i)
-PRINT *, 'has_vlid end       = ', has_vlid(i)
+  
 !-----------------------------------------------------------------------------
 ! Reset inactive temperatures and depths 
 !-----------------------------------------------------------------------------
