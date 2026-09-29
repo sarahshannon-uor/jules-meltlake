@@ -9724,16 +9724,28 @@ DATA metadata(750) / var_metadata(                                             &
     "m"                                                                        &
  ) /
 !-----------------------------------------------------------------------------
-!! Metadata for total liquid water available on the melt lake lid from snowmelt,
-! rainfall and lid surface melting, prior to lateral redistribution.
+!! Metadata for Grau mean water depth over melt lake covered area 
 !!-----------------------------------------------------------------------------
 DATA metadata(751) / var_metadata(                                             &
 ! String identifier 
-    'water_on_lid_depth_ml',                                                   &
+    'grau_mean_lake_depth_ml',                                                 &
 ! Variable type
-    var_type_surft,                                                            &
+    var_type_surface,                                                          &
 ! Long name
-    "Liquid water stored on the melt lake lid",                                &
+    "Grau mean water depth over melt lake covered area",                       &
+! Units
+    "m"                                                                        &
+ ) /
+!-----------------------------------------------------------------------------
+!! Metadata for Cumulative water supply used by Grau melt lake parameterisation 
+!!-----------------------------------------------------------------------------
+DATA metadata(752) / var_metadata(                                             &
+! String identifier 
+    'grau_water_supply_ml',                                                    &
+! Variable type
+    var_type_surface,                                                          &
+! Long name
+    "Cumulative water supply used by Grau melt lake parameterisation",         &
 ! Units
     "m"                                                                        &
  ) / 

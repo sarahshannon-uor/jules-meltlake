@@ -322,9 +322,10 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 !$OMP         frac_melt,dsice,dsliq,ds_old,rain_add,snow_add,dsice_tot,       &
 !$OMP         dsliq_tot,cold_lingering_shallow_puddle)
 DO n = 1,nsurft
-   
-   IF (l_elev_land_ice .AND. l_lice_surft(n)) THEN
-      
+
+   !IF (l_elev_land_ice .AND. l_lice_surft(n)) THEN
+   IF (l_elev_land_ice .AND. l_lice_surft(n) .AND. n == 9) THEN
+         
       DO k = 1,surft_pts(n)
          i = surft_index(k,n)
 
@@ -418,37 +419,6 @@ DO n = 1,nsurft
    ELSE ! reset counter
       cold_puddle_hrs_ml(i,n) = 0.0
    END IF
-
-
-
-
-!-----------------------------------------------------------------------------
-! Rain, snow, evaporation and condensation for exposed lake water
-!-----------------------------------------------------------------------------
-  ! IF (exposed_water(i,n)) THEN
-   
-   !   lake_depth_ml(i,n) = MAX(0.0, lake_depth_ml(i,n) - &
-   !        ei_surft_ml(i,n) * timestep / rho_water)
-
-    !  IF (ls_rain(i) > 0.0 .OR. con_rain(i) > 0.0 .OR. &
-    !       ls_snow(i) > 0.0 .OR. con_snow(i) > 0.0) THEN
-      
-   
-     !    rain_add = ls_rain(i) + con_rain(i)
-     !    snow_add = ls_snow(i) + con_snow(i)
-
-      !   lake_depth_ml(i,n) = lake_depth_ml(i,n) + &
-      !        (rain_add + snow_add) * timestep / rho_water
-
-      !   ls_rain(i)  = 0.0
-      !   con_rain(i) = 0.0
-      !   ls_snow(i)  = 0.0
-      !   con_snow(i) = 0.0
-
-   !END IF
-
-!END IF
-
 
 !-----------------------------------------------------------------------------
 ! Get albedo - doing this again to output albedo to nc. this is already in

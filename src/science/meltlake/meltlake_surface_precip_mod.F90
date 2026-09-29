@@ -138,11 +138,14 @@ DO n = 1, nsurft
       rain_add = ls_rain(i) + con_rain(i)
       snow_add = ls_snow(i) + con_snow(i)
 
+      lid_rain_water_ml(i,n) = 0.0
+      
       IF (has_lid(i,n) .OR. has_vlid(i,n)) THEN
 
          IF (rain_add > 0.0) THEN
-            lid_rain_water_ml(i,n) = lid_rain_water_ml(i,n) +                       &
-                 rain_add * timestep / rho_water
+            lid_rain_water_ml(i,n) = rain_add * timestep / rho_water
+            !lid_rain_water_ml(i,n) = lid_rain_water_ml(i,n) +                  &
+             !    rain_add * timestep / rho_water
          END IF
 
          IF (snow_add > 0.0) THEN

@@ -32,6 +32,7 @@ SUBROUTINE lid_update(land_pts,               & !IN
                       n_wtrac_jls,            & !IN
                       surft_pts,              & !IN
                       surft_index,            & !IN
+                      frac,                   & !IN/OUT
                       nsnow,                  & !IN/OUT
                       tstar_surft,            & !IN
                       tsnow_ml,               & !IN/OUT
@@ -68,14 +69,20 @@ SUBROUTINE lid_update(land_pts,               & !IN
                       lid_snow_depth_ml,      & !IN/OUT
                       lid_snow_temp_ml,       & !IN/OUT
                       lid_snowmelt_water_ml,  & !IN/OUT
-                      lid_ice_melt_flux_ml,   & ! IN
-                      lid_ice_meltwater_ml,   & ! IN/OUT
+                      lid_ice_melt_flux_ml,   & !IN
+                      lid_ice_meltwater_ml,   & !IN/OUT
+                      lid_rain_water_ml,      & !IN/OUT
+                      dhdt_lake_snow_ml,      & !IN
+                      lake_inflow,            & !IN
+                      grau_water_supply_ml,   & !IN/OUT
+                      grau_mean_lake_depth_ml,& !IN/OUT
                       ei_surft_ml,            & !IN/OUT
                       l_lice_point,           & !IN (land_pts)
-                      l_lice_surft)             !IN (ntype)  
-                     
+                      l_lice_surft)             !IN (ntype)
+
 
 USE lid_evolve_mod,          ONLY: lid_evolve
+USE expand_area_mod,         ONLY: expand_area
 USE relayersnow_mod,         ONLY: relayersnow
 
 USE jules_surface_types_mod, ONLY: ntype
@@ -88,7 +95,7 @@ USE jules_snow_mod, ONLY:                                                    &
   ! Constant density of lying snow (kg m-3) = 350
  r0
    ! Grain size for fresh snow (microns).
-       
+
 USE jules_meltlake_mod, ONLY: nsmax_ml, dzsnow_ml
 
 USE parkind1, ONLY: jprb, jpim
@@ -102,99 +109,118 @@ IMPLICIT NONE
 !-----------------------------------------------------------------------------
 ! Scalar arguments with intent(in)
 !-----------------------------------------------------------------------------
-INTEGER, INTENT(IN) ::                                                         &
-   land_pts,                                                                   &
+INTEGER, INTENT(IN) ::                                                       &
+   land_pts,                                                                 &
      ! Total number of land points.
-   nsurft,                                                                     &
+   nsurft,                                                                   &
     ! Number of land tiles.
    n_wtrac_jls
     ! Number of water tracers
 
-REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
+REAL(KIND=real_jlslsm), INTENT(IN) ::                                        &
    timestep
     ! Timestep length (s).
 
 
-REAL(KIND=real_jlslsm), INTENT(IN) ::                                         &
-  lid_snow_melt_flux_ml(land_pts, nsurft),                                    &
+REAL(KIND=real_jlslsm), INTENT(IN) ::                                        &
+  lid_snow_melt_flux_ml(land_pts,nsurft),                                    &
     ! Snowmelt flux from snow on the lake lid (kg/m/s)
-  lid_ice_melt_flux_ml(land_pts,nsurft)
+  lid_ice_melt_flux_ml(land_pts,nsurft),                                     &
     ! Melt flux from the upper surface of bare lake ice (kg/m/s)
+  dhdt_lake_snow_ml(land_pts,nsurft),                                        &
+    ! Lake-snow Stefan boundary movement (m ice equivalent per timestep).
+  lake_inflow(land_pts,nsurft)
+    ! Water supplied from snow/firn hydrology (kg m-2).
+
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(in)
 !-----------------------------------------------------------------------------
-INTEGER, INTENT(IN) ::                                                         &
-  surft_pts(nsurft),                                                           &
+INTEGER, INTENT(IN) ::                                                       &
+  surft_pts(nsurft),                                                         &
     ! Number of tile points.
   surft_index(land_pts,nsurft)
     ! Index of tile points.
-  
+
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(inout)
 !-----------------------------------------------------------------------------
-INTEGER, INTENT(IN OUT) ::                                                     &
+INTEGER, INTENT(IN OUT) ::                                                   &
    nsnow(land_pts,nsurft)
     ! number of snow layers
 
-REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
-   con_rain(land_pts),                                                         &
+REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                    &
+   con_rain(land_pts),                                                       &
     ! Convective rainfall rate (kg/m2/s).
-   ls_rain(land_pts),                                                          &
+   ls_rain(land_pts),                                                        &
     ! Large-scale rainfall fall rate (kg/m2/s).
-   con_snow(land_pts),                                                         &
+   con_snow(land_pts),                                                       &
     ! Convective frozen rainfall rate (kg/m2/s).
-   ls_snow(land_pts),                                                          &
+   ls_snow(land_pts),                                                        &
     ! Large-scale frozen precip fall rate (kg/m2/s).
-   lake_depth_ml(land_pts,nsurft),                                             &
+   lake_depth_ml(land_pts,nsurft),                                           &
     ! Convective rainfall rate (kg/m2/s).
-   lake_temp_ml(land_pts,nsurft),                                              &
+   lake_temp_ml(land_pts,nsurft),                                            &
     ! Temperature of melt lake (K)
-   tstar_surft(land_pts,nsurft),                                               &
+   tstar_surft(land_pts,nsurft),                                             &
     ! Tile surface temperature (K)
-   snow_surft(land_pts,nsurft),                                                &
+   snow_surft(land_pts,nsurft),                                              &
     ! Snow mass on tiles (kg m-2)
-   melt_surft(land_pts,nsurft),                                               & 
+   melt_surft(land_pts,nsurft),                                              &
     ! Surface snowmelt on tiles (kg/m2/s).
-   snowdepth(land_pts,nsurft),                                                 &
+   snowdepth(land_pts,nsurft),                                               &
     ! Snow depth (m).
-   tsnow_ml(land_pts,nsurft,nsmax_ml),                                         &
+   tsnow_ml(land_pts,nsurft,nsmax_ml),                                       &
     ! Snowpack layer temperatures (K).
-   ds_ml(land_pts,nsurft,nsmax_ml),                                            &
+   ds_ml(land_pts,nsurft,nsmax_ml),                                          &
     ! Depth of snowpack layers (m)
-   sice_ml(land_pts,nsurft,nsmax_ml),                                          &
+   sice_ml(land_pts,nsurft,nsmax_ml),                                        &
     ! Snowpack layer ice mass (kg m-2).
-   sliq_ml(land_pts,nsurft,nsmax_ml),                                          &
+   sliq_ml(land_pts,nsurft,nsmax_ml),                                        &
     ! Snowpack layer liquid mass (kg m-2)
-   lid_depth_ml(land_pts,nsurft),                                              &
+   lid_depth_ml(land_pts,nsurft),                                            &
     ! Lid depth (m)
-   vlid_depth_ml(land_pts,nsurft),                                             &
+   vlid_depth_ml(land_pts,nsurft),                                           &
     ! Virtual lid depth (m)
-   lid_temp_ml(land_pts,nsurft),                                               &
+   lid_temp_ml(land_pts,nsurft),                                             &
     ! Lid temp (K)
-   rho_snow_grnd(land_pts,nsurft),                                             &
+   rho_snow_grnd(land_pts,nsurft),                                           &
     ! Snowpack bulk density (kg/m3).
-   lid_snow_depth_ml(land_pts, nsurft),                                        &
-    ! Snow depth on virtual or permanent lid (m) 
-   lid_snow_temp_ml(land_pts, nsurft),                                         &
-    ! Temp of snow on virtual or permanent lid (K) 
-   lid_snowmelt_water_ml(land_pts, nsurft),                                  &
-    ! snowmelt from zero-layer snow scheme on top of the lid 
-   lid_ice_meltwater_ml(land_pts,nsurft),                                      &
+   lid_snow_depth_ml(land_pts,nsurft),                                       &
+    ! Snow depth on virtual or permanent lid (m)
+   lid_snow_temp_ml(land_pts,nsurft),                                        &
+    ! Temp of snow on virtual or permanent lid (K)
+   lid_snowmelt_water_ml(land_pts,nsurft),                                   &
+    ! snowmelt from zero-layer snow scheme on top of the lid
+   lid_ice_meltwater_ml(land_pts,nsurft),                                    &
     ! Liquid water produced by melting the upper surface of lake ice (m).
-   ei_surft_ml(land_pts, nsurft),                                              &
+   lid_rain_water_ml(land_pts,nsurft),                                       &
+    ! Rain water on lid (m)
+   ei_surft_ml(land_pts,nsurft),                                             &
     ! Sublimation of snow (kg/m2/s).
-   lake_state_ml(land_pts,nsurft)
+   lake_state_ml(land_pts,nsurft),                                           &
      ! lake states (maybe should make this integer)
+   frac(land_pts,nsurft),                                                    &
+     ! tile frac
+   grau_water_supply_ml(land_pts),                                           &
+    ! Cumulative gridbox-equivalent water supply used by Grau (m).
+   grau_mean_lake_depth_ml(land_pts)
+    ! Grau mean lake depth over lake-covered area (m).
+
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(out)
 !-----------------------------------------------------------------------------
-REAL(KIND=real_jlslsm), INTENT(OUT) ::                                        &
-   rho_snow_ml(land_pts,nsurft,nsmax_ml),                                     &
+REAL(KIND=real_jlslsm), INTENT(OUT) ::                                       &
+   rho_snow_ml(land_pts,nsurft,nsmax_ml),                                    &
     ! Snow layer densities for meltlake(kg/m3).
    dhdt_lid_lake_ml(land_pts,nsurft)
     ! Stefan boundary movement lid bottom and lake top (ms-1 ice equiv)
-   
-   
+
+INTEGER, PARAMETER ::                                                        &
+  lake_ml    = 9,                                                            &
+   ! Melt-lake tile index.
+  nonlake_ml = 10
+   ! Non-lake elevated-ice tile index.
+
 !-----------------------------------------------------------------------------
 ! Local arrays
 !-----------------------------------------------------------------------------
@@ -205,34 +231,34 @@ REAL(KIND=real_jlslsm) ::                                                     &
   sice0(land_pts),                                                            &
    ! Ice content of fresh snow (kg/m2).
    ! Where nsnow=0, sice0 is the mass of the snowpack.
-  tsnow0(land_pts),                                                           & 
+  tsnow0(land_pts),                                                           &
     ! Temperature of fresh snow (K).
   rgrain(land_pts,nsurft),                                                    &
     ! Snow surface grain size (microns).
-  rgrainl_ml(land_pts,nsurft,nsmax_ml),                                       & 
+  rgrainl_ml(land_pts,nsurft,nsmax_ml),                                       &
     ! Snow layer grain size for meltlake (microns).
   rgrain0(land_pts),                                                          &
     ! Fresh snow grain size (microns).
-  rho0(land_pts),                                                             & 
+  rho0(land_pts),                                                             &
     ! Density of fresh snow (kg/m3).
     ! Where nsnow=0, rho0 is the density of the snowpack.
-  sice0_wtrac(land_pts,n_wtrac_jls),                                          &     
+  sice0_wtrac(land_pts,n_wtrac_jls),                                          &
     ! Where nsnow=0, sice0 is the mass of the snowpack.
   sice_wtrac(land_pts,nsmax_ml,n_wtrac_jls),                                  &
     ! Water tracer ice content of snow layers (kg/m2).
   sliq_wtrac(land_pts,nsmax_ml,n_wtrac_jls)
     ! Water tracer liquid content of snow layers (kg/m2).
-       
+
 !ancil_info (IN)
 LOGICAL, INTENT(IN) :: l_lice_point(land_pts)
 LOGICAL, INTENT(IN) :: l_lice_surft(ntype)
 
 LOGICAL, INTENT(IN OUT) ::                                                    &
  exposed_water(land_pts,nsurft),                                              &
- has_lid(land_pts,nsurft), &
- has_vlid(land_pts,nsurft), &
- has_lake(land_pts,nsurft), &
- did_insert_lid(land_pts,nsurft), &
+ has_lid(land_pts,nsurft),                                                    &
+ has_vlid(land_pts,nsurft),                                                   &
+ has_lake(land_pts,nsurft),                                                   &
+ did_insert_lid(land_pts,nsurft),                                             &
  snow_on_lid(land_pts,nsurft)
 
 !TYPE(wtrac_sn_type) :: wtrac_sn         ! Water tracer working arrays
@@ -240,20 +266,21 @@ LOGICAL, INTENT(IN OUT) ::                                                    &
 !-----------------------------------------------------------------------------
 ! Local scalars
 !-----------------------------------------------------------------------------
-INTEGER ::                                                                     &
-  i,                                                                           &
+INTEGER ::                                                                    &
+  i,                                                                          &
     ! Land point index and loop counter.
-  j,                                                                           &
+  j,                                                                          &
     ! Tile pts loop counter.
-  k,                                                                           &
+  k,                                                                          &
     ! Tile number.
-  n, &                                                                           
+  n,                                                                          &
     ! Tile loop counter.
   ns
+
 !-----------------------------------------------------------------------------
 ! Local arrays
 !-----------------------------------------------------------------------------
-!REAL(KIND=real_jlslsm) ::                                                      &
+!REAL(KIND=real_jlslsm) ::                                                     &
 !   dh(land_pts,nsurft)
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
@@ -266,12 +293,17 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 DO n = 1,nsurft
 
-   IF (l_elev_land_ice .AND. l_lice_surft(n) .AND. surft_pts(n) > 0) THEN
+   IF (l_elev_land_ice .AND. l_lice_surft(n) .AND.        &
+       surft_pts(n) > 0 .AND. n == lake_ml) THEN
 
       sice0_wtrac(:,:)  = 0.0
       sice_wtrac(:,n,:) = 0.0
       sliq_wtrac(:,n,:) = 0.0
-         
+
+!-----------------------------------------------------------------------------
+! grow or melt the lid
+!-----------------------------------------------------------------------------
+
       CALL lid_evolve(land_pts,           &
            timestep,                      &
            surft_pts(n),                  &
@@ -298,17 +330,46 @@ DO n = 1,nsurft
            lid_snow_depth_ml(:,n),        &
            lid_snow_temp_ml(:,n),         &
            lid_snowmelt_water_ml(:,n),    &
-           lid_ice_melt_flux_ml(:,n),     & 
-           lid_ice_meltwater_ml(:,n),     & 
+           lid_ice_melt_flux_ml(:,n),     &
+           lid_ice_meltwater_ml(:,n),     &
            ei_surft_ml(:,n))
-          
-      
+
+
+!-----------------------------------------------------------------------------
+! Use cumulative water supply to expand lake area.
+! Only calculate Grau for the melt-lake tile.
+!-----------------------------------------------------------------------------
+
+      IF (n == lake_ml) THEN
+
+         CALL expand_area(                                   &
+              land_pts,                                      &
+              nsurft,                                        &
+              surft_pts(n),                                  &
+              surft_index(:,n),                              &
+              frac,                                          &
+              lake_inflow,                                   &
+              dhdt_lake_snow_ml,                             &
+              lid_rain_water_ml,                             &
+              lid_snowmelt_water_ml,                         &
+              lake_depth_ml,                                 &
+              grau_water_supply_ml,                          &
+              grau_mean_lake_depth_ml,                       &
+              exposed_water,                                 &
+              has_lid,                                       &
+              has_vlid,                                      &
+              has_lake,                                      &
+              did_insert_lid)
+
+      END IF
+
+
       IF (ANY(did_insert_lid(surft_index(1:surft_pts(n),n),n))) THEN
 
          print *, '------------------------------------------------------------'
          print *, ':-)  Inserting lid ice into snowpack '
          print *, '------------------------------------------------------------'
-         
+
          snowfall(:)       = 0.0
          sice0(:)          = 0.0
          rho0(:)           = rho_ice
@@ -331,7 +392,7 @@ DO n = 1,nsurft
             END IF
 
          END DO
-         
+
          CALL relayersnow(                                      &
               land_pts,                                         &
               surft_pts(n),                                     &
@@ -363,7 +424,7 @@ DO n = 1,nsurft
          print *, ':-)  Inserting snow on lid into snowpack '
          print *, '------------------------------------------------------------'
 
-         
+
          snowfall(:)       = 0.0
          sice0(:)          = 0.0
          rho0(:)           = rho_snow_const
@@ -391,7 +452,7 @@ DO n = 1,nsurft
          END DO
 
          IF (ANY(sice0(surft_index(1:surft_pts(n),n)) > 0.0)) THEN
-            
+
             CALL relayersnow(                                    &
                  land_pts,                                       &
                  surft_pts(n),                                   &
@@ -418,19 +479,20 @@ DO n = 1,nsurft
                  sliq_wtrac(:,n,:),                              &
                  rho_snow_ml(:,n,:),                             &
                  snowdepth(:,n) )
-            
+
          END IF
+
          !----------------------------------------------------------------
-         ! Clear lake and lid states after both insertions 
+         ! Clear lake and lid states after both insertions
          !----------------------------------------------------------------
-   
+
          DO j = 1, surft_pts(n)
             i = surft_index(j,n)
 
             IF (did_insert_lid(i,n)) THEN
 
                did_insert_lid(i,n)    = .false.
-               
+
                lake_depth_ml(i,n)     = 0.0
                lid_depth_ml(i,n)      = 0.0
                vlid_depth_ml(i,n)     = 0.0
@@ -438,7 +500,7 @@ DO n = 1,nsurft
 
                lid_snow_depth_ml(i,n) = 0.0
                lid_snow_temp_ml(i,n)  = tm
-               
+
                lake_state_ml(i,n)     = 0
                has_lake(i,n)          = .false.
                exposed_water(i,n)     = .false.
@@ -446,16 +508,15 @@ DO n = 1,nsurft
                has_vlid(i,n)          = .false.
 
                snow_on_lid(i,n)       = .false.
-               
 
             END IF
 
          END DO
 
       END IF
-      
+
    END IF
-   
+
 END DO
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)

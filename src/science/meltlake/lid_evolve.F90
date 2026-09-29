@@ -528,13 +528,15 @@ END IF ! has_lid or has_vlid Stefan condition
 
 !-----------------------------------------------------------------------------
 ! Keep this for growing lake area
-!-----------------------------------------------------------------------------  
-      lid_ice_meltwater_ml(i) = lid_ice_meltwater_ml(i) + &
-           lid_ice_melt_mass / rho_water
+!-----------------------------------------------------------------------------
+      lid_ice_meltwater_ml(i) = 0.0
+      lid_ice_meltwater_ml(i) = lid_ice_melt_mass / rho_water
+           
+
+!      lid_ice_meltwater_ml(i) = lid_ice_meltwater_ml(i) + &
+!           lid_ice_melt_mass / rho_water
 
    END IF
-
-
    
    IF (has_lid(i) .OR. has_vlid(i)) THEN
 
@@ -565,14 +567,13 @@ END IF ! has_lid or has_vlid Stefan condition
          ! Update snow on lid depth
          lid_snow_depth_ml(i) = snowmass_lid / rho_snow_const
 
-         ! What to do with the melted water on the lid ???
-         ! Could this be a lake, on top of a lid, on top of a lake
-         ! Don't add the water to the lake depth because the lid is impermeable. 
-         ! Keep the water depth on lid in a seperate variable. 
-        
+         
+         ! timestep value not cumulinative
+         lid_snowmelt_water_ml(i) = 0.0
          IF (snow_remove > 0.0) THEN
-            lid_snowmelt_water_ml(i) = lid_snowmelt_water_ml(i)           &
-                 + snow_remove / rho_water
+            !lid_snowmelt_water_ml(i) = lid_snowmelt_water_ml(i)           &
+             !    + snow_remove / rho_water
+            lid_snowmelt_water_ml(i) = snow_remove / rho_water
          END IF
             
    END IF
