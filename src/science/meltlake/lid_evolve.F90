@@ -365,6 +365,7 @@ DO k = 1,surft_pts
               lid_depth_ml(i),                                                  &
               has_lid(i),                                                       &
               has_vlid(i),                                                      &
+             ! 0.0, &
               lid_snow_depth_ml(i),                                             &
               kdtdz_ml,                                                         &
               lid_temp_ml(i),                                                   &
@@ -377,6 +378,7 @@ DO k = 1,surft_pts
               vlid_depth_ml(i),                                                 &
               has_lid(i),                                                       &
               has_vlid(i),                                                      &
+              !0.0, &
               lid_snow_depth_ml(i),                                             &
               kdtdz_ml,                                                         &
               lid_temp_ml(i),                                                   &

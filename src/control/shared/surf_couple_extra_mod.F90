@@ -517,8 +517,6 @@ REAL(KIND=real_jlslsm) ::                                                      &
   ice_meltwater_lid_before
 
 REAL(KIND=real_jlslsm) ::                                                    &
-  grau_lake_inflow_ml(land_pts,nsurft),                                      &
-    ! Lake inflow saved before lake bottom melt calculation (m water).
   nonlake_water_ml(land_pts,nsurft)
     ! Water available from the non-lake elevated-ice tile (m).
 
@@ -999,9 +997,9 @@ CASE ( jules )
             meltlake_vars%lid_rain_water_ml,             &
             meltlake_vars%dhdt_lake_snow_ml,             &
             meltlake_vars%lake_inflow,                   &
-            meltlake_vars%grau_water_supply_ml,          &
-            meltlake_vars%grau_mean_lake_depth_ml,       &
+            meltlake_vars%ice_lens_index,                &
             meltlake_vars%ei_surft_ml,                   &
+            meltlake_vars%lake_area_ml,                  &
             ainfo%l_lice_point,                          &
             ainfo%l_lice_surft)
        

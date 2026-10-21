@@ -37,7 +37,7 @@ REAL(KIND=real_jlslsm) :: firn_depth_max = 35.0
                 ! This is the thickness of each snow layer when it is not
                 ! the bottom layer (note that dzSnow(nsMax) is not used
                 ! because that is always the bottom layer)
-REAL(KIND=real_jlslsm) :: dzsnow_ml(200) = rmdi
+REAL(KIND=real_jlslsm), TARGET :: dzsnow_ml(200) = rmdi
 !-----------------------------------------------------------------------------
 ! Switches
 !-----------------------------------------------------------------------------

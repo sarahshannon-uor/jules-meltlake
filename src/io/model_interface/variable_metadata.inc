@@ -9724,29 +9724,16 @@ DATA metadata(750) / var_metadata(                                             &
     "m"                                                                        &
  ) /
 !-----------------------------------------------------------------------------
-!! Metadata for Grau mean water depth over melt lake covered area 
+!! Metadata for melt lake area
 !!-----------------------------------------------------------------------------
 DATA metadata(751) / var_metadata(                                             &
-! String identifier 
-    'grau_mean_lake_depth_ml',                                                 &
+! String identifier
+    'lake_area_ml',                                                            &
 ! Variable type
-    var_type_surface,                                                          &
+    var_type_surft,                                                            &
 ! Long name
-    "Grau mean water depth over melt lake covered area",                       &
+    "Melt lake area ",                                                         &
 ! Units
-    "m"                                                                        &
+    "m2"                                                                       &
  ) /
-!-----------------------------------------------------------------------------
-!! Metadata for Cumulative water supply used by Grau melt lake parameterisation 
-!!-----------------------------------------------------------------------------
-DATA metadata(752) / var_metadata(                                             &
-! String identifier 
-    'grau_water_supply_ml',                                                    &
-! Variable type
-    var_type_surface,                                                          &
-! Long name
-    "Cumulative water supply used by Grau melt lake parameterisation",         &
-! Units
-    "m"                                                                        &
- ) / 
 #endif

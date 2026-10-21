@@ -263,7 +263,7 @@ REAL(KIND=real_jlslsm) ::                                                      &
 !-----------------------------------------------------------------------------
 ! Allocatable versions of namelist arrays
 !-----------------------------------------------------------------------------
-REAL(KIND=real_jlslsm) :: dzsnow(snow_layers_max) = rmdi
+REAL(KIND=real_jlslsm), TARGET :: dzsnow(snow_layers_max) = rmdi
                 ! Prescribed thickness of snow layers (m)
                 ! This is the thickness of each snow layer when it is not
                 ! the bottom layer (note that dzSnow(nsMax) is not used

@@ -2140,20 +2140,12 @@ CASE ( 'lid_ice_meltwater_ml' )
     meltlake_vars%lid_ice_meltwater_ml(:,:) = const_val
   END IF
 
-CASE ( 'grau_mean_lake_depth_ml' )
+CASE ( 'lake_area_ml' )
   IF ( PRESENT(cube) ) THEN
     cube_land = map_to_land(cube)
-    CALL cube_get_data(cube_land, meltlake_vars%grau_mean_lake_depth_ml)
+    CALL cube_get_data(cube_land, meltlake_vars%lake_area_ml)
   ELSE
-    meltlake_vars%grau_mean_lake_depth_ml(:) = const_val
-  END IF
-
-CASE ( 'grau_water_supply_ml' )
-  IF ( PRESENT(cube) ) THEN
-    cube_land = map_to_land(cube)
-    CALL cube_get_data(cube_land, meltlake_vars%grau_water_supply_ml)
-  ELSE
-    meltlake_vars%grau_water_supply_ml(:) = const_val
+    meltlake_vars%lake_area_ml(:,:) = const_val
   END IF
 
 CASE ( 'f_nsc' )

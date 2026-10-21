@@ -66,9 +66,7 @@ TYPE :: meltlake_vars_data_type
   REAL(KIND=real_jlslsm), ALLOCATABLE :: lid_ice_meltwater_ml(:,:)
   REAL(KIND=real_jlslsm), ALLOCATABLE :: lid_ice_melt_flux_ml(:,:)
   REAL(KIND=real_jlslsm), ALLOCATABLE :: ei_surft_ml(:,:)
-  REAL(KIND=real_jlslsm), ALLOCATABLE :: grau_water_supply_ml(:)
-  REAL(KIND=real_jlslsm), ALLOCATABLE :: grau_mean_lake_depth_ml(:)
-  
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: lake_area_ml(:,:)
   
   LOGICAL, ALLOCATABLE :: exposed_water(:,:)
   LOGICAL, ALLOCATABLE :: has_lid(:,:)
@@ -109,10 +107,9 @@ TYPE :: meltlake_vars_type
   REAL(KIND=real_jlslsm), POINTER :: lid_ice_meltwater_ml(:,:)
   REAL(KIND=real_jlslsm), POINTER :: lid_ice_melt_flux_ml(:,:)
   REAL(KIND=real_jlslsm), POINTER :: ei_surft_ml(:,:)
-  REAL(KIND=real_jlslsm), POINTER :: grau_water_supply_ml(:)
-  REAL(KIND=real_jlslsm), POINTER :: grau_mean_lake_depth_ml(:)
+  REAL(KIND=real_jlslsm), POINTER :: lake_area_ml(:,:)
   
-  
+
   LOGICAL, POINTER :: exposed_water(:,:)
   LOGICAL, POINTER :: has_lid(:,:)
   LOGICAL, POINTER :: has_vlid(:,:)
@@ -180,8 +177,7 @@ ALLOCATE(meltlake_vars_data%lid_rain_water_ml(land_pts,nsurft))
 ALLOCATE(meltlake_vars_data%lid_ice_meltwater_ml(land_pts,nsurft))
 ALLOCATE(meltlake_vars_data%lid_ice_melt_flux_ml(land_pts,nsurft))
 ALLOCATE(meltlake_vars_data%ei_surft_ml(land_pts,nsurft))
-ALLOCATE(meltlake_vars_data%grau_water_supply_ml(land_pts))
-ALLOCATE(meltlake_vars_data%grau_mean_lake_depth_ml(land_pts))
+ALLOCATE(meltlake_vars_data%lake_area_ml(land_pts,nsurft))
 
 ALLOCATE(meltlake_vars_data%exposed_water(land_pts,nsurft))
 ALLOCATE(meltlake_vars_data%has_lid(land_pts,nsurft))
@@ -218,8 +214,7 @@ meltlake_vars_data%lid_rain_water_ml(:,:)     = 0.0
 meltlake_vars_data%lid_ice_meltwater_ml(:,:)  = 0.0
 meltlake_vars_data%lid_ice_melt_flux_ml(:,:)  = 0.0
 meltlake_vars_data%ei_surft_ml(:,:)           = 0.0
-meltlake_vars_data%grau_water_supply_ml(:)    = 0.0
-meltlake_vars_data%grau_mean_lake_depth_ml(:) = 0.0 
+meltlake_vars_data%lake_area_ml(:,:)          = 0.0
 
 meltlake_vars_data%exposed_water(:,:)      = .FALSE.
 meltlake_vars_data%has_lid(:,:)            = .FALSE.
@@ -286,8 +281,7 @@ DEALLOCATE(meltlake_vars_data%lid_rain_water_ml)
 DEALLOCATE(meltlake_vars_data%lid_ice_meltwater_ml)
 DEALLOCATE(meltlake_vars_data%lid_ice_melt_flux_ml)
 DEALLOCATE(meltlake_vars_data%ei_surft_ml)
-DEALLOCATE(meltlake_vars_data%grau_water_supply_ml)
-DEALLOCATE(meltlake_vars_data%grau_mean_lake_depth_ml)
+DEALLOCATE(meltlake_vars_data%lake_area_ml)
 
 DEALLOCATE(meltlake_vars_data%exposed_water)
 DEALLOCATE(meltlake_vars_data%has_lid)
@@ -353,8 +347,7 @@ meltlake_vars%lid_rain_water_ml => meltlake_vars_data%lid_rain_water_ml
 meltlake_vars%lid_ice_meltwater_ml => meltlake_vars_data%lid_ice_meltwater_ml
 meltlake_vars%lid_ice_melt_flux_ml => meltlake_vars_data%lid_ice_melt_flux_ml
 meltlake_vars%ei_surft_ml => meltlake_vars_data%ei_surft_ml
-meltlake_vars%grau_water_supply_ml => meltlake_vars_data%grau_water_supply_ml
-meltlake_vars%grau_mean_lake_depth_ml => meltlake_vars_data%grau_mean_lake_depth_ml
+meltlake_vars%lake_area_ml => meltlake_vars_data%lake_area_ml
 
 meltlake_vars%exposed_water => meltlake_vars_data%exposed_water
 meltlake_vars%has_lid => meltlake_vars_data%has_lid
@@ -415,8 +408,7 @@ NULLIFY(meltlake_vars%lid_rain_water_ml)
 NULLIFY(meltlake_vars%lid_ice_meltwater_ml)
 NULLIFY(meltlake_vars%lid_ice_melt_flux_ml)
 NULLIFY(meltlake_vars%ei_surft_ml)
-NULLIFY(meltlake_vars%grau_water_supply_ml)
-NULLIFY(meltlake_vars%grau_mean_lake_depth_ml)
+NULLIFY(meltlake_vars%lake_area_ml)
 
 NULLIFY(meltlake_vars%exposed_water)
 NULLIFY(meltlake_vars%has_lid)

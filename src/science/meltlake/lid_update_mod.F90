@@ -74,21 +74,22 @@ SUBROUTINE lid_update(land_pts,               & !IN
                       lid_rain_water_ml,      & !IN/OUT
                       dhdt_lake_snow_ml,      & !IN
                       lake_inflow,            & !IN
-                      grau_water_supply_ml,   & !IN/OUT
-                      grau_mean_lake_depth_ml,& !IN/OUT
+                      ice_lens_index,         & !IN
                       ei_surft_ml,            & !IN/OUT
+                      lake_area_ml,           & !OUT
                       l_lice_point,           & !IN (land_pts)
                       l_lice_surft)             !IN (ntype)
 
 
-USE lid_evolve_mod,          ONLY: lid_evolve
-USE expand_area_mod,         ONLY: expand_area
-USE relayersnow_mod,         ONLY: relayersnow
+USE lid_evolve_mod,              ONLY: lid_evolve
+USE expand_area_mod,             ONLY: expand_area
+USE conserve_snowpack_frac_mod,  ONLY: conserve_snowpack_frac
+USE relayersnow_mod,             ONLY: relayersnow
 
 USE jules_surface_types_mod, ONLY: ntype
 USE jules_surface_mod,       ONLY: l_elev_land_ice
 
-USE water_constants_mod,     ONLY: rho_ice, tm
+USE water_constants_mod,     ONLY: rho_ice, tm, rho_water
 
 USE jules_snow_mod, ONLY:                                                    &
  rho_snow_const,                                                             &
@@ -129,9 +130,9 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                        &
     ! Melt flux from the upper surface of bare lake ice (kg/m/s)
   dhdt_lake_snow_ml(land_pts,nsurft),                                        &
     ! Lake-snow Stefan boundary movement (m ice equivalent per timestep).
-  lake_inflow(land_pts,nsurft)
+  lake_inflow(land_pts,nsurft),                                              &
     ! Water supplied from snow/firn hydrology (kg m-2).
-
+  ice_lens_index(land_pts,nsurft)
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(in)
 !-----------------------------------------------------------------------------
@@ -201,20 +202,20 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                    &
      ! lake states (maybe should make this integer)
    frac(land_pts,nsurft),                                                    &
      ! tile frac
-   grau_water_supply_ml(land_pts),                                           &
-    ! Cumulative gridbox-equivalent water supply used by Grau (m).
-   grau_mean_lake_depth_ml(land_pts)
-    ! Grau mean lake depth over lake-covered area (m).
+   lake_area_ml(land_pts,nsurft),                                            &
+    ! lake area (m2) from volume area scaling
+   rho_snow_ml(land_pts,nsurft,nsmax_ml)
+    ! Snow layer densities for meltlake(kg/m3).
 
-!-----------------------------------------------------------------------------
+   !-----------------------------------------------------------------------------
 ! Array arguments with intent(out)
 !-----------------------------------------------------------------------------
 REAL(KIND=real_jlslsm), INTENT(OUT) ::                                       &
-   rho_snow_ml(land_pts,nsurft,nsmax_ml),                                    &
+   !rho_snow_ml(land_pts,nsurft,nsmax_ml),                                    &
     ! Snow layer densities for meltlake(kg/m3).
    dhdt_lid_lake_ml(land_pts,nsurft)
     ! Stefan boundary movement lid bottom and lake top (ms-1 ice equiv)
-
+   
 INTEGER, PARAMETER ::                                                        &
   lake_ml    = 9,                                                            &
    ! Melt-lake tile index.
@@ -262,6 +263,10 @@ LOGICAL, INTENT(IN OUT) ::                                                    &
  snow_on_lid(land_pts,nsurft)
 
 !TYPE(wtrac_sn_type) :: wtrac_sn         ! Water tracer working arrays
+REAL(KIND=real_jlslsm) ::                                                    &
+  frac_lake_old(land_pts)
+! Lake tile fraction before area adjustment, used to conserve
+   ! snow mass and energy when frac changes.
 
 !-----------------------------------------------------------------------------
 ! Local scalars
@@ -299,6 +304,27 @@ DO n = 1,nsurft
       sice0_wtrac(:,:)  = 0.0
       sice_wtrac(:,n,:) = 0.0
       sliq_wtrac(:,n,:) = 0.0
+
+
+!-----------------------------------------------------------------------------
+! Add lateral runoff from non-lake tile to exposed lake before lid evolution
+!-----------------------------------------------------------------------------
+
+     ! DO k = 1, surft_pts(n)
+
+      !   i = surft_index(k,n)
+
+       !  IF (exposed_water(i,lake_ml) .AND.                 &
+       !      frac(i,lake_ml) > 0.0) THEN
+
+     !       lake_depth_ml(i,lake_ml) = lake_depth_ml(i,lake_ml) &
+     !            + frac(i,nonlake_ml) / frac(i,lake_ml) &
+     !            * lake_inflow(i,nonlake_ml) / rho_water
+
+        ! END IF
+
+      !END DO
+
 
 !-----------------------------------------------------------------------------
 ! grow or melt the lid
@@ -340,29 +366,37 @@ DO n = 1,nsurft
 ! Only calculate Grau for the melt-lake tile.
 !-----------------------------------------------------------------------------
 
-      IF (n == lake_ml) THEN
+      frac_lake_old(:) = frac(:,lake_ml)
 
-         CALL expand_area(                                   &
-              land_pts,                                      &
-              nsurft,                                        &
-              surft_pts(n),                                  &
-              surft_index(:,n),                              &
-              frac,                                          &
-              lake_inflow,                                   &
-              dhdt_lake_snow_ml,                             &
-              lid_rain_water_ml,                             &
-              lid_snowmelt_water_ml,                         &
-              lake_depth_ml,                                 &
-              grau_water_supply_ml,                          &
-              grau_mean_lake_depth_ml,                       &
-              exposed_water,                                 &
-              has_lid,                                       &
-              has_vlid,                                      &
-              has_lake,                                      &
-              did_insert_lid)
-
-      END IF
-
+      CALL expand_area(                  &
+           land_pts,                     &
+           nsurft,                       &
+           surft_pts(n),                 &
+           surft_index(:,n),             &
+           exposed_water(:,n),           &
+           frac,                         &
+           lake_depth_ml(:,n),           &
+           lake_area_ml(:,n))
+         
+       
+      CALL conserve_snowpack_frac(       &
+           land_pts,                     &
+           nsurft,                       &
+           surft_pts(n),                 &
+           surft_index(:,n),             &
+           frac_lake_old,                &
+           frac,                         &
+           nsnow,                        &
+           ice_lens_index,               &
+           sice_ml,                      &
+           sliq_ml,                      &
+           tsnow_ml,                     &
+           ds_ml,                        &
+           snowdepth,                    &
+           snow_surft,                   &
+           rho_snow_ml,                  &
+           rho_snow_grnd)
+      
 
       IF (ANY(did_insert_lid(surft_index(1:surft_pts(n),n),n))) THEN
 
@@ -502,6 +536,7 @@ DO n = 1,nsurft
                lid_snow_temp_ml(i,n)  = tm
 
                lake_state_ml(i,n)     = 0
+               lake_area_ml(i,n)      = 0.0
                has_lake(i,n)          = .false.
                exposed_water(i,n)     = .false.
                has_lid(i,n)           = .false.

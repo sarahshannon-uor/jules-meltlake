@@ -2747,12 +2747,8 @@ CASE ( 'lid_ice_meltwater_ml' )
   cube_land = cube_from_array(meltlake_vars%lid_ice_meltwater_ml)
   cube = map_from_land(cube_land)
 
-CASE ( 'grau_mean_lake_depth_ml' )
-  cube_land = cube_from_array(meltlake_vars%grau_mean_lake_depth_ml)
-  cube = map_from_land(cube_land)
-
-CASE ( 'grau_water_supply_ml' )
-  cube_land = cube_from_array(meltlake_vars%grau_water_supply_ml)
+CASE ( 'lake_area_ml' )
+  cube_land = cube_from_array(meltlake_vars%lake_area_ml)
   cube = map_from_land(cube_land)
 
 CASE ( 'rflow' )
