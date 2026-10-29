@@ -74,17 +74,21 @@ SUBROUTINE lid_update(land_pts,               & !IN
                       lid_rain_water_ml,      & !IN/OUT
                       dhdt_lake_snow_ml,      & !IN
                       lake_inflow,            & !IN
-                      ice_lens_index,         & !IN
+                      ice_lens_index,         & !IN/OUT
+                      ice_lens_depth,         & !IN/OUT
                       ei_surft_ml,            & !IN/OUT
                       lake_area_ml,           & !OUT
+                      sice_imbal_ml,          & !IN/OUT
+                      sliq_imbal_ml,          & !IN/OUT
+                      en_imbal_ml,            & !IN/OUT
                       l_lice_point,           & !IN (land_pts)
                       l_lice_surft)             !IN (ntype)
 
 
-USE lid_evolve_mod,              ONLY: lid_evolve
-USE expand_area_mod,             ONLY: expand_area
-USE conserve_snowpack_frac_mod,  ONLY: conserve_snowpack_frac
-USE relayersnow_mod,             ONLY: relayersnow
+USE lid_evolve_mod,          ONLY: lid_evolve
+USE expand_area_mod,         ONLY: expand_area
+USE merge_snowpacks_mod,     ONLY: merge_snowpacks
+USE relayersnow_mod,         ONLY: relayersnow
 
 USE jules_surface_types_mod, ONLY: ntype
 USE jules_surface_mod,       ONLY: l_elev_land_ice
@@ -130,9 +134,10 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                        &
     ! Melt flux from the upper surface of bare lake ice (kg/m/s)
   dhdt_lake_snow_ml(land_pts,nsurft),                                        &
     ! Lake-snow Stefan boundary movement (m ice equivalent per timestep).
-  lake_inflow(land_pts,nsurft),                                              &
+  lake_inflow(land_pts,nsurft)
     ! Water supplied from snow/firn hydrology (kg m-2).
-  ice_lens_index(land_pts,nsurft)
+  
+  
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(in)
 !-----------------------------------------------------------------------------
@@ -204,9 +209,19 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                    &
      ! tile frac
    lake_area_ml(land_pts,nsurft),                                            &
     ! lake area (m2) from volume area scaling
-   rho_snow_ml(land_pts,nsurft,nsmax_ml)
+   rho_snow_ml(land_pts,nsurft,nsmax_ml),                                    &
     ! Snow layer densities for meltlake(kg/m3).
-
+   sice_imbal_ml(land_pts),                                                  &
+    ! Cumulative compensating snow ice mass adjustment (kg m-2 gridbox).
+   sliq_imbal_ml(land_pts),                                                  &
+    ! Cumulative compensating snow liquid water mass adjustment (kg m-2 gridbox).
+   en_imbal_ml(land_pts),                                                    &
+    ! Cumulative compensating snowpack enthalpy adjustment (J m-2 gridbox).
+   ice_lens_index(land_pts,nsurft),                                          &
+    ! Snow layer that ice lens is located in
+  ice_lens_depth(land_pts,nsurft)
+    ! Lens depth from surface (m)
+   
    !-----------------------------------------------------------------------------
 ! Array arguments with intent(out)
 !-----------------------------------------------------------------------------
@@ -278,8 +293,6 @@ INTEGER ::                                                                    &
     ! Tile pts loop counter.
   k,                                                                          &
     ! Tile number.
-  n,                                                                          &
-    ! Tile loop counter.
   ns
 
 !-----------------------------------------------------------------------------
@@ -296,263 +309,353 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='LID_UPDATE'
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
-DO n = 1,nsurft
-
-   IF (l_elev_land_ice .AND. l_lice_surft(n) .AND.        &
-       surft_pts(n) > 0 .AND. n == lake_ml) THEN
-
-      sice0_wtrac(:,:)  = 0.0
-      sice_wtrac(:,n,:) = 0.0
-      sliq_wtrac(:,n,:) = 0.0
-
-
+IF (l_elev_land_ice .AND. l_lice_surft(lake_ml) .AND. &
+    surft_pts(lake_ml) > 0) THEN
+        
 !-----------------------------------------------------------------------------
-! Add lateral runoff from non-lake tile to exposed lake before lid evolution
+! Add lateral runoff from nonlake tile to lake before lid evolution. 
+! Laternal water transport is only allowed if there is exposed water
 !-----------------------------------------------------------------------------
+   DO k = 1, surft_pts(lake_ml)
 
-     ! DO k = 1, surft_pts(n)
+      i = surft_index(k,lake_ml)
 
-      !   i = surft_index(k,n)
+      IF (exposed_water(i,lake_ml) .AND.                     &
+           frac(i,lake_ml) > 0.0) THEN
 
-       !  IF (exposed_water(i,lake_ml) .AND.                 &
-       !      frac(i,lake_ml) > 0.0) THEN
+         !lake_depth_ml(i,lake_ml) = lake_depth_ml(i,lake_ml) &
+         !     + frac(i,nonlake_ml) / frac(i,lake_ml)         &
+         !     * lake_inflow(i,nonlake_ml) / rho_water
 
-     !       lake_depth_ml(i,lake_ml) = lake_depth_ml(i,lake_ml) &
-     !            + frac(i,nonlake_ml) / frac(i,lake_ml) &
-     !            * lake_inflow(i,nonlake_ml) / rho_water
+      END IF
 
-        ! END IF
-
-      !END DO
-
+   END DO
 
 !-----------------------------------------------------------------------------
 ! grow or melt the lid
 !-----------------------------------------------------------------------------
-
-      CALL lid_evolve(land_pts,           &
-           timestep,                      &
-           surft_pts(n),                  &
-           surft_index(:,n),              &
-           tstar_surft(:,n),              &
-           ls_snow,                       &
-           con_snow,                      &
-           ls_rain,                       &
-           con_rain,                      &
-           lake_temp_ml(:,n),             &
-           lake_depth_ml(:,n),            &
-           lid_temp_ml(:,n),              &
-           lid_depth_ml(:,n),             &
-           vlid_depth_ml(:,n),            &
-           has_lake(:,n),                 &
-           exposed_water(:,n),            &
-           has_lid(:,n),                  &
-           has_vlid(:,n),                 &
-           did_insert_lid(:,n),           &
-           snow_on_lid(:,n),              &
-           lid_snow_melt_flux_ml(:,n),    &
-           lake_state_ml(:,n),            &
-           dhdt_lid_lake_ml(:,n),         &
-           lid_snow_depth_ml(:,n),        &
-           lid_snow_temp_ml(:,n),         &
-           lid_snowmelt_water_ml(:,n),    &
-           lid_ice_melt_flux_ml(:,n),     &
-           lid_ice_meltwater_ml(:,n),     &
-           ei_surft_ml(:,n))
-
-
-!-----------------------------------------------------------------------------
-! Use cumulative water supply to expand lake area.
-! Only calculate Grau for the melt-lake tile.
-!-----------------------------------------------------------------------------
-
-      frac_lake_old(:) = frac(:,lake_ml)
-
-      CALL expand_area(                  &
-           land_pts,                     &
-           nsurft,                       &
-           surft_pts(n),                 &
-           surft_index(:,n),             &
-           exposed_water(:,n),           &
-           frac,                         &
-           lake_depth_ml(:,n),           &
-           lake_area_ml(:,n))
-         
-       
-      CALL conserve_snowpack_frac(       &
-           land_pts,                     &
-           nsurft,                       &
-           surft_pts(n),                 &
-           surft_index(:,n),             &
-           frac_lake_old,                &
-           frac,                         &
-           nsnow,                        &
-           ice_lens_index,               &
-           sice_ml,                      &
-           sliq_ml,                      &
-           tsnow_ml,                     &
-           ds_ml,                        &
-           snowdepth,                    &
-           snow_surft,                   &
-           rho_snow_ml,                  &
-           rho_snow_grnd)
+   CALL lid_evolve(land_pts,                        &
+        timestep,                                   &
+        surft_pts(lake_ml),                         &
+        surft_index(:,lake_ml),                     &
+        tstar_surft(:,lake_ml),                     &
+        ls_snow,                                    &
+        con_snow,                                   &
+        ls_rain,                                    &
+        con_rain,                                   &
+        lake_temp_ml(:,lake_ml),                    &
+        lake_depth_ml(:,lake_ml),                   &
+        lid_temp_ml(:,lake_ml),                     &
+        lid_depth_ml(:,lake_ml),                    &
+        vlid_depth_ml(:,lake_ml),                   &
+        has_lake(:,lake_ml),                        &
+        exposed_water(:,lake_ml),                   &
+        has_lid(:,lake_ml),                         &
+        has_vlid(:,lake_ml),                        &
+        did_insert_lid(:,lake_ml),                  &
+        snow_on_lid(:,lake_ml),                     &
+        lid_snow_melt_flux_ml(:,lake_ml),           &
+        lake_state_ml(:,lake_ml),                   &
+        dhdt_lid_lake_ml(:,lake_ml),                &
+        lid_snow_depth_ml(:,lake_ml),               &
+        lid_snow_temp_ml(:,lake_ml),                &
+        lid_snowmelt_water_ml(:,lake_ml),           &
+        lid_ice_melt_flux_ml(:,lake_ml),            &
+        lid_ice_meltwater_ml(:,lake_ml),            &
+        ei_surft_ml(:,lake_ml))
+   
       
+!-----------------------------------------------------------------------------
+! Use volume area scaling to expand lake area and modify lake frac 
+! and nonlake frac
+!-----------------------------------------------------------------------------
 
-      IF (ANY(did_insert_lid(surft_index(1:surft_pts(n),n),n))) THEN
-
-         print *, '------------------------------------------------------------'
-         print *, ':-)  Inserting lid ice into snowpack '
-         print *, '------------------------------------------------------------'
-
-         snowfall(:)       = 0.0
-         sice0(:)          = 0.0
-         rho0(:)           = rho_ice
-         tsnow0(:)         = tm
-         rgrain0(:)        = 2000.0
-         sice0_wtrac(:,:)  = 0.0
-
-         DO j = 1, surft_pts(n)
-            i = surft_index(j,n)
-
-            IF (did_insert_lid(i,n)) THEN
-
-               sice0(i)   = rho_ice * lid_depth_ml(i,n)
-               rho0(i)    = rho_ice
-               tsnow0(i)  = lid_temp_ml(i,n)
-               rgrain0(i) = 2000.0
-
-               snow_surft(i,n) = snow_surft(i,n) + sice0(i)
-
-            END IF
-
-         END DO
-
-         CALL relayersnow(                                      &
-              land_pts,                                         &
-              surft_pts(n),                                     &
-              n_wtrac_jls,                                      &
-              surft_index(:,n),                                 &
-              nsmax_ml,                                         &
-              dzsnow_ml,                                        &
-              rgrain0,                                          &
-              rho0,                                             &
-              sice0,                                            &
-              snowfall,                                         &
-              snow_surft(:,n),                                  &
-              tsnow0,                                           &
-              sice0_wtrac,                                      &
-              nsnow(:,n),                                       &
-              ds_ml(:,n,:),                                     &
-              rgrain(:,n),                                      &
-              rgrainl_ml(:,n,:),                                &
-              sice_ml(:,n,:),                                   &
-              rho_snow_grnd(:,n),                               &
-              sliq_ml(:,n,:),                                   &
-              tsnow_ml(:,n,:),                                  &
-              sice_wtrac(:,n,:),                                &
-              sliq_wtrac(:,n,:),                                &
-              rho_snow_ml(:,n,:),                               &
-              snowdepth(:,n) )
-
-         print *, '------------------------------------------------------------'
-         print *, ':-)  Inserting snow on lid into snowpack '
-         print *, '------------------------------------------------------------'
+   !CALL expand_area(                       &
+   !     land_pts,                          &
+   !     nsurft,                            &
+   !     surft_pts(lake_ml),                &
+   !     surft_index(:,lake_ml),            &
+   !     nsnow,                             &
+   !     sice_ml,                           &
+   !     sliq_ml,                           &
+   !     tsnow_ml,                          &
+   !     exposed_water(:,lake_ml),         &
+   !     frac,                              &
+   !     lake_depth_ml(:,lake_ml),          &
+   !     lake_area_ml(:,lake_ml),           &
+   !     sice_imbal_ml,                     &
+   !     sliq_imbal_ml,                     &
+   !     en_imbal_ml)
+   
 
 
-         snowfall(:)       = 0.0
-         sice0(:)          = 0.0
-         rho0(:)           = rho_snow_const
-         tsnow0(:)         = tm
-         rgrain0(:)        = r0
-         sice0_wtrac(:,:)  = 0.0
 
-         DO j = 1, surft_pts(n)
-            i = surft_index(j,n)
+IF (ANY(did_insert_lid(surft_index(1:surft_pts(lake_ml),lake_ml),lake_ml))) THEN
 
-            IF (did_insert_lid(i,n) .AND.                         &
-                 lid_snow_depth_ml(i,n) > 0.0) THEN
+   print *, '------------------------------------------------------------'
+   print *, ':-)  Inserting lid ice into snowpack '
+   print *, '------------------------------------------------------------'
 
-               sice0(i) = rho_snow_const *                        &
-                    lid_snow_depth_ml(i,n)
+   snowfall(:)       = 0.0
+   sice0(:)          = 0.0
+   rho0(:)           = rho_ice
+   tsnow0(:)         = tm
+   rgrain0(:)        = 2000.0
+   sice0_wtrac(:,:)  = 0.0
+   
 
-               rho0(i)    = rho_snow_const
-               tsnow0(i)  = lid_snow_temp_ml(i,n)
-               rgrain0(i) = r0
+   DO j = 1, surft_pts(lake_ml)
+      i = surft_index(j,lake_ml)
 
-               snow_surft(i,n) = snow_surft(i,n) + sice0(i)
+      IF (did_insert_lid(i,lake_ml)) THEN
 
-            END IF
+         sice0(i)   = rho_ice * lid_depth_ml(i,lake_ml)
+         rho0(i)    = rho_ice
+         tsnow0(i)  = lid_temp_ml(i,lake_ml)
+         rgrain0(i) = 2000.0
 
-         END DO
-
-         IF (ANY(sice0(surft_index(1:surft_pts(n),n)) > 0.0)) THEN
-
-            CALL relayersnow(                                    &
-                 land_pts,                                       &
-                 surft_pts(n),                                   &
-                 n_wtrac_jls,                                    &
-                 surft_index(:,n),                               &
-                 nsmax_ml,                                       &
-                 dzsnow_ml,                                      &
-                 rgrain0,                                        &
-                 rho0,                                           &
-                 sice0,                                          &
-                 snowfall,                                       &
-                 snow_surft(:,n),                                &
-                 tsnow0,                                         &
-                 sice0_wtrac,                                    &
-                 nsnow(:,n),                                     &
-                 ds_ml(:,n,:),                                   &
-                 rgrain(:,n),                                    &
-                 rgrainl_ml(:,n,:),                              &
-                 sice_ml(:,n,:),                                 &
-                 rho_snow_grnd(:,n),                             &
-                 sliq_ml(:,n,:),                                 &
-                 tsnow_ml(:,n,:),                                &
-                 sice_wtrac(:,n,:),                              &
-                 sliq_wtrac(:,n,:),                              &
-                 rho_snow_ml(:,n,:),                             &
-                 snowdepth(:,n) )
-
-         END IF
-
-         !----------------------------------------------------------------
-         ! Clear lake and lid states after both insertions
-         !----------------------------------------------------------------
-
-         DO j = 1, surft_pts(n)
-            i = surft_index(j,n)
-
-            IF (did_insert_lid(i,n)) THEN
-
-               did_insert_lid(i,n)    = .false.
-
-               lake_depth_ml(i,n)     = 0.0
-               lid_depth_ml(i,n)      = 0.0
-               vlid_depth_ml(i,n)     = 0.0
-               lid_temp_ml(i,n)       = tm
-
-               lid_snow_depth_ml(i,n) = 0.0
-               lid_snow_temp_ml(i,n)  = tm
-
-               lake_state_ml(i,n)     = 0
-               lake_area_ml(i,n)      = 0.0
-               has_lake(i,n)          = .false.
-               exposed_water(i,n)     = .false.
-               has_lid(i,n)           = .false.
-               has_vlid(i,n)          = .false.
-
-               snow_on_lid(i,n)       = .false.
-
-            END IF
-
-         END DO
+         snow_surft(i,lake_ml) = snow_surft(i,lake_ml) + sice0(i)
 
       END IF
 
+   END DO
+
+   CALL relayersnow(                                      &
+        land_pts,                                         &
+        surft_pts(lake_ml),                               &
+        n_wtrac_jls,                                      &
+        surft_index(:,lake_ml),                           &
+        nsmax_ml,                                         &
+        dzsnow_ml,                                        &
+        rgrain0,                                          &
+        rho0,                                             &
+        sice0,                                            &
+        snowfall,                                         &
+        snow_surft(:,lake_ml),                            &
+        tsnow0,                                           &
+        sice0_wtrac,                                      &
+        nsnow(:,lake_ml),                                 &
+        ds_ml(:,lake_ml,:),                               &
+        rgrain(:,lake_ml),                                &
+        rgrainl_ml(:,lake_ml,:),                          &
+        sice_ml(:,lake_ml,:),                             &
+        rho_snow_grnd(:,lake_ml),                         &
+        sliq_ml(:,lake_ml,:),                             &
+        tsnow_ml(:,lake_ml,:),                            &
+        sice_wtrac,                          &
+        sliq_wtrac,                          &
+        rho_snow_ml(:,lake_ml,:),                         &
+        snowdepth(:,lake_ml) )
+
+   
+   print *, '------------------------------------------------------------'
+   print *, ':-)  Inserting snow on lid into snowpack '
+   print *, '------------------------------------------------------------'
+
+
+   snowfall(:)       = 0.0
+   sice0(:)          = 0.0
+   rho0(:)           = rho_snow_const
+   tsnow0(:)         = tm
+   rgrain0(:)        = r0
+   sice0_wtrac(:,:)  = 0.0
+
+   DO j = 1, surft_pts(lake_ml)
+      i = surft_index(j,lake_ml)
+
+      IF (did_insert_lid(i,lake_ml) .AND.                 &
+           lid_snow_depth_ml(i,lake_ml) > 0.0) THEN
+
+         sice0(i) = rho_snow_const *                      &
+              lid_snow_depth_ml(i,lake_ml)
+
+         rho0(i)    = rho_snow_const
+         tsnow0(i)  = lid_snow_temp_ml(i,lake_ml)
+         rgrain0(i) = r0
+
+         snow_surft(i,lake_ml) = snow_surft(i,lake_ml) + sice0(i)
+         
+      END IF
+
+   END DO
+
+   IF (ANY(sice0(surft_index(1:surft_pts(lake_ml),lake_ml)) > 0.0)) THEN
+      
+      CALL relayersnow(                                    &
+           land_pts,                                       &
+           surft_pts(lake_ml),                             &
+           n_wtrac_jls,                                    &
+           surft_index(:,lake_ml),                         &
+           nsmax_ml,                                       &
+           dzsnow_ml,                                      &
+           rgrain0,                                        &
+           rho0,                                           &
+           sice0,                                          &
+           snowfall,                                       &
+           snow_surft(:,lake_ml),                          &
+           tsnow0,                                         &
+           sice0_wtrac,                                    &
+           nsnow(:,lake_ml),                               &
+           ds_ml(:,lake_ml,:),                             &
+           rgrain(:,lake_ml),                              &
+           rgrainl_ml(:,lake_ml,:),                        &
+           sice_ml(:,lake_ml,:),                           &
+           rho_snow_grnd(:,lake_ml),                       &
+           sliq_ml(:,lake_ml,:),                           &
+           tsnow_ml(:,lake_ml,:),                          &
+           sice_wtrac,                        &
+           sliq_wtrac,                        &
+           rho_snow_ml(:,lake_ml,:),                       &
+           snowdepth(:,lake_ml) )
+      
    END IF
 
-END DO
+!----------------------------------------------------------------
+! Lake is gone. This is the time to adjust the snowpack variables
+! to conserve mass and enthalpy caused by changing frac. 
+! Up until now these gridbox imbalances have been accumulinating
+! Merge snowpack for lake+nonlake tile, apply imbalance
+! correction. Set merged tile to nonlake tile
+!----------------------------------------------------------------
+   !CALL merge_snowpacks(                 &
+   !     land_pts,                        &
+   !     nsurft,                          &
+   !     surft_pts(lake_ml),              &
+   !     surft_index(:,lake_ml),          &
+   !     did_insert_lid(:,lake_ml),       &
+   !     frac,                            &
+   !     nsnow,                           &
+   !     sice_ml,                         &
+   !     sliq_ml,                         &
+   !     tsnow_ml,                        &
+   !     ds_ml,                           &
+   !     snowdepth,                       &
+   !     snow_surft,                      &
+   !     sice_imbal_ml,                   &
+   !     sliq_imbal_ml,                   &
+   !     en_imbal_ml)
+
+
+
+!-----------------------------------------------------------------------
+! Relayer merged snowpack on the nonlake tile
+! No additional snow or ice is inserted.
+!-----------------------------------------------------------------------
+
+   !snowfall(:)       = 0.0
+   !sice0(:)          = 0.0
+   !rho0(:)           = rho_snow_const
+   !tsnow0(:)         = tm
+   !rgrain0(:)        = r0
+   !sice0_wtrac(:,:)  = 0.0
+   
+   !CALL relayersnow(                                      &
+   !     land_pts,                                         &
+   !     surft_pts(nonlake_ml),                            &
+   !     n_wtrac_jls,                                      &
+   !     surft_index(:,nonlake_ml),                        &
+   !     nsmax_ml,                                         &
+   !     dzsnow_ml,                                        &
+   !     rgrain0,                                          &
+    !    rho0,                                             &
+    !    sice0,                                            &
+    !    snowfall,                                         &
+    !    snow_surft(:,nonlake_ml),                         &
+    !    tsnow0,                                           &
+    !    sice0_wtrac,                                      &
+     !   nsnow(:,nonlake_ml),                              &
+     !   ds_ml(:,nonlake_ml,:),                            &
+     !   rgrain(:,nonlake_ml),                             &
+     !   rgrainl_ml(:,nonlake_ml,:),                       &
+      !  sice_ml(:,nonlake_ml,:),                          &
+      !  rho_snow_grnd(:,nonlake_ml),                      &
+      !  sliq_ml(:,nonlake_ml,:),                          &
+      !  tsnow_ml(:,nonlake_ml,:),                         &
+       ! sice_wtrac,                                       &
+       ! sliq_wtrac,                                       &
+       ! rho_snow_ml(:,nonlake_ml,:),                      &
+       ! snowdepth(:,nonlake_ml) )
+         
+
+!-----------------------------------------------------------------------
+! Copy the merged and relayered nonlake snowpack to the lake tile.
+! Both tiles have the same snowpack after complete freeze over.
+!-----------------------------------------------------------------------
+
+   !DO j = 1, surft_pts(lake_ml)
+      
+    !  i = surft_index(j,lake_ml)
+
+     ! IF (did_insert_lid(i,lake_ml)) THEN
+
+      !   nsnow(i,lake_ml)          = nsnow(i,nonlake_ml)
+
+       !  sice_ml(i,lake_ml,:)      = sice_ml(i,nonlake_ml,:)
+       !  sliq_ml(i,lake_ml,:)      = sliq_ml(i,nonlake_ml,:)
+       !  tsnow_ml(i,lake_ml,:)     = tsnow_ml(i,nonlake_ml,:)
+       !  ds_ml(i,lake_ml,:)        = ds_ml(i,nonlake_ml,:)
+
+        ! rho_snow_ml(i,lake_ml,:)  = rho_snow_ml(i,nonlake_ml,:)
+        ! rho_snow_grnd(i,lake_ml)  = rho_snow_grnd(i,nonlake_ml)
+
+         !rgrainl_ml(i,lake_ml,:)   = rgrainl_ml(i,nonlake_ml,:)
+         !rgrain(i,lake_ml)         = rgrain(i,nonlake_ml)
+
+         !snowdepth(i,lake_ml)      = snowdepth(i,nonlake_ml)
+         !snow_surft(i,lake_ml)     = snow_surft(i,nonlake_ml)
+
+      !END IF
+
+   !END DO
+   
+ !----------------------------------------------------------------
+ ! Clear lake and lid states after both insertions
+ !----------------------------------------------------------------
+
+   DO j = 1, surft_pts(lake_ml)
+      i = surft_index(j,lake_ml)
+
+      IF (did_insert_lid(i,lake_ml)) THEN
+
+         did_insert_lid(i,lake_ml)    = .FALSE.
+
+         lake_depth_ml(i,lake_ml)     = 0.0
+         lid_depth_ml(i,lake_ml)      = 0.0
+         vlid_depth_ml(i,lake_ml)     = 0.0
+         lid_temp_ml(i,lake_ml)       = tm
+
+         lid_snow_depth_ml(i,lake_ml) = 0.0
+         lid_snow_temp_ml(i,lake_ml)  = tm
+
+         lake_state_ml(i,lake_ml)     = 0
+         lake_area_ml(i,lake_ml)      = 0.0
+         has_lake(i,lake_ml)          = .FALSE.
+         exposed_water(i,lake_ml)     = .FALSE.
+         has_lid(i,lake_ml)           = .FALSE.
+         has_vlid(i,lake_ml)          = .FALSE.
+
+         snow_on_lid(i,lake_ml)       = .FALSE.
+
+    !     frac(i,lake_ml)              = 0.0
+    !     frac(i,nonlake_ml)           = 1.0
+
+         sice_imbal_ml(i)             = 0.0
+         sliq_imbal_ml(i)             = 0.0
+         en_imbal_ml(i)               = 0.0
+
+         ice_lens_depth(i,lake_ml)    = -1.0
+         ice_lens_index(i,lake_ml)    = -1.0
+
+         ice_lens_depth(i,nonlake_ml) = -1.0
+         ice_lens_index(i,nonlake_ml) = -1.0
+
+      END IF
+
+   END DO
+
+END IF ! ANY(did_insert_lid)
+
+END IF ! elevated lake ice tile
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 

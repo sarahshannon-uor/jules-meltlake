@@ -998,8 +998,12 @@ CASE ( jules )
             meltlake_vars%dhdt_lake_snow_ml,             &
             meltlake_vars%lake_inflow,                   &
             meltlake_vars%ice_lens_index,                &
+            meltlake_vars%ice_lens_depth,                &
             meltlake_vars%ei_surft_ml,                   &
             meltlake_vars%lake_area_ml,                  &
+            meltlake_vars%sice_imbal_ml,                 &
+            meltlake_vars%sliq_imbal_ml,                 &
+            meltlake_vars%en_imbal_ml,                   &
             ainfo%l_lice_point,                          &
             ainfo%l_lice_surft)
        

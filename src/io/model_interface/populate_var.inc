@@ -2148,6 +2148,32 @@ CASE ( 'lake_area_ml' )
     meltlake_vars%lake_area_ml(:,:) = const_val
   END IF
 
+CASE ( 'sice_imbal_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, meltlake_vars%sice_imbal_ml)
+  ELSE
+    meltlake_vars%sice_imbal_ml(:) = const_val
+  END IF
+
+CASE ( 'sliq_imbal_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, meltlake_vars%sliq_imbal_ml)
+  ELSE
+    meltlake_vars%sliq_imbal_ml(:) = const_val
+  END IF
+
+CASE ( 'en_imbal_ml' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, meltlake_vars%en_imbal_ml)
+  ELSE
+    meltlake_vars%en_imbal_ml(:) = const_val
+  END IF
+
+
+
 CASE ( 'f_nsc' )
   IF ( PRESENT(cube) ) THEN
     cube_land = map_to_land(cube)

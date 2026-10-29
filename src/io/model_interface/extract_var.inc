@@ -2751,6 +2751,18 @@ CASE ( 'lake_area_ml' )
   cube_land = cube_from_array(meltlake_vars%lake_area_ml)
   cube = map_from_land(cube_land)
 
+CASE ( 'sice_imbal_ml' )
+  cube_land = cube_from_array(meltlake_vars%sice_imbal_ml)
+  cube = map_from_land(cube_land)
+
+CASE ( 'sliq_imbal_ml' )
+  cube_land = cube_from_array(meltlake_vars%sliq_imbal_ml)
+  cube = map_from_land(cube_land)
+
+CASE ( 'en_imbal_ml' )
+  cube_land = cube_from_array(meltlake_vars%en_imbal_ml)
+  cube = map_from_land(cube_land)
+
 CASE ( 'rflow' )
   cube_land = cube_from_array(fluxes%rflow_gb)
   cube = map_from_land(cube_land)

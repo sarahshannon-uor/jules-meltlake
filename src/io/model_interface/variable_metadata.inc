@@ -9736,4 +9736,43 @@ DATA metadata(751) / var_metadata(                                             &
 ! Units
     "m2"                                                                       &
  ) /
+!-----------------------------------------------------------------------------
+!! Metadata for cumulative snow ice mass adjustment
+!!-----------------------------------------------------------------------------
+DATA metadata(752) / var_metadata(                                             &
+! String identifier
+    'sice_imbal_ml',                                                           &
+! Variable type
+    var_type_surface,                                                          &
+! Long name
+    "Accumulated gridbox mean ice mass imbalance",                             &
+! Units
+    "kg m-2"                                                                   &
+ ) /
+!-----------------------------------------------------------------------------
+!! Metadata for cumulative snow liquid water mass adjustment
+!!-----------------------------------------------------------------------------
+DATA metadata(753) / var_metadata(                                             &
+! String identifier
+    'sliq_imbal_ml',                                                           &
+! Variable type
+    var_type_surface,                                                          &
+! Long name
+    "Accumulated gridbox mean liquid mass imbalance",                          &
+! Units
+    "kg m-2"                                                                   &
+ ) /
+!-----------------------------------------------------------------------------
+!! Metadata for cumulative snowpack enthalpy adjustment
+!!-----------------------------------------------------------------------------
+DATA metadata(754) / var_metadata(                                             &
+! String identifier
+    'en_imbal_ml',                                                             &
+! Variable type
+    var_type_surface,                                                          &
+! Long name
+    "Accumulated gridbox mean sensible energy imbalance",                    &
+! Units
+    "J m-2"                                                                    &
+ ) /
 #endif
