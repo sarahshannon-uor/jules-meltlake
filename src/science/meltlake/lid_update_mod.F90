@@ -298,8 +298,7 @@ INTEGER ::                                                                    &
 !-----------------------------------------------------------------------------
 ! Local arrays
 !-----------------------------------------------------------------------------
-!REAL(KIND=real_jlslsm) ::                                                     &
-!   dh(land_pts,nsurft)
+LOGICAL, PARAMETER :: do_merge_snowpacks = .FALSE.
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -311,7 +310,8 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 IF (l_elev_land_ice .AND. l_lice_surft(lake_ml) .AND. &
     surft_pts(lake_ml) > 0) THEN
-        
+
+   
 !-----------------------------------------------------------------------------
 ! Add lateral runoff from nonlake tile to lake before lid evolution. 
 ! Laternal water transport is only allowed if there is exposed water
@@ -323,9 +323,9 @@ IF (l_elev_land_ice .AND. l_lice_surft(lake_ml) .AND. &
       IF (exposed_water(i,lake_ml) .AND.                     &
            frac(i,lake_ml) > 0.0) THEN
 
-         !lake_depth_ml(i,lake_ml) = lake_depth_ml(i,lake_ml) &
-         !     + frac(i,nonlake_ml) / frac(i,lake_ml)         &
-         !     * lake_inflow(i,nonlake_ml) / rho_water
+         lake_depth_ml(i,lake_ml) = lake_depth_ml(i,lake_ml) &
+              + frac(i,nonlake_ml) / frac(i,lake_ml)         &
+              * lake_inflow(i,nonlake_ml) / rho_water
 
       END IF
 
@@ -370,22 +370,22 @@ IF (l_elev_land_ice .AND. l_lice_surft(lake_ml) .AND. &
 ! and nonlake frac
 !-----------------------------------------------------------------------------
 
-   !CALL expand_area(                       &
-   !     land_pts,                          &
-   !     nsurft,                            &
-   !     surft_pts(lake_ml),                &
-   !     surft_index(:,lake_ml),            &
-   !     nsnow,                             &
-   !     sice_ml,                           &
-   !     sliq_ml,                           &
-   !     tsnow_ml,                          &
-   !     exposed_water(:,lake_ml),         &
-   !     frac,                              &
-   !     lake_depth_ml(:,lake_ml),          &
-   !     lake_area_ml(:,lake_ml),           &
-   !     sice_imbal_ml,                     &
-   !     sliq_imbal_ml,                     &
-   !     en_imbal_ml)
+   CALL expand_area(                       &
+        land_pts,                          &
+        nsurft,                            &
+        surft_pts(lake_ml),                &
+        surft_index(:,lake_ml),            &
+        nsnow,                             &
+        sice_ml,                           &
+        sliq_ml,                           &
+        tsnow_ml,                          &
+        exposed_water(:,lake_ml),         &
+        frac,                              &
+        lake_depth_ml(:,lake_ml),          &
+        lake_area_ml(:,lake_ml),           &
+        sice_imbal_ml,                     &
+        sliq_imbal_ml,                     &
+        en_imbal_ml)
    
 
 
@@ -409,7 +409,10 @@ IF (ANY(did_insert_lid(surft_index(1:surft_pts(lake_ml),lake_ml),lake_ml))) THEN
 
       IF (did_insert_lid(i,lake_ml)) THEN
 
-         sice0(i)   = rho_ice * lid_depth_ml(i,lake_ml)
+         !sice0(i)   = rho_ice * lid_depth_ml(i,lake_ml)
+         sice0(i) = rho_ice * &
+              (lid_depth_ml(i,lake_ml) + vlid_depth_ml(i,lake_ml))
+         
          rho0(i)    = rho_ice
          tsnow0(i)  = lid_temp_ml(i,lake_ml)
          rgrain0(i) = 2000.0
@@ -503,8 +506,8 @@ IF (ANY(did_insert_lid(surft_index(1:surft_pts(lake_ml),lake_ml),lake_ml))) THEN
            rho_snow_grnd(:,lake_ml),                       &
            sliq_ml(:,lake_ml,:),                           &
            tsnow_ml(:,lake_ml,:),                          &
-           sice_wtrac,                        &
-           sliq_wtrac,                        &
+           sice_wtrac,                                     &
+           sliq_wtrac,                                     &
            rho_snow_ml(:,lake_ml,:),                       &
            snowdepth(:,lake_ml) )
       
@@ -517,23 +520,25 @@ IF (ANY(did_insert_lid(surft_index(1:surft_pts(lake_ml),lake_ml),lake_ml))) THEN
 ! Merge snowpack for lake+nonlake tile, apply imbalance
 ! correction. Set merged tile to nonlake tile
 !----------------------------------------------------------------
-   !CALL merge_snowpacks(                 &
-   !     land_pts,                        &
-   !     nsurft,                          &
-   !     surft_pts(lake_ml),              &
-   !     surft_index(:,lake_ml),          &
-   !     did_insert_lid(:,lake_ml),       &
-   !     frac,                            &
-   !     nsnow,                           &
-   !     sice_ml,                         &
-   !     sliq_ml,                         &
-   !     tsnow_ml,                        &
-   !     ds_ml,                           &
-   !     snowdepth,                       &
-   !     snow_surft,                      &
-   !     sice_imbal_ml,                   &
-   !     sliq_imbal_ml,                   &
-   !     en_imbal_ml)
+   IF (do_merge_snowpacks) THEN
+      
+      CALL merge_snowpacks(                 &
+           land_pts,                        &
+           nsurft,                          &
+           surft_pts(lake_ml),              &
+           surft_index(:,lake_ml),          &
+           did_insert_lid(:,lake_ml),       &
+           frac,                            &
+           nsnow,                           &
+           sice_ml,                         &
+           sliq_ml,                         &
+           tsnow_ml,                        &
+           ds_ml,                           &
+           snowdepth,                       &
+           snow_surft,                      &
+           sice_imbal_ml,                   &
+           sliq_imbal_ml,                   &
+           en_imbal_ml)
 
 
 
@@ -542,39 +547,39 @@ IF (ANY(did_insert_lid(surft_index(1:surft_pts(lake_ml),lake_ml),lake_ml))) THEN
 ! No additional snow or ice is inserted.
 !-----------------------------------------------------------------------
 
-   !snowfall(:)       = 0.0
-   !sice0(:)          = 0.0
-   !rho0(:)           = rho_snow_const
-   !tsnow0(:)         = tm
-   !rgrain0(:)        = r0
-   !sice0_wtrac(:,:)  = 0.0
+      snowfall(:)       = 0.0
+      sice0(:)          = 0.0
+      rho0(:)           = rho_snow_const
+      tsnow0(:)         = tm
+      rgrain0(:)        = r0
+      sice0_wtrac(:,:)  = 0.0
    
-   !CALL relayersnow(                                      &
-   !     land_pts,                                         &
-   !     surft_pts(nonlake_ml),                            &
-   !     n_wtrac_jls,                                      &
-   !     surft_index(:,nonlake_ml),                        &
-   !     nsmax_ml,                                         &
-   !     dzsnow_ml,                                        &
-   !     rgrain0,                                          &
-    !    rho0,                                             &
-    !    sice0,                                            &
-    !    snowfall,                                         &
-    !    snow_surft(:,nonlake_ml),                         &
-    !    tsnow0,                                           &
-    !    sice0_wtrac,                                      &
-     !   nsnow(:,nonlake_ml),                              &
-     !   ds_ml(:,nonlake_ml,:),                            &
-     !   rgrain(:,nonlake_ml),                             &
-     !   rgrainl_ml(:,nonlake_ml,:),                       &
-      !  sice_ml(:,nonlake_ml,:),                          &
-      !  rho_snow_grnd(:,nonlake_ml),                      &
-      !  sliq_ml(:,nonlake_ml,:),                          &
-      !  tsnow_ml(:,nonlake_ml,:),                         &
-       ! sice_wtrac,                                       &
-       ! sliq_wtrac,                                       &
-       ! rho_snow_ml(:,nonlake_ml,:),                      &
-       ! snowdepth(:,nonlake_ml) )
+      CALL relayersnow(                                      &
+           land_pts,                                         &
+           surft_pts(nonlake_ml),                            &
+           n_wtrac_jls,                                      &
+           surft_index(:,nonlake_ml),                        &
+           nsmax_ml,                                         &
+           dzsnow_ml,                                        &
+           rgrain0,                                          &
+           rho0,                                             &
+           sice0,                                            &
+           snowfall,                                         &
+           snow_surft(:,nonlake_ml),                         &
+           tsnow0,                                           &
+           sice0_wtrac,                                      &
+           nsnow(:,nonlake_ml),                              &
+           ds_ml(:,nonlake_ml,:),                            &
+           rgrain(:,nonlake_ml),                             &
+           rgrainl_ml(:,nonlake_ml,:),                       &
+           sice_ml(:,nonlake_ml,:),                          &
+           rho_snow_grnd(:,nonlake_ml),                      &
+           sliq_ml(:,nonlake_ml,:),                          &
+           tsnow_ml(:,nonlake_ml,:),                         &
+           sice_wtrac,                                       &
+           sliq_wtrac,                                       &
+           rho_snow_ml(:,nonlake_ml,:),                      &
+           snowdepth(:,nonlake_ml) )
          
 
 !-----------------------------------------------------------------------
@@ -582,31 +587,33 @@ IF (ANY(did_insert_lid(surft_index(1:surft_pts(lake_ml),lake_ml),lake_ml))) THEN
 ! Both tiles have the same snowpack after complete freeze over.
 !-----------------------------------------------------------------------
 
-   !DO j = 1, surft_pts(lake_ml)
+      DO j = 1, surft_pts(lake_ml)
       
-    !  i = surft_index(j,lake_ml)
+         i = surft_index(j,lake_ml)
 
-     ! IF (did_insert_lid(i,lake_ml)) THEN
+         IF (did_insert_lid(i,lake_ml)) THEN
 
-      !   nsnow(i,lake_ml)          = nsnow(i,nonlake_ml)
+            nsnow(i,lake_ml)          = nsnow(i,nonlake_ml)
 
-       !  sice_ml(i,lake_ml,:)      = sice_ml(i,nonlake_ml,:)
-       !  sliq_ml(i,lake_ml,:)      = sliq_ml(i,nonlake_ml,:)
-       !  tsnow_ml(i,lake_ml,:)     = tsnow_ml(i,nonlake_ml,:)
-       !  ds_ml(i,lake_ml,:)        = ds_ml(i,nonlake_ml,:)
+            sice_ml(i,lake_ml,:)      = sice_ml(i,nonlake_ml,:)
+            sliq_ml(i,lake_ml,:)      = sliq_ml(i,nonlake_ml,:)
+            tsnow_ml(i,lake_ml,:)     = tsnow_ml(i,nonlake_ml,:)
+            ds_ml(i,lake_ml,:)        = ds_ml(i,nonlake_ml,:)
 
-        ! rho_snow_ml(i,lake_ml,:)  = rho_snow_ml(i,nonlake_ml,:)
-        ! rho_snow_grnd(i,lake_ml)  = rho_snow_grnd(i,nonlake_ml)
+            rho_snow_ml(i,lake_ml,:)  = rho_snow_ml(i,nonlake_ml,:)
+            rho_snow_grnd(i,lake_ml)  = rho_snow_grnd(i,nonlake_ml)
+            
+            rgrainl_ml(i,lake_ml,:)   = rgrainl_ml(i,nonlake_ml,:)
+            rgrain(i,lake_ml)         = rgrain(i,nonlake_ml)
+            
+            snowdepth(i,lake_ml)      = snowdepth(i,nonlake_ml)
+            snow_surft(i,lake_ml)     = snow_surft(i,nonlake_ml)
 
-         !rgrainl_ml(i,lake_ml,:)   = rgrainl_ml(i,nonlake_ml,:)
-         !rgrain(i,lake_ml)         = rgrain(i,nonlake_ml)
+         END IF
 
-         !snowdepth(i,lake_ml)      = snowdepth(i,nonlake_ml)
-         !snow_surft(i,lake_ml)     = snow_surft(i,nonlake_ml)
+      END DO
 
-      !END IF
-
-   !END DO
+   END IF ! do_merge_snowpack
    
  !----------------------------------------------------------------
  ! Clear lake and lid states after both insertions
@@ -617,7 +624,7 @@ IF (ANY(did_insert_lid(surft_index(1:surft_pts(lake_ml),lake_ml),lake_ml))) THEN
 
       IF (did_insert_lid(i,lake_ml)) THEN
 
-         did_insert_lid(i,lake_ml)    = .FALSE.
+!         did_insert_lid(i,lake_ml)    = .FALSE.
 
          lake_depth_ml(i,lake_ml)     = 0.0
          lid_depth_ml(i,lake_ml)      = 0.0
@@ -636,18 +643,22 @@ IF (ANY(did_insert_lid(surft_index(1:surft_pts(lake_ml),lake_ml),lake_ml))) THEN
 
          snow_on_lid(i,lake_ml)       = .FALSE.
 
-    !     frac(i,lake_ml)              = 0.0
-    !     frac(i,nonlake_ml)           = 1.0
+         frac(i,lake_ml)              = 0.0
+         frac(i,nonlake_ml)           = 1.0
 
-         sice_imbal_ml(i)             = 0.0
-         sliq_imbal_ml(i)             = 0.0
-         en_imbal_ml(i)               = 0.0
-
-         ice_lens_depth(i,lake_ml)    = -1.0
+         IF (do_merge_snowpacks) THEN
+            sice_imbal_ml(i)         = 0.0
+            sliq_imbal_ml(i)         = 0.0
+            en_imbal_ml(i)           = 0.0
+         END IF
+         
+         ! reset lens - this means percolate_monarche
+         ! will recalcualte lens depth after merge
+         ice_lens_depth(i,lake_ml)    = -1
          ice_lens_index(i,lake_ml)    = -1.0
 
          ice_lens_depth(i,nonlake_ml) = -1.0
-         ice_lens_index(i,nonlake_ml) = -1.0
+         ice_lens_index(i,nonlake_ml) = -1
 
       END IF
 

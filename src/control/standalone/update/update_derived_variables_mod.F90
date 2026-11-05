@@ -185,7 +185,7 @@ ELSE
     forcing%ls_snow_ij(:,:)  = precip_rel_perturbation * forcing%ls_snow_ij(:,:)
   END IF
 
-  l_ideal_forcing=.TRUE.
+  l_ideal_forcing=.FALSE.
 
         
   IF (l_ideal_forcing) THEN
@@ -210,14 +210,14 @@ IF (timestep_number <= 2502) THEN
 
 ELSE IF (timestep_number > 2502) THEN
    ! Buzzard-style imposed low forcing phase
-   forcing%tl_1_ij(:,:)     = 263.15
+   forcing%tl_1_ij(:,:)     = 253.15
    forcing%qw_1_ij(:,:)     = 0.0005
    forcing%con_rain_ij(:,:) = 0.0
    forcing%ls_rain_ij(:,:)  = 0.0
    forcing%con_snow_ij(:,:) = 0.0
    forcing%ls_snow_ij(:,:)  = 0.0
-   forcing%sw_down_ij(:,:)  = 50.0
-   forcing%lw_down_ij(:,:)  = 180.0
+   forcing%sw_down_ij(:,:)  = 10.0
+   forcing%lw_down_ij(:,:)  = 150.0
    forcing%u_0_ij(:,:)      = 2.0
    forcing%v_0_ij(:,:)      = 0.0
    u_1_ij(:,:)              = 2.0

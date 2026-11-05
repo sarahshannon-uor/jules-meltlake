@@ -9775,4 +9775,17 @@ DATA metadata(754) / var_metadata(                                             &
 ! Units
     "J m-2"                                                                    &
  ) /
+!-----------------------------------------------------------------------------
+!! Metadata for melt lake freeze-over flag
+!!-----------------------------------------------------------------------------
+DATA metadata(755) / var_metadata(                                             &
+! String identifier
+    'did_insert_lid',                                                          &
+! Variable type
+    var_type_surft,                                                            &
+! Long name
+    'Lake frozen over',                                                        &
+! Units
+    '1'                                                                        &
+ )/
 #endif

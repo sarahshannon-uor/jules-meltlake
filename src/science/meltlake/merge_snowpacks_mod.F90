@@ -119,7 +119,7 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                    &
 INTEGER, PARAMETER :: merge_unit = 99
 
 CHARACTER(LEN=*), PARAMETER :: &
-  merge_file = 'snowpack_merge_t6134.csv'
+  merge_file = 'snowpack_merges_all.csv'
 
 !-----------------------------------------------------------------------------
 ! Local scalars
@@ -132,8 +132,10 @@ INTEGER ::                                                                   &
     ! Lake tile point index.
   ns,                                                                        &
     ! Snow layer index.
-  nmerge
+  nmerge,                                                                    &
     ! Number of layers in the preliminary merged snowpack.
+  csv_size
+    ! CSV file size, used to write the header once.
 
 REAL(KIND=real_jlslsm) ::                                                    &
   sice_merge(nsmax_ml),                                                      &
@@ -159,6 +161,8 @@ REAL(KIND=real_jlslsm) ::                                                    &
   tsnow_merge(nsmax_ml),                                                     &
   en_lake, en_nonlake,                                                       &
   delta_t,                                                                   &
+  sice_factor, sliq_factor,                                                   &
+  sice_before, sliq_before, en_before,                                        &
   sice_error, sliq_error, en_error
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
@@ -177,7 +181,8 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,                         &
 !$OMP PRIVATE(k,i,ns,nmerge,sice_merge,sliq_merge,ds_merge,en_merge, &
 !$OMP         tsnow_merge,en_lake,en_nonlake, &
 !$OMP         sice_gridbox_total,sliq_gridbox_total,en_gridbox_total, &
-!$OMP         delta_t,sice_error,sliq_error,en_error)
+!$OMP         delta_t,sice_error,sliq_error,en_error, &
+!$OMP         sice_factor,sliq_factor,sice_before,sliq_before,en_before,csv_size)
 
 DO k = 1, surft_pts
 
@@ -186,48 +191,6 @@ DO k = 1, surft_pts
    IF (did_insert_lid(i)) THEN
 
       print *, 'did_insert_lid at timestep_number', timestep_number
-
-!-----------------------------------------------------------------------------
-! Write original snowpacks after lid insertion, before merging.
-!-----------------------------------------------------------------------------
-
-      !IF (timestep_number == 6134 .AND. k == 1) THEN
-
-        ! OPEN(UNIT=merge_unit,FILE=merge_file, &
-        !      STATUS='REPLACE',ACTION='WRITE')
-
-        ! WRITE(merge_unit,'(A)') &
-        !      'column,layer,ds_m,sice_kgm2,sliq_kgm2,T_C,rho_kgm3,snowdepth_m'
-
-       !  DO ns = 1, nsnow(i,lake_ml)
-
-         !   WRITE(merge_unit,'(A,",",I0,6(",",ES17.9))') &
-        !         'lake',ns, &
-        !         ds_ml(i,lake_ml,ns), &
-        !         sice_ml(i,lake_ml,ns), &
-        !         sliq_ml(i,lake_ml,ns), &
-        !         tsnow_ml(i,lake_ml,ns)-tm, &
-        !         (sice_ml(i,lake_ml,ns)+sliq_ml(i,lake_ml,ns)) / &
-        !         ds_ml(i,lake_ml,ns), &
-        !         snowdepth(i,lake_ml)
-
-        ! END DO
-
-        ! DO ns = 1, nsnow(i,nonlake_ml)
-
-         !   WRITE(merge_unit,'(A,",",I0,6(",",ES17.9))') &
-         !        'nonlake',ns, &
-         !        ds_ml(i,nonlake_ml,ns), &
-         !        sice_ml(i,nonlake_ml,ns), &
-         !        sliq_ml(i,nonlake_ml,ns), &
-         !        tsnow_ml(i,nonlake_ml,ns)-tm, &
-         !        (sice_ml(i,nonlake_ml,ns)+sliq_ml(i,nonlake_ml,ns)) / &
-         !        ds_ml(i,nonlake_ml,ns), &
-         !        snowdepth(i,nonlake_ml)
-
-         !END DO
-
-      !END IF
 
 !-----------------------------------------------------------------------------
 ! The lid has been inserted into the snopack changing sice , sliq, tsnow
@@ -324,9 +287,18 @@ DO k = 1, surft_pts
 ! the merged snowpack.
 !-----------------------------------------------------------------------------
 
-! Calculate merged layer temperature from merged enthalpy
-      tsnow_merge(1:nmerge) = tm + en_merge(1:nmerge) / &
-           (sice_merge(1:nmerge)*hcapi + sliq_merge(1:nmerge)*hcapw)
+! Store gridbox values BEFORE correction for CSV output.
+! en_merge is sensible energy relative to tm (J m-2).
+      sice_before = SUM(sice_merge(1:nmerge))
+      sliq_before = SUM(sliq_merge(1:nmerge))
+      en_before = SUM(en_merge(1:nmerge))
+
+      sice_factor = sice_gridbox_total / sice_before
+
+      sliq_factor = 1.0
+      IF (sliq_before > 0.0) THEN
+         sliq_factor = sliq_gridbox_total / sliq_before
+      END IF
 
 ! Distribute ice imbalance proportionally
       sice_merge(1:nmerge) = sice_merge(1:nmerge) * &
@@ -338,13 +310,44 @@ DO k = 1, surft_pts
               (sliq_gridbox_total/SUM(sliq_merge(1:nmerge)))
       END IF
 
-! Apply uniform temperature adjustment to conserve sensible energy
-      delta_t = (en_gridbox_total - &
-           SUM((sice_merge(1:nmerge)*hcapi + sliq_merge(1:nmerge)*hcapw) * &
-           (tsnow_merge(1:nmerge)-tm))) / &
-           SUM(sice_merge(1:nmerge)*hcapi + sliq_merge(1:nmerge)*hcapw)
+! Calculate merged layer temperature from merged enthalpy
+      tsnow_merge(1:nmerge) = tm + en_merge(1:nmerge) / &
+           (sice_merge(1:nmerge)*hcapi + sliq_merge(1:nmerge)*hcapw)
+      
+      delta_t = en_imbal_ml(i) / &
+           SUM(sice_merge(1:nmerge)*hcapi + &
+           sliq_merge(1:nmerge)*hcapw)
 
+      ! Apply uniform temperature adjustment to conserve sensible energy
+      !delta_t = (en_gridbox_total - &
+      !     SUM((sice_merge(1:nmerge)*hcapi + sliq_merge(1:nmerge)*hcapw) * &
+      !     (tsnow_merge(1:nmerge)-tm))) / &
+      !     SUM(sice_merge(1:nmerge)*hcapi + sliq_merge(1:nmerge)*hcapw)
+
+      
       tsnow_merge(1:nmerge) = tsnow_merge(1:nmerge) + delta_t
+
+! Write one CSV row per merge, including the calculated delta_t.
+!$OMP CRITICAL (merge_csv_write)
+      OPEN(UNIT=merge_unit,FILE=merge_file, &
+           STATUS='UNKNOWN',POSITION='APPEND',ACTION='WRITE')
+
+      INQUIRE(UNIT=merge_unit,SIZE=csv_size)
+      IF (csv_size == 0) THEN
+         WRITE(merge_unit,'(A)') &
+              'timestep_number,sice_gridbox_before_kgm2,' // &
+              'sliq_gridbox_before_kgm2,' // &
+              'sensible_energy_gridbox_before_Jm2,' // &
+              'sice_factor,sliq_factor,delta_t_K'
+      END IF
+
+      WRITE(merge_unit,'(I0,6(",",ES23.15))') timestep_number, &
+           sice_before, sliq_before, en_before, &
+           sice_factor, sliq_factor, delta_t
+
+      CLOSE(merge_unit)
+!$OMP END CRITICAL (merge_csv_write)
+
 
 !-----------------------------------------------------------------------------
 ! Check conservation of ice mass, liquid mass and sensible energy.
@@ -362,30 +365,6 @@ DO k = 1, surft_pts
       WRITE(*,*) 'Liquid mass error (kg m-2) = ', sliq_error
       WRITE(*,*) 'Sensible energy error (J m-2) = ', en_error
 
-!-----------------------------------------------------------------------------
-! Write merged snowpack after applying imbalances.
-!-----------------------------------------------------------------------------
-
-     ! IF (timestep_number == 6134 .AND. k == 1) THEN
-
-      !   DO ns = 1, nmerge
-
-       !     WRITE(merge_unit,'(A,",",I0,6(",",ES17.9))') &
-       !          'merged',ns, &
-       !          ds_merge(ns), &
-       !          sice_merge(ns), &
-       !          sliq_merge(ns), &
-       !          tsnow_merge(ns)-tm, &
-       !          (sice_merge(ns)+sliq_merge(ns))/ds_merge(ns), &
-       !          SUM(ds_merge(1:nmerge))
-
-       !  END DO
-
-       !  CLOSE(merge_unit)
-
-      !END IF
-
-      
       IF (ABS(sice_error) > MAX(0.001,1.0E-6*ABS(sice_gridbox_total)) .OR. &
            ABS(sliq_error) > MAX(0.001,1.0E-6*ABS(sliq_gridbox_total)) .OR. &
            ABS(en_error) > MAX(1000.0,1.0E-6*ABS(en_gridbox_total))) THEN

@@ -349,9 +349,7 @@ DO n = 1,nsurft
 
          END IF
    END IF
-
-   !cum_inflow_m = cum_inflow_m + lake_inflow(i) / rho_water
-
+ 
 !-----------------------------------------------------------------------------
 ! Re-calculate lake state after lake growth
 !-----------------------------------------------------------------------------
@@ -484,7 +482,9 @@ DO n = 1,nsurft
 ! lake water (lake_temp_ml)         | lake water (lake_temp_ml)
 !-----------------------------------------------------------------------------
    IF (exposed_water(i,n) .OR. has_vlid(i,n) .OR. has_lid(i,n)) THEN
-
+   !IF ((exposed_water(i,n) .OR. has_vlid(i,n) .OR. has_lid(i,n)) &
+    !    .AND. lake_depth_ml(i,n) > 0.0) THEN
+      
       IF (exposed_water(i,n)) THEN
          delta_t = lake_temp_ml(i,n) - tstar_surft(i,n)
       ELSE
@@ -514,7 +514,7 @@ DO n = 1,nsurft
 !-----------------------------------------------------------------------------
 ! Change in lake temperature. eqn 15
 !-----------------------------------------------------------------------------
-         
+          
       dTdt = (- flux_upper - flux_lower + sw_absorb) /                  &
            (rho_water * hcapw * lake_depth_ml(i,n))
             

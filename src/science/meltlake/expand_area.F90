@@ -118,18 +118,31 @@ REAL(KIND=real_jlslsm) ::                                                    &
   en_lake,                                                                   &
   en_nonlake
 
+
+!Larger va_b: slower relative increase in lake area with volume.
+!Smaller va_b: faster relative increase in lake area with volume.
+
+!Larger va_a: Deeper lakes for a given area, or smaller areas for a given volume.
+!Smaller va_a: Shallower lakes for a given area, or larger areas for a given volume.
+
 REAL(KIND=real_jlslsm), PARAMETER ::                                         &
-  ! most obs   
-  !a_va         = 0.401,                                                      &
-  !b_va         = 1.018,                                                      &
+  ! test
+!  a_va         = 0.138,                                                      &
+!  b_va         = 2.0,                                                      &
   ! slow
   !a_va         = 5.0e-8,                                                     &
   !b_va         = 2.0,                                                        &
-  a_va         = 1.14e-4,                                                     &
-  b_va         = 1.5,                                                        &
-  ! synthetic
-  ! a_va         = 0.01,                                                     &
-  ! b_va         = 1.20,                                                     &
+! me dummy
+  !a_va         =  1.14e-4,                                                   &
+  !b_va         = 1.5,                                                        &
+     ! 3m at 10% coverage
+  a_va=   0.318, &
+  !a_va         =  0.0953612,                                                   &
+  b_va         = 1.2,                                                        &
+
+  ! danny steep
+   !a_va         = 0.6357412332,                                                &
+!   b_va         = 1.20,                                                        &
   gridbox_area = 3.0814E8
   ! ERA5 0.25 degree gridbox area at AWS18 (m2).
   
@@ -164,15 +177,36 @@ DO k = 1, surft_pts
 ! Calculate current lake volume
 !-----------------------------------------------------------------------------
 
-      lake_volume = lake_depth_ml(i)                                         &
-                  * frac(i,lake_ml)                                          &
-                  * gridbox_area
+      !lake_volume = lake_depth_ml(i)                                         &
+      !            * frac(i,lake_ml)                                          &
+      !            * gridbox_area
 
 !-----------------------------------------------------------------------------
 ! Calculate lake area from V = a A^b
 !-----------------------------------------------------------------------------
 
-      lake_area_ml(i) = (lake_volume / a_va)**(1.0 / b_va)
+      !lake_area_ml(i) = (lake_volume / a_va)**(1.0 / b_va)
+
+      IF (frac(i,lake_ml) > 0.0) THEN
+
+         ! Existing lake
+         lake_volume = lake_depth_ml(i) * frac(i,lake_ml) * gridbox_area
+
+         lake_area_ml(i) = (lake_volume / a_va)**(1.0 / b_va)
+
+      ELSE
+
+         ! New lake after complete freeze-over
+         ! From lake_depth = a_va * lake_area**(b_va - 1)
+         print *, '---------- growing from nothing ----------- ' 
+         lake_area_ml(i) = &
+              (lake_depth_ml(i) / a_va)**(1.0 / (b_va - 1.0))
+
+         lake_volume = lake_depth_ml(i) * lake_area_ml(i)
+
+      END IF
+
+      
 
       new_lake_frac = lake_area_ml(i) / gridbox_area
 
@@ -239,9 +273,8 @@ DO k = 1, surft_pts
          en_lake = en_lake + &
               (sice_ml(i,lake_ml,n) * hcapi + &
               sliq_ml(i,lake_ml,n) * hcapw) * &
-              (tsnow_ml(i,lake_ml,n) - tm) !+ &
-              !lf * sliq_ml(i,lake_ml,n)
-
+              (tsnow_ml(i,lake_ml,n) - tm) 
+             
       END DO
 
       en_nonlake = 0.0
@@ -251,9 +284,8 @@ DO k = 1, surft_pts
          en_nonlake = en_nonlake + &
               (sice_ml(i,nonlake_ml,n) * hcapi + &
               sliq_ml(i,nonlake_ml,n) * hcapw) * &
-              (tsnow_ml(i,nonlake_ml,n) - tm) !+ &
-              !lf * sliq_ml(i,nonlake_ml,n)
-
+              (tsnow_ml(i,nonlake_ml,n) - tm) 
+         
       END DO
 
 !-----------------------------------------------------------------------------

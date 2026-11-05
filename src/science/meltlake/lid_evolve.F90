@@ -531,12 +531,9 @@ END IF ! has_lid or has_vlid Stefan condition
 !-----------------------------------------------------------------------------
 ! Keep this for growing lake area
 !-----------------------------------------------------------------------------
-      lid_ice_meltwater_ml(i) = 0.0
-      lid_ice_meltwater_ml(i) = lid_ice_melt_mass / rho_water
            
-
-!      lid_ice_meltwater_ml(i) = lid_ice_meltwater_ml(i) + &
-!           lid_ice_melt_mass / rho_water
+      lid_ice_meltwater_ml(i) = lid_ice_meltwater_ml(i) + &
+           lid_ice_melt_mass / rho_water
 
    END IF
    
@@ -570,12 +567,10 @@ END IF ! has_lid or has_vlid Stefan condition
          lid_snow_depth_ml(i) = snowmass_lid / rho_snow_const
 
          
-         ! timestep value not cumulinative
-         lid_snowmelt_water_ml(i) = 0.0
+         ! accumulinate snow melt water on lid
          IF (snow_remove > 0.0) THEN
-            !lid_snowmelt_water_ml(i) = lid_snowmelt_water_ml(i)           &
-             !    + snow_remove / rho_water
-            lid_snowmelt_water_ml(i) = snow_remove / rho_water
+            lid_snowmelt_water_ml(i) = lid_snowmelt_water_ml(i)           &
+                 + snow_remove / rho_water
          END IF
             
    END IF
@@ -586,32 +581,19 @@ END IF ! has_lid or has_vlid
 ! Set a flag if lake has fully frozen over. Flag is used later to insert the 
 ! lid ice and snow on lid, into the snowpack. 
 !-----------------------------------------------------------------------------
-   IF (lake_depth_ml(i) <= 1.0e-5 .AND. lid_depth_ml(i) > 0.0) THEN
+!IF (lake_depth_ml(i) <= 1.0e-5 .AND. lid_depth_ml(i) > 0.0) THEN
+
+   IF (lake_depth_ml(i) <= 1.0e-5 .AND. &
+        (lid_depth_ml(i) > 0.0 .OR. vlid_depth_ml(i) > 0.0)) THEN
+      
       lake_depth_ml(i)  = 0.0
       did_insert_lid(i) = .true.
    END IF
 
-
-   if (timestep_number.eq.45624) then
-      PRINT *, 'before final state update'
-      PRINT *, 'lid depth  = ', lid_depth_ml(i)
-      PRINT *, 'vlid depth = ', vlid_depth_ml(i)
-      PRINT *, 'has_lid    = ', has_lid(i)
-      PRINT *, 'has_vlid   = ', has_vlid(i)
-   end if
 !-----------------------------------------------------------------------------
 ! update states now the lid and lake depths have changed
 !-----------------------------------------------------------------------------   
    CALL update_lake_states(i)
-   if (timestep_number.eq.45624) then
-
-      PRINT *, 'after final state update'
-      PRINT *, 'lid depth  = ', lid_depth_ml(i)
-      PRINT *, 'vlid depth = ', vlid_depth_ml(i)
-      PRINT *, 'has_lid    = ', has_lid(i)
-      PRINT *, 'has_vlid   = ', has_vlid(i)
-   end if
-
    
 !-----------------------------------------------------------------------------
 ! Reset inactive temperatures and depths 

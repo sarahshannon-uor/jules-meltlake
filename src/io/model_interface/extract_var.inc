@@ -2763,6 +2763,11 @@ CASE ( 'en_imbal_ml' )
   cube_land = cube_from_array(meltlake_vars%en_imbal_ml)
   cube = map_from_land(cube_land)
 
+CASE ( 'did_insert_lid' )
+  cube_land = cube_from_array( &
+       REAL(MERGE(1, 0, meltlake_vars%did_insert_lid)) )
+  cube = map_from_land(cube_land)
+  
 CASE ( 'rflow' )
   cube_land = cube_from_array(fluxes%rflow_gb)
   cube = map_from_land(cube_land)
