@@ -8,14 +8,39 @@
 
 ! *****************************COPYRIGHT*******************************
 !  SUBROUTINE LID_UPDATE----------------------------------------------
-
 ! Description:
-!     Calling routine for lid_evolve and relayersnow after insertion
-!     of a permanent lake lid into the snowpack.
+!   Update the melt lake frozen lid and manage snowpack changes associated
+!   with lake area evolution and complete lake freeze over.
+!
 ! Method:
-!     Evolve virtual and permanent lake lids.
-!     If a permanent lid is inserted into the snowpack, call relayersnow
-!     to produce a consistent snow layer structure.
+!   Add lateral meltwater inflow to exposed lake water before evolving
+!   the virtual and permanent ice lids using lid_evolve.
+!
+!   Update the lake and nonlake tile fractions using the lake
+!   volume-area relationship in expand_area.
+!
+!   To conserve mass and sensible energy when the lake fraction
+!   changes there are 3 options. 
+!  
+!
+!   1. No imbalance correction correct_imbalance = .FALSE.
+!
+!   2. Immediate correction whenever the lake fraction changes,
+!      followed by relayering of the receiving snowpack
+!      correct_imbalance = .TRUE.,correct_frac_immediately = .TRUE. 
+!
+!   3. Accumulation of mass and sensible energy imbalances during lake
+!      evolution, followed by correction and merging of the lake
+!      and nonlake snowpacks at complete freeze over.
+!      correct_imbalance = .TRUE.,correct_frac_immediately = .FALSE.
+!
+!   When the lake freezes completely, insert the ice lid and
+!   overlying snow into the lake tile snowpack using relayersnow.
+!   Apply the selected imbalance correction method and reset
+!   the lake state, lid properties and tile fractions.
+!   Reset ice lens depth and layer index so that lens positions can be
+!   recalculated on the next timestep
+!
 !
 ! Code Owner: s.r.shannon@reading.ac.uk
 !
@@ -86,7 +111,7 @@ SUBROUTINE lid_update(land_pts,               & !IN
 
 
 USE lid_evolve_mod,          ONLY: lid_evolve
-USE expand_area_mod,         ONLY: expand_area
+USE expand_area_mod,         ONLY: expand_area, correct_snowpack_frac
 USE merge_snowpacks_mod,     ONLY: merge_snowpacks
 USE relayersnow_mod,         ONLY: relayersnow
 
@@ -293,12 +318,47 @@ INTEGER ::                                                                    &
     ! Tile pts loop counter.
   k,                                                                          &
     ! Tile number.
-  ns
+  ns,                                                                         &
+  target
 
 !-----------------------------------------------------------------------------
 ! Local arrays
 !-----------------------------------------------------------------------------
-LOGICAL, PARAMETER :: do_merge_snowpacks = .FALSE.
+
+!-----------------------------------------------------------------------------
+! No mass and energy correction to snowpack when lake frac
+!-----------------------------------------------------------------------------
+LOGICAL, PARAMETER :: correct_imbalance = .TRUE.
+
+!-----------------------------------------------------------------------------
+! Gradually release accumulated mass and energy imbalances
+! using an approach based on CLM subgrid area-change accounting.
+!-----------------------------------------------------------------------------
+LOGICAL, PARAMETER :: gradual_imbal_release = .FALSE.
+
+!-----------------------------------------------------------------------------
+! Apply correction everytime lake frac changes. Output accumulinated imbalances 
+! TRUE = correct every timestep, FALSE = correct merged snowpack at freeze over
+!-----------------------------------------------------------------------------
+LOGICAL, PARAMETER :: correct_frac_immediately = .TRUE.
+
+! Select lake tile for immediate corrections during lake growth.
+! At complete freeze-over, correction goes to nonlake tile.
+LOGICAL, PARAMETER :: correct_lake_tile = .TRUE.
+
+!-----------------------------------------------------------------------------
+! Apply imbalances when lake freezes over. Apply correction to a merged
+! snowpack. The lake adn non lake snowpacks are homogenised
+!-----------------------------------------------------------------------------
+LOGICAL, PARAMETER :: do_merge_snowpacks = &
+     correct_imbalance .AND. .NOT. correct_frac_immediately &
+     .AND. .NOT. gradual_imbal_release
+
+REAL(KIND=real_jlslsm), PARAMETER :: tau_release = &
+     1.0 * 365.25 * 86400.0
+
+REAL(KIND=real_jlslsm) :: release_fraction
+!-----------------------------------------------------------------------------
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -324,7 +384,7 @@ IF (l_elev_land_ice .AND. l_lice_surft(lake_ml) .AND. &
            frac(i,lake_ml) > 0.0) THEN
 
          lake_depth_ml(i,lake_ml) = lake_depth_ml(i,lake_ml) &
-              + frac(i,nonlake_ml) / frac(i,lake_ml)         &
+              + 0.025*frac(i,nonlake_ml) / frac(i,lake_ml)         &
               * lake_inflow(i,nonlake_ml) / rho_water
 
       END IF
@@ -370,6 +430,8 @@ IF (l_elev_land_ice .AND. l_lice_surft(lake_ml) .AND. &
 ! and nonlake frac
 !-----------------------------------------------------------------------------
 
+   frac_lake_old(:) = frac(:,lake_ml)
+
    CALL expand_area(                       &
         land_pts,                          &
         nsurft,                            &
@@ -379,16 +441,22 @@ IF (l_elev_land_ice .AND. l_lice_surft(lake_ml) .AND. &
         sice_ml,                           &
         sliq_ml,                           &
         tsnow_ml,                          &
-        exposed_water(:,lake_ml),         &
+        ds_ml,                             &
+        snowdepth,                         &
+        snow_surft,                        &
+        rho_snow_ml,                       &
+        rho_snow_grnd,                     &
+        exposed_water(:,lake_ml),          &
         frac,                              &
         lake_depth_ml(:,lake_ml),          &
         lake_area_ml(:,lake_ml),           &
         sice_imbal_ml,                     &
         sliq_imbal_ml,                     &
-        en_imbal_ml)
+        en_imbal_ml,                       &
+        correct_imbalance,                 &
+        correct_frac_immediately,          &
+        correct_lake_tile)
    
-
-
 
 IF (ANY(did_insert_lid(surft_index(1:surft_pts(lake_ml),lake_ml),lake_ml))) THEN
 
@@ -410,6 +478,7 @@ IF (ANY(did_insert_lid(surft_index(1:surft_pts(lake_ml),lake_ml),lake_ml))) THEN
       IF (did_insert_lid(i,lake_ml)) THEN
 
          !sice0(i)   = rho_ice * lid_depth_ml(i,lake_ml)
+         ! this will insert vlid as well
          sice0(i) = rho_ice * &
               (lid_depth_ml(i,lake_ml) + vlid_depth_ml(i,lake_ml))
          
@@ -445,8 +514,8 @@ IF (ANY(did_insert_lid(surft_index(1:surft_pts(lake_ml),lake_ml),lake_ml))) THEN
         rho_snow_grnd(:,lake_ml),                         &
         sliq_ml(:,lake_ml,:),                             &
         tsnow_ml(:,lake_ml,:),                            &
-        sice_wtrac,                          &
-        sliq_wtrac,                          &
+        sice_wtrac,                                       &
+        sliq_wtrac,                                       &
         rho_snow_ml(:,lake_ml,:),                         &
         snowdepth(:,lake_ml) )
 
@@ -643,6 +712,16 @@ IF (ANY(did_insert_lid(surft_index(1:surft_pts(lake_ml),lake_ml),lake_ml))) THEN
 
          snow_on_lid(i,lake_ml)       = .FALSE.
 
+         ! Correct the fraction change after lid insertion, before fraction reset.
+         IF (correct_imbalance .AND. correct_frac_immediately .AND. &
+                 frac(i,lake_ml) > 0.0) THEN
+            
+            CALL correct_snowpack_frac(i, land_pts, nsurft, nsnow,         &
+                 sice_ml, sliq_ml, tsnow_ml, ds_ml, snowdepth, snow_surft, &
+                 rho_snow_ml, rho_snow_grnd, frac(i,lake_ml), 0.0,        &
+                 correct_lake_tile)
+         END IF
+
          frac(i,lake_ml)              = 0.0
          frac(i,nonlake_ml)           = 1.0
 
@@ -665,6 +744,92 @@ IF (ANY(did_insert_lid(surft_index(1:surft_pts(lake_ml),lake_ml),lake_ml))) THEN
    END DO
 
 END IF ! ANY(did_insert_lid)
+
+!-----------------------------------------------------------------------------
+! Relayer the snowpack receiving the immediate fraction correction.
+! With lake-tile correction, the lake tile is adjusted during expansion,
+! while the nonlake tile is adjusted at complete freeze-over.
+!-----------------------------------------------------------------------------
+! The deferred option already relayers the merged snowpack above.
+
+IF (correct_imbalance .AND. correct_frac_immediately) THEN
+
+   DO target = lake_ml, nonlake_ml
+
+      IF (target == lake_ml) THEN
+
+         ! During growth, the lake tile receives the correction.
+         IF (.NOT. correct_lake_tile) CYCLE
+         IF (.NOT. ANY(frac(:,lake_ml) > 0.0 .AND. &
+                      frac(:,lake_ml) /= frac_lake_old(:))) CYCLE
+
+      ELSE
+
+         IF (correct_lake_tile) THEN
+            ! During complete freeze-over, nonlake receives the correction.
+            IF (.NOT. ANY(did_insert_lid(:,lake_ml) .AND. &
+                         frac_lake_old(:) > 0.0 .AND. &
+                         frac(:,lake_ml) == 0.0)) CYCLE
+         ELSE
+            ! Original behaviour: always correct the nonlake tile.
+            IF (.NOT. ANY(frac(:,lake_ml) /= frac_lake_old(:))) CYCLE
+         END IF
+
+      END IF
+
+      snowfall(:)      = 0.0
+      sice0(:)         = 0.0
+      rho0(:)          = rho_snow_const
+      tsnow0(:)        = tm
+      rgrain0(:)       = r0
+      sice0_wtrac(:,:) = 0.0
+
+      CALL relayersnow(                                      &
+           land_pts,                                         &
+           surft_pts(target),                                &
+           n_wtrac_jls,                                      &
+           surft_index(:,target),                            &
+           nsmax_ml,                                         &
+           dzsnow_ml,                                        &
+           rgrain0,                                          &
+           rho0,                                             &
+           sice0,                                            &
+           snowfall,                                         &
+           snow_surft(:,target),                             &
+           tsnow0,                                           &
+           sice0_wtrac,                                      &
+           nsnow(:,target),                                  &
+           ds_ml(:,target,:),                                &
+           rgrain(:,target),                                 &
+           rgrainl_ml(:,target,:),                           &
+           sice_ml(:,target,:),                              &
+           rho_snow_grnd(:,target),                          &
+           sliq_ml(:,target,:),                              &
+           tsnow_ml(:,target,:),                             &
+           sice_wtrac,                                       &
+           sliq_wtrac,                                       &
+           rho_snow_ml(:,target,:),                          &
+           snowdepth(:,target) )
+
+   END DO
+
+END IF
+
+
+IF (gradual_imbal_release) THEN
+
+   release_fraction = 1.0 - EXP(-timestep / tau_release)
+
+   DO i = 1, land_pts
+
+      sice_imbal_ml(i) = sice_imbal_ml(i) * (1.0 - release_fraction)
+      sliq_imbal_ml(i) = sliq_imbal_ml(i) * (1.0 - release_fraction)
+      en_imbal_ml(i)   = en_imbal_ml(i)   * (1.0 - release_fraction)
+
+   END DO
+
+END IF
+
 
 END IF ! elevated lake ice tile
 
