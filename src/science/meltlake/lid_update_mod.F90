@@ -325,6 +325,8 @@ INTEGER ::                                                                    &
 ! Local arrays
 !-----------------------------------------------------------------------------
 
+LOGICAL, PARAMETER :: immediate_merge = .TRUE.
+
 !-----------------------------------------------------------------------------
 ! No mass and energy correction to snowpack when lake frac
 !-----------------------------------------------------------------------------
@@ -455,7 +457,8 @@ IF (l_elev_land_ice .AND. l_lice_surft(lake_ml) .AND. &
         en_imbal_ml,                       &
         correct_imbalance,                 &
         correct_frac_immediately,          &
-        correct_lake_tile)
+        correct_lake_tile,                 &
+        immediate_merge)
    
 
 IF (ANY(did_insert_lid(surft_index(1:surft_pts(lake_ml),lake_ml),lake_ml))) THEN
@@ -719,7 +722,7 @@ IF (ANY(did_insert_lid(surft_index(1:surft_pts(lake_ml),lake_ml),lake_ml))) THEN
             CALL correct_snowpack_frac(i, land_pts, nsurft, nsnow,         &
                  sice_ml, sliq_ml, tsnow_ml, ds_ml, snowdepth, snow_surft, &
                  rho_snow_ml, rho_snow_grnd, frac(i,lake_ml), 0.0,        &
-                 correct_lake_tile)
+                 correct_lake_tile, immediate_merge) 
          END IF
 
          frac(i,lake_ml)              = 0.0
