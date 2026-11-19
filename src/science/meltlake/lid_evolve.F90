@@ -494,6 +494,12 @@ END IF ! has_lid or has_vlid Stefan condition
 !-----------------------------------------------------------------------------
    IF ((has_lid(i) .OR. has_vlid(i)) .AND. .NOT. snow_on_lid(i)) THEN
 
+
+   ! to disable the surface melting of lid
+    !  IF (.FALSE. .AND. (has_lid(i) .OR. has_vlid(i)) .AND. &
+     !      .NOT. snow_on_lid(i)) THEN
+   ! to disable melting
+         
       lid_ice_melt_mass = MAX(lid_ice_melt_flux_ml(i), 0.0) * timestep
 
       IF (has_lid(i)) THEN
@@ -576,7 +582,7 @@ END IF ! has_lid or has_vlid Stefan condition
    END IF
       
 END IF ! has_lid or has_vlid 
-      
+
 !-----------------------------------------------------------------------------
 ! Set a flag if lake has fully frozen over. Flag is used later to insert the 
 ! lid ice and snow on lid, into the snowpack. 

@@ -187,6 +187,11 @@ ELSE
 
   l_ideal_forcing=.FALSE.
 
+  !forcing%con_rain_ij(:,:) = 0.0
+  !forcing%ls_rain_ij(:,:)  = 0.0
+  !forcing%con_snow_ij(:,:) = 0.0
+  !forcing%ls_snow_ij(:,:)  = 0.0
+   
         
   IF (l_ideal_forcing) THEN
 

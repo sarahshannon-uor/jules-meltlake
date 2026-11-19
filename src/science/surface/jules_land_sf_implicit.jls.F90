@@ -680,8 +680,14 @@ IF (l_flake_model .AND. .NOT. l_aggregate .AND. (n == lake)) THEN
     meltlake_vars%has_vlid(:,n),meltlake_vars%has_lid(:,n),                    &
     meltlake_vars%exposed_water(:,n), meltlake_vars%snow_on_lid(:,n),          &
     meltlake_vars%lid_ice_melt_flux_ml(:,n))
-  
-  END IF
+
+  ! sarah check mass conservation by deactivate evap/sublim
+ ! IF (n == 9 .OR. n == 10) THEN
+ !    ei_surft(:,n) = 0.0
+ !    fqw_surft(:,n) = 0.0
+ ! END IF
+
+END IF
 
   !-----------------------------------------------------------------------
   !  Increment snow by sublimation and melt

@@ -2820,6 +2820,12 @@ DO n = 1,nsurft
    exposed_water(:,n)                                                          &
    )
 
+! sarah check mass conservation by deactivate evap/sublim
+!IF (n == 9 .OR. n == 10) THEN
+!  fqw_surft(:,n) = 0.0
+!END IF
+! end sarah
+  
   ! update gridbox means and diagnostics
 !$OMP PARALLEL DO IF(surft_pts(n) > 1) DEFAULT(NONE) PRIVATE(i, j, k, l)       &
 !$OMP SHARED(n, surft_pts, surft_index, land_index, t_i_length,                &

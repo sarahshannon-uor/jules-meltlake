@@ -426,7 +426,15 @@ END DO
 !$OMP DO SCHEDULE(STATIC)
 DO k = 1,surft_pts
   i = surft_index(k)
-  
+
+  !---------------------------------------------------------------------------
+  ! Reset lake_inflow each timestep to prevent stale values when
+  ! snowdepth < dzsnow(1), nsnow = 0, and percolate_monarchs is skipped.
+  !---------------------------------------------------------------------------
+  IF (l_meltlake .AND. l_elev_land_ice .AND. l_lice_point(i)) THEN
+    lake_inflow(i) = 0.0
+  END IF
+
   IF (l_elev_land_ice .AND. l_lice_point(i)) THEN
     tsoilw  = tsurf_elev_surft(i)
     dzsoilw = dzsoil_elev

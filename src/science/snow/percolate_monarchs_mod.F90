@@ -255,8 +255,30 @@ win_in = win
 z_top   = 0.0
 
 IF (has_lake(i)) THEN
-   win = 0
-   !print *, 'lake present bypass percolate_monarchs'
+
+   ! Diagnose the shallowest ice lens beneath the lake without
+   ! redistributing snowpack liquid water.
+   ice_lens_index(i) = -1.0
+   ice_lens_depth(i) = -1.0
+   z_top = 0.0
+
+   DO n = 1, nsnow
+      z_bot = z_top + ds(i,n)
+
+      IF (ds(i,n) > EPSILON(0.0)) THEN
+         lens_found = (sice(i,n) >= rho_firn_pore_closure * ds(i,n))
+
+         IF (lens_found) THEN
+            ice_lens_index(i) = REAL(n, KIND=real_jlslsm)
+            ice_lens_depth(i) = z_top + 0.5 * ds(i,n)
+            EXIT
+         END IF
+      END IF
+
+      z_top = z_bot
+   END DO
+
+   win = 0.0
    RETURN
 END IF
 
